@@ -1,284 +1,381 @@
-from flask_sqlalchemy import SQLAlchemy
+# /src/models/models.py
+# REVISADO PARA FASTAPI (SQLAlchemy Puro)
+
+from sqlalchemy import (
+    Column, Integer, String, DateTime, Boolean, Numeric, Text, BigInteger, Date,
+    ForeignKey, UniqueConstraint, JSON # <-- ADICIONE JSON AQUI
+)
+from sqlalchemy.orm import relationship
 from datetime import datetime
 import bcrypt
 
-db = SQLAlchemy()
+# Importa o Base do nosso novo arquivo database.py
+from src.database import Base
 
-class User(db.Model):
-    __tablename__ = 'users'
+# ============================================
+# TABELAS PRINCIPAIS (ORGANIZAÇÕES, USUÁRIOS, EMPRESAS)
+# ============================================
+
+class Organizacao(Base):
+    __tablename__ = 'TB_ORGANIZACOES'
     
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(50), nullable=False, default='user')
-    # --- NOVOS CAMPOS ---
-    full_name = db.Column(db.String(255), nullable=True)
-    phone_number = db.Column(db.String(20), nullable=True)
-    is_active = db.Column(db.Boolean, default=True)
-    # ---
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, primary_key=True)
+    no_organizacao = Column('NO_ORGANIZACAO', String(200), nullable=False)
+    nr_cnpj = Column('NR_CNPJ', String(18), unique=True)
+    ds_email_contato = Column('DS_EMAIL_CONTATO', String(150))
+    nr_telefone_contato = Column('NR_TELEFONE_CONTATO', String(20))
+    st_assinatura = Column('ST_ASSINATURA', String(20), default='ativo')
+    tp_plano = Column('TP_PLANO', String(50)) 
+    qt_limite_usuarios = Column('QT_LIMITE_USUARIOS', Integer)
+    qt_limite_empresas = Column('QT_LIMITE_EMPRESAS', Integer)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    user_companies = db.relationship('UserCompany', back_populates='user', cascade='all, delete-orphan')
-    orders = db.relationship('Order', back_populates='user')
+    # Relacionamentos
+    usuarios = relationship('Usuario', back_populates='organizacao', cascade='all, delete-orphan')
+    empresas = relationship('Empresa', back_populates='organizacao', cascade='all, delete-orphan')
+    clientes = relationship('Cliente', back_populates='organizacao', cascade='all, delete-orphan')
+    categorias_produto = relationship('CategoriaProduto', back_populates='organizacao', cascade='all, delete-orphan')
+    formas_pagamento = relationship('FormaPagamento', back_populates='organizacao', cascade='all, delete-orphan')
+    regras_comissao = relationship('RegraComissao', back_populates='organizacao', cascade='all, delete-orphan')
+    logs_auditoria = relationship('LogAuditoria', back_populates='organizacao', cascade='all, delete-orphan')
+
+class Usuario(Base):
+    __tablename__ = 'TB_USUARIOS'
+    
+    id_usuario = Column('ID_USUARIO', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=True)
+    ds_email = Column('DS_EMAIL', String(150), unique=True, nullable=False)
+    ds_senha_hash = Column('DS_SENHA_HASH', String(255), nullable=False)
+    tp_usuario = Column('TP_USUARIO', String(20), nullable=False, default='vendedor')
+    no_completo = Column('NO_COMPLETO', String(200))
+    nr_telefone = Column('NR_TELEFONE', String(20))
+    fl_ativo = Column('FL_ATIVO', Boolean, default=True)
+    id_usuario_criador = Column('ID_USUARIO_CRIADOR', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO'))
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    dt_ultimo_acesso = Column('DT_ULTIMO_ACESSO', DateTime)
+    
+    organizacao = relationship('Organizacao', back_populates='usuarios')
+    criador = relationship('Usuario', remote_side=[id_usuario], backref='usuarios_criados')
+    empresas_vinculadas = relationship('UsuarioEmpresa', back_populates='usuario', cascade='all, delete-orphan')
+    pedidos = relationship('Pedido', back_populates='vendedor', foreign_keys='Pedido.id_usuario')
+    comissoes_pedido = relationship('ComissaoPedido', back_populates='vendedor', foreign_keys='ComissaoPedido.id_usuario')
+    historico_precos = relationship('HistoricoPreco', back_populates='usuario_alteracao', foreign_keys='HistoricoPreco.id_usuario_alteracao')
+    logs_auditoria = relationship('LogAuditoria', back_populates='usuario', foreign_keys='LogAuditoria.id_usuario')
+    regras_comissao = relationship('RegraComissao', back_populates='usuario', foreign_keys='RegraComissao.id_usuario')
 
     def set_password(self, password):
-        self.password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+        self.ds_senha_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
     
     def check_password(self, password):
-        return bcrypt.checkpw(password.encode('utf-8'), self.password_hash.encode('utf-8'))
+        if not self.ds_senha_hash:
+            return False
+        return bcrypt.checkpw(password.encode('utf-8'), self.ds_senha_hash.encode('utf-8'))
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'email': self.email,
-            'role': self.role,
-            'full_name': self.full_name,
-            'phone_number': self.phone_number,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
-        }
-
-class Company(db.Model):
-    __tablename__ = 'companies'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), nullable=False)
-    cnpj = db.Column(db.String(14), nullable=False, unique=True)
-    state_registration = db.Column(db.String(20))
-    contact_email = db.Column(db.String(255))
-    contact_phone = db.Column(db.String(20))
-    website = db.Column(db.String(255))
-    deleted_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    user_companies = db.relationship('UserCompany', back_populates='company', cascade='all, delete-orphan')
-    products = db.relationship('Product', back_populates='company')
-    orders = db.relationship('Order', back_populates='company')
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'cnpj': self.cnpj,
-            'state_registration': self.state_registration,
-            'contact_email': self.contact_email,
-            'contact_phone': self.contact_phone,
-            'website': self.website,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
-        }
-
-class UserCompany(db.Model):
-    __tablename__ = 'user_companies'
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), primary_key=True)
+class Empresa(Base):
+    __tablename__ = 'TB_EMPRESAS'
     
-    user = db.relationship('User', back_populates='user_companies')
-    company = db.relationship('Company', back_populates='user_companies')
-
-class Client(db.Model):
-    __tablename__ = 'clients'
+    id_empresa = Column('ID_EMPRESA', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=False)
+    no_empresa = Column('NO_EMPRESA', String(200), nullable=False)
+    nr_cnpj = Column('NR_CNPJ', String(18), nullable=False)
+    nr_inscricao_estadual = Column('NR_INSCRICAO_ESTADUAL', String(50))
+    ds_email_contato = Column('DS_EMAIL_CONTATO', String(150))
+    nr_telefone_contato = Column('NR_TELEFONE_CONTATO', String(20))
+    ds_site = Column('DS_SITE', String(200))
+    pc_comissao_padrao = Column('PC_COMISSAO_PADRAO', Numeric(5,2), default=0.00)
+    fl_ativa = Column('FL_ATIVA', Boolean, default=True)
+    dt_exclusao = Column('DT_EXCLUSAO', DateTime)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    id = db.Column(db.Integer, primary_key=True)
-    cnpj = db.Column(db.String(18), unique=True, nullable=False)
-    razao_social = db.Column(db.String(255), nullable=False)
-    nome_fantasia = db.Column(db.String(255))
-    # --- NOVOS CAMPOS ---
-    state_registration = db.Column(db.String(20), nullable=True)
-    email = db.Column(db.String(120), nullable=True)
-    phone = db.Column(db.String(20), nullable=True)
-    notes = db.Column(db.Text, nullable=True)
-    deleted_at = db.Column(db.DateTime, nullable=True)
-    # ---
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    __table_args__ = (UniqueConstraint('ID_ORGANIZACAO', 'NR_CNPJ', name='UK_EMPRESAS_CNPJ_ORG'),)
     
-    orders = db.relationship('Order', back_populates='client')
-    # --- NOVOS RELACIONAMENTOS ---
-    addresses = db.relationship('Address', back_populates='client', cascade='all, delete-orphan')
-    contacts = db.relationship('Contact', back_populates='client', cascade='all, delete-orphan')
+    organizacao = relationship('Organizacao', back_populates='empresas')
+    usuarios_vinculados = relationship('UsuarioEmpresa', back_populates='empresa', cascade='all, delete-orphan')
+    produtos = relationship('Produto', back_populates='empresa', cascade='all, delete-orphan')
+    regras_comissao = relationship('RegraComissao', back_populates='empresa', cascade='all, delete-orphan')
+    pedidos = relationship('Pedido', back_populates='empresa', cascade='all, delete-orphan')
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'cnpj': self.cnpj,
-            'razao_social': self.razao_social,
-            'nome_fantasia': self.nome_fantasia,
-            'state_registration': self.state_registration,
-            'email': self.email,
-            'phone': self.phone,
-            'notes': self.notes,
-            'addresses': [address.to_dict() for address in self.addresses],
-            'contacts': [contact.to_dict() for contact in self.contacts]
-        }
-
-# --- NOVOS MODELOS ---
-class Address(db.Model):
-    __tablename__ = 'addresses'
-    id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False)
-    type = db.Column(db.String(50), nullable=False) # 'Comercial', 'Entrega', 'Faturamento'
-    street = db.Column(db.String(255), nullable=False)
-    number = db.Column(db.String(20))
-    complement = db.Column(db.String(100))
-    neighborhood = db.Column(db.String(100))
-    city = db.Column(db.String(100), nullable=False)
-    state = db.Column(db.String(2), nullable=False)
-    zip_code = db.Column(db.String(9), nullable=False)
-    is_primary = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    client = db.relationship('Client', back_populates='addresses')
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'type': self.type,
-            'street': self.street,
-            'number': self.number,
-            'complement': self.complement,
-            'neighborhood': self.neighborhood,
-            'city': self.city,
-            'state': self.state,
-            'zip_code': self.zip_code,
-            'is_primary': self.is_primary
-        }
-
-class Contact(db.Model):
-    __tablename__ = 'contacts'
-    id = db.Column(db.Integer, primary_key=True)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False)
-    name = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(100)) # Ex: 'Comprador'
-    email = db.Column(db.String(120))
-    phone = db.Column(db.String(20))
-    is_primary = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    client = db.relationship('Client', back_populates='contacts')
-
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'name': self.name,
-            'role': self.role,
-            'email': self.email,
-            'phone': self.phone,
-            'is_primary': self.is_primary
-        }
-# --- FIM DOS NOVOS MODELOS ---
-
-
-class PaymentMethod(db.Model):
-    # ... (sem alterações)
-    __tablename__ = 'payment_methods'    
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), unique=True, nullable=False)
-    is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-    orders = db.relationship('Order', back_populates='payment_method')
-
-    def to_dict(self):
-        return {
-            'id': self.id, 'name': self.name, 'is_active': self.is_active
-        }
-
-class Product(db.Model):
-    __tablename__ = 'products'
-    id = db.Column(db.Integer, primary_key=True)
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
-    code = db.Column(db.String(50), nullable=False)
-    description = db.Column(db.Text, nullable=False)
-    value = db.Column(db.Numeric(10, 2), nullable=False)
-    sizes = db.Column(db.JSON)
-    deleted_at = db.Column(db.DateTime, nullable=True) # <-- Garante que está aqui
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class UsuarioEmpresa(Base):
+    __tablename__ = 'TB_USUARIO_EMPRESAS'
+    id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO', ondelete='CASCADE'), primary_key=True)
+    id_empresa = Column('ID_EMPRESA', Integer, ForeignKey('TB_EMPRESAS.ID_EMPRESA', ondelete='CASCADE'), primary_key=True)
+    dt_vinculo = Column('DT_VINCULO', DateTime, default=datetime.utcnow)
     
-    company = db.relationship('Company', back_populates='products')
-    order_items = db.relationship('OrderItem', back_populates='product')
-    
-    __table_args__ = (db.UniqueConstraint('company_id', 'code', name='_company_code_uc'),)
+    usuario = relationship('Usuario', back_populates='empresas_vinculadas')
+    empresa = relationship('Empresa', back_populates='usuarios_vinculados')
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'company_id': self.company_id,
-            'code': self.code,
-            'description': self.description,
-            'value': float(self.value) if self.value is not None else 0,
-            'sizes': self.sizes,
-        }
+# ============================================
+# CLIENTES
+# ============================================
 
-class Order(db.Model):
-    __tablename__ = 'orders'
+class Cliente(Base):
+    __tablename__ = 'TB_CLIENTES'
     
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    company_id = db.Column(db.Integer, db.ForeignKey('companies.id'), nullable=False)
-    client_id = db.Column(db.Integer, db.ForeignKey('clients.id'), nullable=False)
-    # --- NOVOS CAMPOS ---
-    shipping_address_id = db.Column(db.Integer, db.ForeignKey('addresses.id'), nullable=True)
-    billing_address_id = db.Column(db.Integer, db.ForeignKey('addresses.id'), nullable=True)
-    observations = db.Column(db.Text, nullable=True)
-    # ---
-    payment_method_id = db.Column(db.Integer, db.ForeignKey('payment_methods.id'))
-    discount_percentage = db.Column(db.Numeric(5, 2), default=0.00)
-    total_value = db.Column(db.Numeric(10, 2), nullable=False)
-    status = db.Column(db.String(50), nullable=False, default='Pendente')
-    order_date = db.Column(db.DateTime, default=datetime.utcnow)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id_cliente = Column('ID_CLIENTE', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=False)
+    nr_cnpj = Column('NR_CNPJ', String(18), nullable=False)
+    no_razao_social = Column('NO_RAZAO_SOCIAL', String(200), nullable=False)
+    no_fantasia = Column('NO_FANTASIA', String(200))
+    nr_inscricao_estadual = Column('NR_INSCRICAO_ESTADUAL', String(50))
+    ds_email = Column('DS_EMAIL', String(150))
+    nr_telefone = Column('NR_TELEFONE', String(20))
+    ds_observacoes = Column('DS_OBSERVACOES', Text)
+    fl_ativo = Column('FL_ATIVO', Boolean, default=True)
+    dt_exclusao = Column('DT_EXCLUSAO', DateTime)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    user = db.relationship('User', back_populates='orders')
-    company = db.relationship('Company', back_populates='orders')
-    client = db.relationship('Client', back_populates='orders')
-    payment_method = db.relationship('PaymentMethod', back_populates='orders')
-    order_items = db.relationship('OrderItem', back_populates='order', cascade='all, delete-orphan')
-    # --- NOVOS RELACIONAMENTOS ---
-    shipping_address = db.relationship('Address', foreign_keys=[shipping_address_id])
-    billing_address = db.relationship('Address', foreign_keys=[billing_address_id])
+    __table_args__ = (UniqueConstraint('ID_ORGANIZACAO', 'NR_CNPJ', name='UK_CLIENTES_CNPJ_ORG'),)
+    
+    organizacao = relationship('Organizacao', back_populates='clientes')
+    enderecos = relationship('Endereco', back_populates='cliente', cascade='all, delete-orphan')
+    contatos = relationship('Contato', back_populates='cliente', cascade='all, delete-orphan')
+    pedidos = relationship('Pedido', back_populates='cliente', cascade='all, delete-orphan')
 
-    def to_dict(self):
-        return {
-            'id': self.id,
-            'user_id': self.user_id,
-            'company_id': self.company_id,
-            'client_id': self.client_id,
-            'shipping_address_id': self.shipping_address_id,
-            'billing_address_id': self.billing_address_id,
-            'observations': self.observations,
-            'payment_method_id': self.payment_method_id,
-            'discount_percentage': float(self.discount_percentage),
-            'total_value': float(self.total_value),
-            'status': self.status,
-            'order_date': self.order_date.isoformat(),
-            'client': self.client.to_dict() if self.client else None,
-            'items': [item.to_dict() for item in self.order_items]
-        }
+class Endereco(Base):
+    __tablename__ = 'TB_ENDERECOS'
+    
+    id_endereco = Column('ID_ENDERECO', Integer, primary_key=True)
+    id_cliente = Column('ID_CLIENTE', Integer, ForeignKey('TB_CLIENTES.ID_CLIENTE', ondelete='CASCADE'), nullable=False)
+    tp_endereco = Column('TP_ENDERECO', String(20), nullable=False)
+    ds_logradouro = Column('DS_LOGRADOURO', String(200), nullable=False)
+    nr_endereco = Column('NR_ENDERECO', String(20))
+    ds_complemento = Column('DS_COMPLEMENTO', String(100))
+    no_bairro = Column('NO_BAIRRO', String(100))
+    no_cidade = Column('NO_CIDADE', String(100), nullable=False)
+    sg_estado = Column('SG_ESTADO', String(2), nullable=False)
+    nr_cep = Column('NR_CEP', String(10), nullable=False)
+    fl_principal = Column('FL_PRINCIPAL', Boolean, default=False)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    cliente = relationship('Cliente', back_populates='enderecos')
 
-class OrderItem(db.Model):
-    # ... (sem alterações)
-    __tablename__ = 'order_items'
-    id = db.Column(db.Integer, primary_key=True)
-    order_id = db.Column(db.Integer, db.ForeignKey('orders.id'), nullable=False)
-    product_id = db.Column(db.Integer, db.ForeignKey('products.id'), nullable=False)
-    quantity = db.Column(db.JSON, nullable=False)
-    unit_value = db.Column(db.Numeric(10, 2), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+class Contato(Base):
+    __tablename__ = 'TB_CONTATOS'
     
-    order = db.relationship('Order', back_populates='order_items')
-    product = db.relationship('Product', back_populates='order_items')
+    id_contato = Column('ID_CONTATO', Integer, primary_key=True)
+    id_cliente = Column('ID_CLIENTE', Integer, ForeignKey('TB_CLIENTES.ID_CLIENTE', ondelete='CASCADE'), nullable=False)
+    no_contato = Column('NO_CONTATO', String(200), nullable=False)
+    ds_cargo = Column('DS_CARGO', String(100))
+    ds_email = Column('DS_EMAIL', String(150))
+    nr_telefone = Column('NR_TELEFONE', String(20))
+    fl_principal = Column('FL_PRINCIPAL', Boolean, default=False)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
-    def to_dict(self):
-         return {
-            'id': self.id,
-            'product_code': self.product.code,
-            'product_description': self.product.description,
-            'quantity': self.quantity,
-            'unit_value': float(self.unit_value)
-        }
+    cliente = relationship('Cliente', back_populates='contatos')
+
+# ============================================
+# PRODUTOS E CATÁLOGO
+# ============================================
+
+class CategoriaProduto(Base):
+    __tablename__ = 'TB_CATEGORIAS_PRODUTOS'
+    
+    id_categoria = Column('ID_CATEGORIA', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=False)
+    no_categoria = Column('NO_CATEGORIA', String(100), nullable=False)
+    id_categoria_pai = Column('ID_CATEGORIA_PAI', Integer, ForeignKey('TB_CATEGORIAS_PRODUTOS.ID_CATEGORIA'))
+    ds_categoria = Column('DS_CATEGORIA', Text)
+    fl_ativa = Column('FL_ATIVA', Boolean, default=True)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (UniqueConstraint('ID_ORGANIZACAO', 'NO_CATEGORIA', 'ID_CATEGORIA_PAI', name='UK_CATEGORIAS_NOME_ORG'),)
+    
+    organizacao = relationship('Organizacao', back_populates='categorias_produto')
+    produtos = relationship('Produto', back_populates='categoria')
+    parent = relationship('CategoriaProduto', remote_side=[id_categoria], backref='children')
+
+class Produto(Base):
+    __tablename__ = 'TB_PRODUTOS'
+    
+    id_produto = Column('ID_PRODUTO', Integer, primary_key=True)
+    id_empresa = Column('ID_EMPRESA', Integer, ForeignKey('TB_EMPRESAS.ID_EMPRESA', ondelete='CASCADE'), nullable=False)
+    id_categoria = Column('ID_CATEGORIA', Integer, ForeignKey('TB_CATEGORIAS_PRODUTOS.ID_CATEGORIA'))
+    cd_produto = Column('CD_PRODUTO', String(50), nullable=False)
+    ds_produto = Column('DS_PRODUTO', Text, nullable=False)
+    vl_base = Column('VL_BASE', Numeric(15,2), nullable=False)
+    sg_unidade_medida = Column('SG_UNIDADE_MEDIDA', String(10))
+    fl_ativo = Column('FL_ATIVO', Boolean, default=True)
+    dt_exclusao = Column('DT_EXCLUSAO', DateTime)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (UniqueConstraint('ID_EMPRESA', 'CD_PRODUTO', name='UK_PRODUTOS_CODIGO_EMPRESA'),)
+    
+    empresa = relationship('Empresa', back_populates='produtos')
+    categoria = relationship('CategoriaProduto', back_populates='produtos')
+    variacoes = relationship('VariacaoProduto', back_populates='produto', cascade='all, delete-orphan')
+    historico_precos = relationship('HistoricoPreco', back_populates='produto', cascade='all, delete-orphan')
+    itens_pedido = relationship('ItemPedido', back_populates='produto')
+
+class VariacaoProduto(Base):
+    __tablename__ = 'TB_VARIACOES_PRODUTOS'
+    
+    id_variacao = Column('ID_VARIACAO', Integer, primary_key=True)
+    id_produto = Column('ID_PRODUTO', Integer, ForeignKey('TB_PRODUTOS.ID_PRODUTO', ondelete='CASCADE'), nullable=False)
+    ds_tamanho = Column('DS_TAMANHO', String(20))
+    ds_cor = Column('DS_COR', String(50))
+    cd_sku = Column('CD_SKU', String(100), unique=True)
+    vl_ajuste_preco = Column('VL_AJUSTE_PRECO', Numeric(15,2), default=0.00)
+    qt_estoque = Column('QT_ESTOQUE', Integer, default=0)
+    fl_ativa = Column('FL_ATIVA', Boolean, default=True)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    
+    produto = relationship('Produto', back_populates='variacoes')
+    itens_pedido = relationship('ItemPedido', back_populates='variacao')
+
+class HistoricoPreco(Base):
+    __tablename__ = 'TB_HISTORICO_PRECOS'
+    
+    id_historico = Column('ID_HISTORICO', Integer, primary_key=True)
+    id_produto = Column('ID_PRODUTO', Integer, ForeignKey('TB_PRODUTOS.ID_PRODUTO', ondelete='CASCADE'), nullable=False)
+    vl_anterior = Column('VL_ANTERIOR', Numeric(15,2), nullable=False)
+    vl_novo = Column('VL_NOVO', Numeric(15,2), nullable=False)
+    ds_motivo_alteracao = Column('DS_MOTIVO_ALTERACAO', String(200))
+    id_usuario_alteracao = Column('ID_USUARIO_ALTERACAO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO'))
+    dt_alteracao = Column('DT_ALTERACAO', DateTime, default=datetime.utcnow)
+    
+    produto = relationship('Produto', back_populates='historico_precos')
+    usuario_alteracao = relationship('Usuario', back_populates='historico_precos', foreign_keys=[id_usuario_alteracao])
+
+# ============================================
+# PAGAMENTOS E COMISSÕES
+# ============================================
+
+class FormaPagamento(Base):
+    __tablename__ = 'TB_FORMAS_PAGAMENTO'
+    
+    id_forma_pagamento = Column('ID_FORMA_PAGAMENTO', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=True) # NULL = Global
+    no_forma_pagamento = Column('NO_FORMA_PAGAMENTO', String(100), nullable=False)
+    fl_permite_parcelamento = Column('FL_PERMITE_PARCELAMENTO', Boolean, default=False)
+    qt_maximo_parcelas = Column('QT_MAXIMO_PARCELAS', Integer, default=1)
+    fl_ativa = Column('FL_ATIVA', Boolean, default=True)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (UniqueConstraint('ID_ORGANIZACAO', 'NO_FORMA_PAGAMENTO', name='UK_FORMAS_PAGAMENTO_NOME'),)
+    
+    organizacao = relationship('Organizacao', back_populates='formas_pagamento')
+    pedidos = relationship('Pedido', back_populates='forma_pagamento')
+
+class RegraComissao(Base):
+    __tablename__ = 'TB_REGRAS_COMISSAO'
+    
+    id_regra_comissao = Column('ID_REGRA_COMISSAO', Integer, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'), nullable=False)
+    id_empresa = Column('ID_EMPRESA', Integer, ForeignKey('TB_EMPRESAS.ID_EMPRESA', ondelete='CASCADE'), nullable=True) 
+    id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO', ondelete='CASCADE'), nullable=True)
+    pc_comissao = Column('PC_COMISSAO', Numeric(5,2), nullable=False)
+    nr_prioridade = Column('NR_PRIORIDADE', Integer, default=0)
+    dt_inicio_vigencia = Column('DT_INICIO_VIGENCIA', Date)
+    dt_fim_vigencia = Column('DT_FIM_VIGENCIA', Date)
+    fl_ativa = Column('FL_ATIVA', Boolean, default=True)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    
+    organizacao = relationship('Organizacao', back_populates='regras_comissao')
+    empresa = relationship('Empresa', back_populates='regras_comissao')
+    usuario = relationship('Usuario', back_populates='regras_comissao', foreign_keys=[id_usuario])
+
+# ============================================
+# PEDIDOS
+# ============================================
+
+class Pedido(Base):
+    __tablename__ = 'TB_PEDIDOS'
+    
+    id_pedido = Column('ID_PEDIDO', Integer, primary_key=True)
+    id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO'), nullable=False) # Vendedor
+    id_empresa = Column('ID_EMPRESA', Integer, ForeignKey('TB_EMPRESAS.ID_EMPRESA'), nullable=False)
+    id_cliente = Column('ID_CLIENTE', Integer, ForeignKey('TB_CLIENTES.ID_CLIENTE'), nullable=False)
+    id_endereco_entrega = Column('ID_ENDERECO_ENTREGA', Integer, ForeignKey('TB_ENDERECOS.ID_ENDERECO'))
+    id_endereco_cobranca = Column('ID_ENDERECO_COBRANCA', Integer, ForeignKey('TB_ENDERECOS.ID_ENDERECO'))
+    id_forma_pagamento = Column('ID_FORMA_PAGAMENTO', Integer, ForeignKey('TB_FORMAS_PAGAMENTO.ID_FORMA_PAGAMENTO'))
+    
+    nr_pedido = Column('NR_PEDIDO', String(50))
+    pc_desconto = Column('PC_DESCONTO', Numeric(5,2), default=0.00)
+    vl_total = Column('VL_TOTAL', Numeric(15,2), nullable=False)
+    st_pedido = Column('ST_PEDIDO', String(20), nullable=False, default='pendente')
+    ds_observacoes = Column('DS_OBSERVACOES', Text)
+    dt_pedido = Column('DT_PEDIDO', DateTime, default=datetime.utcnow)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    vendedor = relationship('Usuario', back_populates='pedidos', foreign_keys=[id_usuario])
+    empresa = relationship('Empresa', back_populates='pedidos')
+    cliente = relationship('Cliente', back_populates='pedidos')
+    forma_pagamento = relationship('FormaPagamento', back_populates='pedidos')
+    endereco_entrega = relationship('Endereco', foreign_keys=[id_endereco_entrega])
+    endereco_cobranca = relationship('Endereco', foreign_keys=[id_endereco_cobranca])
+    
+    itens = relationship('ItemPedido', back_populates='pedido', cascade='all, delete-orphan')
+    comissoes = relationship('ComissaoPedido', back_populates='pedido', cascade='all, delete-orphan')
+
+class ItemPedido(Base):
+    __tablename__ = 'TB_ITENS_PEDIDO'
+    
+    id_item_pedido = Column('ID_ITEM_PEDIDO', Integer, primary_key=True)
+    id_pedido = Column('ID_PEDIDO', Integer, ForeignKey('TB_PEDIDOS.ID_PEDIDO', ondelete='CASCADE'), nullable=False)
+    id_produto = Column('ID_PRODUTO', Integer, ForeignKey('TB_PRODUTOS.ID_PRODUTO'), nullable=False)
+    id_variacao = Column('ID_VARIACAO', Integer, ForeignKey('TB_VARIACOES_PRODUTOS.ID_VARIACAO'), nullable=True)
+    qt_quantidade = Column('QT_QUANTIDADE', Integer, nullable=False)
+    vl_unitario = Column('VL_UNITARIO', Numeric(15,2), nullable=False)
+    pc_desconto_item = Column('PC_DESCONTO_ITEM', Numeric(5,2), default=0.00)
+    vl_total_item = Column('VL_TOTAL_ITEM', Numeric(15,2), nullable=False)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    pedido = relationship('Pedido', back_populates='itens')
+    produto = relationship('Produto', back_populates='itens_pedido')
+    variacao = relationship('VariacaoProduto', back_populates='itens_pedido')
+
+class ComissaoPedido(Base):
+    __tablename__ = 'TB_COMISSOES_PEDIDO'
+    
+    id_comissao_pedido = Column('ID_COMISSAO_PEDIDO', Integer, primary_key=True)
+    id_pedido = Column('ID_PEDIDO', Integer, ForeignKey('TB_PEDIDOS.ID_PEDIDO', ondelete='CASCADE'), nullable=False)
+    id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO'), nullable=False) # Vendedor
+    pc_comissao = Column('PC_COMISSAO', Numeric(5,2), nullable=False)
+    vl_comissao = Column('VL_COMISSAO', Numeric(15,2))
+    ds_observacao = Column('DS_OBSERVACAO', String(200))
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    pedido = relationship('Pedido', back_populates='comissoes')
+    vendedor = relationship('Usuario', back_populates='comissoes_pedido', foreign_keys=[id_usuario])
+
+# ============================================
+# AUDITORIA
+# ============================================
+
+class LogAuditoria(Base):
+    """ Mapeia a tabela TB_LOGS_AUDITORIA (COM TIPOS CORRIGIDOS) """
+    __tablename__ = 'TB_LOGS_AUDITORIA'
+    
+    id_log = Column('ID_LOG', BigInteger, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'))
+    id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO', ondelete='SET NULL'))
+    tp_entidade = Column('TP_ENTIDADE', String(50), nullable=False)
+    id_entidade = Column('ID_ENTIDADE', Integer, nullable=False)
+    tp_acao = Column('TP_ACAO', String(20), nullable=False)
+    
+    # --- CORREÇÃO AQUI ---
+    # Trocado 'JSONB(astext_type=Text())' por 'JSON'
+    # O SQLAlchemy usará JSONB no Postgres e um fallback no SQLite.
+    ds_valores_antigos = Column('DS_VALORES_ANTIGOS', JSON) 
+    ds_valores_novos = Column('DS_VALORES_NOVOS', JSON)
+    
+    # --- CORREÇÃO AQUI ---
+    # Trocado 'INET' por 'String(45)' (compatível com IPv6)
+    ds_endereco_ip = Column('DS_ENDERECO_IP', String(45)) 
+    ds_user_agent = Column('DS_USER_AGENT', Text)
+    dt_acao = Column('DT_ACAO', DateTime, default=datetime.utcnow)
+    
+    # Relacionamentos
+    organizacao = relationship('Organizacao', back_populates='logs_auditoria')
+    usuario = relationship('Usuario', back_populates='logs_auditoria', foreign_keys=[id_usuario])

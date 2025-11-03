@@ -1,205 +1,213 @@
-from flask import Blueprint, jsonify, request, session
-from flask_login import login_user, logout_user, login_required, current_user
-from src.models.models import User, Company, UserCompany, db
-from werkzeug.security import generate_password_hash, check_password_hash
-from functools import wraps
+# /src/routes/auth.py
+# VERSÃO CORRIGIDA E LIMPA (usando Pydantic v2 .model_validate())
+from fastapi import APIRouter, Depends, HTTPException, status, Form
+from sqlalchemy.orm import Session
+from datetime import datetime
+from typing import Annotated
+from src.database import get_db
+from src.models.models import Usuario, Empresa, UsuarioEmpresa, Organizacao
+from src.schemas import (
+    LoginRequest, LoginResponse, MeResponse, SelectCompanyRequest, SelectCompanyResponse,
+    UsuarioSchema, OrganizacaoSchema, EmpresaSchema, Token
+)
+from src.core.security import create_access_token, get_current_user_data
 
-auth_bp = Blueprint('auth', __name__)
+# Substitui o Blueprint do Flask
+auth_router = APIRouter(
+    prefix="/api/auth",
+    tags=["1. Autenticação"] # Agrupa no /docs
+)
 
-def login_required(f):
-    """Decorator para verificar se o usuário está logado"""
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        # --- INÍCIO DA ALTERAÇÃO ---
-        # Permite que as requisições preflight (OPTIONS) passem sem verificação de login
-        if request.method == 'OPTIONS':
-            return f(*args, **kwargs)
-        # --- FIM DA ALTERAÇÃO ---
-            
-        if 'user_id' not in session:
-            return jsonify({'error': 'Login necessário'}), 401
-        return f(*args, **kwargs)
-    return decorated_function
-
-@auth_bp.route('/register', methods=['POST'])
-def register():
-    """Registra um novo usuário"""
+@auth_router.post("/login", response_model=LoginResponse)
+def login_for_access_token(
+    login_data: LoginRequest, # Validação automática de entrada
+    db: Session = Depends(get_db) # Injeção de dependência do DB
+):
+    """
+    Autentica um usuário, retorna dados da sessão e um token JWT inicial.
+    """
     try:
-        data = request.json
-        
-        if not data or not data.get('email') or not data.get('password'):
-            return jsonify({'error': 'Email e senha são obrigatórios'}), 400
-        
-        # Verifica se o usuário já existe
-        existing_user = User.query.filter_by(email=data['email']).first()
-        if existing_user:
-            return jsonify({'error': 'Email já cadastrado'}), 400
-        
-        # Cria novo usuário
-        user = User(email=data['email'])
-        user.set_password(data['password'])
-        
-        db.session.add(user)
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Usuário criado com sucesso',
-            'user': user.to_dict()
-        }), 201
-        
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        user = db.query(Usuario).filter(Usuario.ds_email == login_data.email).first()
 
-@auth_bp.route('/login', methods=['POST'])
-def login():
-    """Autentica um usuário"""
-    try:
-        data = request.json
-        
-        if not data or not data.get('email') or not data.get('password'):
-            return jsonify({'error': 'Email e senha são obrigatórios'}), 400
-        
-        # Busca o usuário
-        user = User.query.filter_by(email=data['email']).first()
-        
-        if not user or not user.check_password(data['password']):
-            return jsonify({'error': 'Email ou senha inválidos'}), 401
-        
-        # Cria sessão
-        session['user_id'] = user.id
-        
-        # Busca empresas do usuário
-        user_companies = db.session.query(UserCompany, Company).join(
-            Company, UserCompany.company_id == Company.id
-        ).filter(UserCompany.user_id == user.id).all()
-        
-        companies = [company.to_dict() for _, company in user_companies]
-        
-        return jsonify({
-            'message': 'Login realizado com sucesso',
-            'user': user.to_dict(),
-            'companies': companies
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        if not user or not user.check_password(login_data.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email ou senha inválidos",
+            )
 
-@auth_bp.route('/logout', methods=['POST'])
-@login_required
-def logout():
-    """Faz logout do usuário"""
-    session.pop('user_id', None)
-    session.pop('company_id', None)
-    return jsonify({'message': 'Logout realizado com sucesso'}), 200
+        if not user.fl_ativo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Esta conta de usuário está desativada",
+            )
 
-@auth_bp.route('/select-company', methods=['POST'])
-@login_required
-def select_company():
-    """Seleciona a empresa ativa para o usuário"""
-    try:
-        data = request.json
-        
-        if not data or not data.get('company_id'):
-            return jsonify({'error': 'ID da empresa é obrigatório'}), 400
-        
-        # Verifica se o usuário tem acesso à empresa
-        user_company = UserCompany.query.filter_by(
-            user_id=session['user_id'],
-            company_id=data['company_id']
-        ).first()
-        
-        if not user_company:
-            return jsonify({'error': 'Acesso negado à empresa'}), 403
-        
-        # Define a empresa ativa na sessão
-        session['company_id'] = data['company_id']
-        
-        company = Company.query.get(data['company_id'])
-        
-        return jsonify({
-            'message': 'Empresa selecionada com sucesso',
-            'company': company.to_dict()
-        }), 200
-        
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        # Atualiza a data de último acesso
+        user.dt_ultimo_acesso = datetime.utcnow()
+        db.commit()
 
-# Em src/routes/auth.py
-
-@auth_bp.route("/companies", methods=["GET"])
-@login_required
-def get_user_companies():
-    """Busca as empresas associadas ao usuário logado."""
-    try:
-        # 1. Busca o usuário a partir do ID armazenado na sessão
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({"error": "Sessão inválida"}), 401
-
-        user = User.query.get(user_id)
-
-        if not user:
-            return jsonify({"error": "Usuário não encontrado"}), 404
-
-        companies_data = []
-        
-        # 2. Usa o nome correto do relacionamento ('user_companies') definido em models.py
-        for user_company_link in user.user_companies:
-            company = user_company_link.company
-            if company:
-                companies_data.append({
-                    "id": company.id,
-                    "name": company.name,
-                    "cnpj": company.cnpj
-                })
-                
-        return jsonify({"companies": companies_data}), 200
-
-    except Exception as e:
-        # Adiciona um bloco try-except para capturar outros erros inesperados
-        return jsonify({'error': f"Um erro inesperado ocorreu: {str(e)}"}), 500
-
-
-# Em src/routes/auth.py
-
-# Em src/routes/auth.py
-
-@auth_bp.route('/me', methods=['GET'])
-@login_required
-def get_current_user():
-    """Retorna informações do usuário logado, empresa selecionada e lista de empresas."""
-    try:
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'error': 'Sessão inválida'}), 401
-            
-        user = User.query.get(user_id)
-        if not user:
-            return jsonify({'error': 'Usuário não encontrado'}), 404
-        
-        # --- INÍCIO DA NOVA LÓGICA ---
-        # Busca todas as empresas associadas ao usuário
-        user_companies_link = UserCompany.query.filter_by(user_id=user.id).all()
-        companies = [Company.query.get(link.company_id) for link in user_companies_link]
-        companies_data = [company.to_dict() for company in companies if company]
-        # --- FIM DA NOVA LÓGICA ---
-        
-        response_data = {
-            'user': user.to_dict(),
-            'company': None, # Será preenchido abaixo se houver
-            'companies': companies_data # Inclui a lista de empresas na resposta
+        # Cria o token JWT (payload inicial)
+        token_payload = {
+            "sub": str(user.id_usuario),
+            "org": user.id_organizacao,
+            "role": user.tp_usuario,
+            "emp_ativa": None # Nenhum empresa selecionada ainda
         }
-        
-        company_id = session.get('company_id')
-        if company_id:
-            company = Company.query.get(company_id)
-            if company:
-                response_data['company'] = company.to_dict()
-        
-        return jsonify(response_data), 200
-        
-    except Exception as e:
-        db.session.rollback() # Adicionado para segurança
-        return jsonify({'error': str(e)}), 500
+        access_token = create_access_token(data=token_payload)
 
+        # Busca empresas vinculadas
+        empresas_vinculadas = [
+            vinculo.empresa 
+            for vinculo in user.empresas_vinculadas 
+            if vinculo.empresa and vinculo.empresa.fl_ativa
+        ]
+
+        # --- CORREÇÃO AQUI: Usando .model_validate() ---
+        return LoginResponse(
+            token=Token(access_token=access_token, token_type="bearer"),
+            usuario=UsuarioSchema.model_validate(user, from_attributes=True),
+            organizacao=OrganizacaoSchema.model_validate(user.organizacao, from_attributes=True) if user.organizacao else None,
+            empresas_vinculadas=[EmpresaSchema.model_validate(emp, from_attributes=True) for emp in empresas_vinculadas]
+        )
+
+    except HTTPException as e:
+        raise e 
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f'Erro interno no servidor: {str(e)}'
+        )
+
+# /src/routes/auth.py
+
+@auth_router.post("/login", response_model=LoginResponse)
+def login_for_access_token(
+    login_data: LoginRequest, # Validação automática de entrada
+    db: Session = Depends(get_db) # Injeção de dependência do DB
+):
+    """
+    Autentica um usuário, retorna dados da sessão e um token JWT inicial.
+    """
+    try:
+        user = db.query(Usuario).filter(Usuario.ds_email == login_data.email).first()
+
+        if not user or not user.check_password(login_data.password):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Email ou senha inválidos",
+            )
+
+        if not user.fl_ativo:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Esta conta de usuário está desativada",
+            )
+
+        # Atualiza a data de último acesso
+        user.dt_ultimo_acesso = datetime.utcnow()
+        db.commit()
+
+        # Cria o token JWT (payload inicial)
+        token_payload = {
+            "sub": str(user.id_usuario),
+            "org": user.id_organizacao,
+            "role": user.tp_usuario,
+            "emp_ativa": None # Nenhum empresa selecionada ainda
+        }
+        access_token = create_access_token(data=token_payload)
+
+        # Busca empresas vinculadas
+        empresas_vinculadas = [
+            vinculo.empresa 
+            for vinculo in user.empresas_vinculadas 
+            if vinculo.empresa and vinculo.empresa.fl_ativa
+        ]
+
+        # --- CORREÇÃO AQUI: Usando .model_validate() ---
+        return LoginResponse(
+            token=Token(access_token=access_token, token_type="bearer"),
+            usuario=UsuarioSchema.model_validate(user),
+            organizacao=OrganizacaoSchema.model_validate(user.organizacao) if user.organizacao else None,
+            empresas_vinculadas=[EmpresaSchema.model_validate(emp) for emp in empresas_vinculadas]
+        )
+
+    except HTTPException as e:
+        raise e 
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f'Erro interno no servidor: {str(e)}'
+        )
+
+
+@auth_router.post("/select-company", response_model=SelectCompanyResponse)
+def select_company(
+    request_data: SelectCompanyRequest,
+    db: Session = Depends(get_db),
+    user_data: tuple = Depends(get_current_user_data)
+):
+    """
+    Seleciona uma empresa ativa e retorna um NOVO token JWT com essa informação.
+    O frontend deve substituir o token antigo por este novo.
+    """
+    current_user, token_data = user_data
+    id_empresa_selecionada = request_data.id_empresa
+
+    vinculo = db.query(UsuarioEmpresa).filter(
+        UsuarioEmpresa.id_usuario == current_user.id_usuario,
+        UsuarioEmpresa.id_empresa == id_empresa_selecionada
+    ).first()
+
+    if not vinculo or not vinculo.empresa or not vinculo.empresa.fl_ativa:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado a esta empresa ou empresa inativa"
+        )
+
+    # Cria um NOVO token com a empresa ativa incluída
+    new_token_payload = {
+        "sub": str(current_user.id_usuario),
+        "org": current_user.id_organizacao,
+        "role": current_user.tp_usuario,
+        "emp_ativa": id_empresa_selecionada # <-- A GRANDE MUDANÇA
+    }
+    access_token = create_access_token(data=new_token_payload)
+    
+    # --- CORREÇÃO AQUI: Usando .model_validate() ---
+    return SelectCompanyResponse(
+        token=Token(access_token=access_token, token_type="bearer"),
+        empresa_ativa=EmpresaSchema.model_validate(vinculo.empresa, from_attributes=True)
+    )
+
+
+@auth_router.get("/me", response_model=MeResponse)
+def get_current_user_session(
+    user_data: tuple = Depends(get_current_user_data),
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna informações da sessão atual (usuário, organização, 
+    empresa ativa e lista de empresas vinculadas).
+    """
+    current_user, token_data = user_data
+    
+    empresa_ativa = None
+    if token_data.id_empresa_ativa:
+        empresa_ativa = db.get(Empresa, token_data.id_empresa_ativa)
+        if not empresa_ativa or not empresa_ativa.fl_ativa:
+            empresa_ativa = None
+
+    empresas_vinculadas = [
+        vinculo.empresa 
+        for vinculo in current_user.empresas_vinculadas 
+        if vinculo.empresa and vinculo.empresa.fl_ativa
+    ]
+
+    # --- CORREÇÃO AQUI: Usando .model_validate() ---
+    return MeResponse(
+        usuario=UsuarioSchema.model_validate(current_user, from_attributes=True),
+        organizacao=OrganizacaoSchema.model_validate(current_user.organizacao, from_attributes=True) if current_user.organizacao else None,
+        empresa_ativa=EmpresaSchema.model_validate(empresa_ativa, from_attributes=True) if empresa_ativa else None,
+        empresas_vinculadas=[EmpresaSchema.model_validate(emp, from_attributes=True) for emp in empresas_vinculadas]
+    )

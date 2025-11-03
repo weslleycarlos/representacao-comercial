@@ -1,158 +1,126 @@
-import os
-import sys
-from dotenv import load_dotenv
-# DON'T CHANGE THIS !!!
-sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from flask import Flask, send_from_directory, jsonify
-from flask_cors import CORS
-from src.models.models import db
-from src.routes.auth import auth_bp
-from src.routes.dashboard import dashboard_bp
-from src.routes.cnpj import cnpj_bp
-from src.routes.orders import orders_bp
-from src.routes.catalog import catalog_bp
-from src.routes.companies import companies_bp
-from src.routes.clients import clients_bp
-from src.routes.users import users_bp
+# /src/main.py
+import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy.orm import Session
+from datetime import datetime
 
-app = Flask(__name__, static_folder=os.path.join(os.path.dirname(__file__), 'static'))
-app.config['SECRET_KEY'] = 'asdf#FGSgvasgf$5$WGT'
-# --- INÍCIO DA NOVA CONFIGURAÇÃO DE COOKIE ---
-# Necessário para que o navegador envie o cookie de sessão entre domínios diferentes em produção.
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
+# Importações da nossa aplicação
+from src.database import engine, Base, SessionLocal
+from src.models import models # Importa o models.py
+from src.routes.auth import auth_router
+from src.routes.gestor.empresas import gestor_empresas_router
+from src.routes.gestor.vendedores import gestor_vendedores_router
+from src.routes.gestor.clientes import gestor_clientes_router
+from src.routes.gestor.produtos import gestor_produtos_router
+from src.routes.vendedor.pedidos import vendedor_pedidos_router
+# (Importaremos os outros routers aqui no futuro)
 
+# --- 1. CRIAÇÃO DAS TABELAS ---
+# Isso é o equivalente ao db.create_all() do Flask
+# Ele garante que todas as tabelas (TB_USUARIOS, etc.) existam
+print("Criando tabelas no banco de dados, se não existirem...")
+Base.metadata.create_all(bind=engine)
+print("Tabelas criadas com sucesso.")
+
+# --- 2. CRIAÇÃO DA APLICAÇÃO FASTAPI ---
+app = FastAPI(
+    title="API de Representação Comercial",
+    description="Backend profissional para o sistema RepCom.",
+    version="1.0.0"
+)
+
+# --- 3. CONFIGURAÇÃO DO CORS ---
+# Lista de origens permitidas (seu frontend)
 origins = [
-    "http://localhost:5173", # Frontend de desenvolvimento local
-    "https://representacao-frontend.onrender.com" # Frontend em produção
+    "http://localhost:5173", # Frontend Vite local
+    "https://representacao-frontend.onrender.com" # Frontend Produção
 ]
 
-# Configuração CORS para permitir requisições do frontend
-CORS(app, supports_credentials=True, origins=origins)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True, # Essencial para cookies/tokens
+    allow_methods=["*"],    # Permitir todos os métodos (GET, POST, etc.)
+    allow_headers=["*"],    # Permitir todos os headers
+)
 
-# Registra os blueprints
-app.register_blueprint(auth_bp, url_prefix='/api/auth')
-app.register_blueprint(dashboard_bp, url_prefix='/api/dashboard')
-app.register_blueprint(cnpj_bp, url_prefix='/api/cnpj')
-app.register_blueprint(orders_bp, url_prefix='/api/orders')
-app.register_blueprint(catalog_bp, url_prefix='/api/catalog')
-app.register_blueprint(companies_bp, url_prefix='/api/companies')
-app.register_blueprint(clients_bp, url_prefix='/api/clients')
-app.register_blueprint(users_bp, url_prefix='/api/users')
-
-# Configuração do banco de dados
-# Em src/main.py
-
-# Lê a string de conexão da variável de ambiente DATABASE_URL
-# Se não encontrar, continua usando o banco de dados SQLite local como fallback.
-database_uri = os.environ.get('DATABASE_URL')
-
-# IMPORTANTE: Corrige o dialeto para compatibilidade com SQLAlchemy
-if database_uri and database_uri.startswith("postgres://"):
-    database_uri = database_uri.replace("postgres://", "postgresql://", 1)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = database_uri or f"sqlite:///{os.path.join(os.path.dirname(__file__), 'database', 'app.db')}"
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db.init_app(app)
-
-# Cria as tabelas do banco de dados
-with app.app_context():
-    db.create_all()
-    
-    # Adiciona dados iniciais se necessário
-    from src.models.models import PaymentMethod, Company, User, UserCompany, Product
-    
-    # Verifica se já existem formas de pagamento
-    if PaymentMethod.query.count() == 0:
-        payment_methods = [
-            PaymentMethod(name='Dinheiro'),
-            PaymentMethod(name='Cartão de Crédito'),
-            PaymentMethod(name='Cartão de Débito'),
-            PaymentMethod(name='PIX'),
-            PaymentMethod(name='Boleto'),
-            PaymentMethod(name='Transferência Bancária')
-        ]
-        for method in payment_methods:
-            db.session.add(method)
-    
-    # Cria empresa e usuário de exemplo se não existirem
-    if User.query.count() == 0:
-        # Cria empresa de exemplo
-        company = Company(
-            name='Empresa Exemplo Ltda',
-            cnpj='12.345.678/0001-90'
-        )
-        db.session.add(company)
-        db.session.flush()
-        
-        # Cria usuário de exemplo
-        user = User(email='admin@exemplo.com')
-        user.set_password('123456')
-        db.session.add(user)
-        db.session.flush()
-        
-        # Associa usuário à empresa
-        user_company = UserCompany(user_id=user.id, company_id=company.id)
-        db.session.add(user_company)
-        
-        # Adiciona alguns produtos de exemplo
-        products = [
-            Product(
-                company_id=company.id,
-                code='CAMISETA-001',
-                description='Camiseta Básica Algodão',
-                value=29.90,
-                sizes=['P', 'M', 'G', 'GG']
-            ),
-            Product(
-                company_id=company.id,
-                code='CALCA-001',
-                description='Calça Jeans Masculina',
-                value=89.90,
-                sizes=['38', '40', '42', '44', '46']
-            ),
-            Product(
-                company_id=company.id,
-                code='TENIS-001',
-                description='Tênis Esportivo',
-                value=159.90,
-                sizes=['37', '38', '39', '40', '41', '42', '43']
+# --- 4. POPULAÇÃO DE DADOS INICIAIS (SEED) ---
+# (Lógica movida do seu antigo main.py para cá, adaptada para FastAPI)
+# Isso garante que temos um usuário para testar o login.
+def seed_initial_data():
+    db: Session = SessionLocal()
+    try:
+        print("Verificando dados iniciais (seed)...")
+        # Verifica se já existe uma organização
+        org = db.query(models.Organizacao).first()
+        if org is None:
+            print("Nenhuma organização encontrada. Criando dados iniciais...")
+            
+            # 1. Cria a Organização
+            org = models.Organizacao(
+                no_organizacao="Organização Padrão",
+                st_assinatura="ativo",
+                tp_plano="premium"
             )
-        ]
-        for product in products:
-            db.session.add(product)
-    
-    db.session.commit()
+            db.add(org)
+            db.flush() # Garante que org.id_organizacao esteja disponível
 
-# Em src/main.py
-
-# Em src/main.py
-
-@app.route('/', defaults={'path': ''})
-@app.route('/<path:path>')
-def serve(path):
-    # --- INÍCIO DA CORREÇÃO ---
-    # Se a requisição for para um endpoint da API que não existe,
-    # retorna um erro 404 em JSON em vez de servir o index.html.
-    if path.startswith('api/'):
-        return jsonify({'error': 'Endpoint não encontrado'}), 404
-    # --- FIM DA CORREÇÃO ---
-
-    static_folder_path = app.static_folder
-    if static_folder_path is None:
-            return "Static folder not configured", 404
-
-    if path != "" and os.path.exists(os.path.join(static_folder_path, path)):
-        return send_from_directory(static_folder_path, path)
-    else:
-        index_path = os.path.join(static_folder_path, 'index.html')
-        if os.path.exists(index_path):
-            return send_from_directory(static_folder_path, 'index.html')
+            # 2. Cria o Usuário Gestor
+            gestor = models.Usuario(
+                id_organizacao=org.id_organizacao,
+                ds_email="gestor@repcom.com", # Email de teste
+                tp_usuario="gestor",
+                no_completo="Gestor Padrão",
+                fl_ativo=True
+            )
+            gestor.set_password("123456") # Senha de teste
+            db.add(gestor)
+            
+            # 3. Cria Formas de Pagamento Padrão (Globais)
+            payment_methods = [
+                models.FormaPagamento(no_forma_pagamento='Dinheiro', fl_ativa=True, id_organizacao=None),
+                models.FormaPagamento(no_forma_pagamento='Cartão de Crédito', fl_ativa=True, id_organizacao=None),
+                models.FormaPagamento(no_forma_pagamento='PIX', fl_ativa=True, id_organizacao=None),
+                models.FormaPagamento(no_forma_pagamento='Boleto', fl_ativa=True, id_organizacao=None)
+            ]
+            db.bulk_save_objects(payment_methods)
+            
+            db.commit()
+            print("Dados iniciais criados com sucesso.")
         else:
-            return "index.html not found", 404
+            print("Banco de dados já populado.")
+            
+    except Exception as e:
+        print(f"Erro ao popular dados: {e}")
+        db.rollback()
+    finally:
+        db.close()
 
+# Executa a função de seed na inicialização
+seed_initial_data()
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+# --- 5. INCLUSÃO DAS ROTAS ---
+app.include_router(auth_router)
+app.include_router(gestor_empresas_router)
+app.include_router(gestor_vendedores_router)
+app.include_router(gestor_clientes_router)
+app.include_router(gestor_produtos_router)
+app.include_router(vendedor_pedidos_router)
+# (Incluiremos os outros routers aqui)
 
+# --- 6. ROTA RAIZ (Redireciona para /docs) ---
+@app.get("/", include_in_schema=False)
+async def root_redirect():
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/docs")
+
+# --- 7. EXECUTANDO O SERVIDOR ---
+# (Este bloco só é usado se você rodar 'python src/main.py')
+if __name__ == "__main__":
+    uvicorn.run(
+        "src.main:app", 
+        host="0.0.0.0", 
+        port=5000, 
+        reload=True # Ativa o auto-reload (como o debug=True do Flask)
+    )

@@ -2,7 +2,8 @@
 
 # --- Core API Framework ---
 fastapi
-uvicorn[standard]  # Servidor ASGI (inclui watchfiles para --reload)
+gunicorn             # O 'manager' do servidor de produção
+uvicorn[standard]    # O 'worker' ASGI que o Gunicorn usa
 pydantic
 pydantic-settings
 pydantic[email]    # Para validação de EmailStr

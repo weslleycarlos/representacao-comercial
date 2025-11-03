@@ -1,134 +1,84 @@
-# Sistema de Representação Comercial (RepCom)
+# Backend API - Sistema de Representação Comercial
 
-Este é um sistema SaaS multi-tenant para gestão de representação comercial, dividido em um Backend (FastAPI) e um Frontend (Vite).
+Este diretório contém o backend da API para o sistema RepCom, construído com FastAPI e SQLAlchemy.
 
-## Visão Geral da Arquitetura
+## Stack Tecnológica
 
-* **Backend:**
-    * Framework: FastAPI
-    * Banco de Dados: SQLAlchemy (PostgreSQL em produção, SQLite em desenvolvimento)
-    * Autenticação: Tokens JWT
-    * Local: `/backend`
-* **Frontend:**
-    * Framework: React (Vite)
-    * Local: `/frontend`
+* **Framework:** FastAPI
+* **Servidor:** Uvicorn (desenvolvimento), Gunicorn (produção)
+* **Banco de Dados:** SQLAlchemy ORM
+* **Driver de DB (Produção):** PostgreSQL (via `psycopg2-binary`)
+* **Autenticação:** Tokens JWT (via `python-jose`)
+* **Validação:** Pydantic
 
 ---
 
-## 🚀 Configuração do Ambiente de Desenvolvimento
+## 1. Configuração de Desenvolvimento Local
 
-Siga estes passos para configurar e rodar o projeto em uma nova máquina.
+(Resumo dos passos que já fizemos)
 
-### Pré-requisitos
-
-* [Python](https://www.python.org/downloads/) (v3.11+)
-* [Node.js](https://nodejs.org/en) (v18+)
-
----
-
-### 1. Configuração do Backend (FastAPI)
-
-O Backend roda na porta `5000`.
-
-1.  **Navegue até a pasta do backend:**
+1.  **Criar Ambiente Virtual:**
     ```bash
     cd backend
-    ```
-
-2.  **Crie e Ative um Ambiente Virtual (Venv):**
-    ```bash
-    # Criar o venv (Windows)
     python -m venv venv
-    
-    # Ativar o venv (Windows CMD/PowerShell)
-    .\venv\Scripts\activate
-    
-    # Ativar o venv (Git Bash / macOS / Linux)
-    source venv/Scripts/activate
+    source venv/Scripts/activate # (ou ./venv/bin/activate)
     ```
 
-3.  **Instale as Dependências do Python:**
+2.  **Instalar Dependências:**
     ```bash
     pip install -r requirements.txt
     ```
-    *(Se ocorrer erro no `pydantic[email]`, rode `pip install email-validator` separadamente).*
 
-4.  **Crie o Arquivo de Ambiente (`.env`):**
-    Crie um arquivo chamado `.env` dentro da pasta `/backend`. Este arquivo **não** será enviado ao Git e contém suas credenciais locais.
-
-    Copie e cole o conteúdo abaixo no arquivo `backend/.env`:
-
+3.  **Configurar `.env` Local:**
+    Crie `backend/.env` com sua string de conexão local (SQLite) e uma chave secreta.
     ```ini
-    # backend/.env
-
-    # --- Configuração do Banco de Dados Local (SQLite) ---
-    # Use o caminho absoluto COMPLETO para a pasta /backend do seu projeto.
-    # IMPORTANTE: Use barras normais (/) mesmo no Windows.
-    # Exemplo (Windows): DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/representacao-comercial/backend/local_api.db
-    # Exemplo (macOS/Linux): DATABASE_URL=sqlite:////Users/SeuUsuario/Projetos/representacao-comercial/backend/local_api.db
+    # Use o caminho absoluto para o seu arquivo .db
+    DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/representacao-comercial/backend/local_api.db
+    SECRET_KEY=uma_chave_secreta_de_teste_longa_e_aleatoria
     
-    DATABASE_URL=sqlite:///C:/COLOQUE/SEU/CAMINHO/ABSOLUTO/AQUI/backend/local_api.db
-
-    # --- Chave Secreta para Tokens JWT ---
-    # Use um gerador de chaves online para criar uma string aleatória forte.
-    SECRET_KEY=SUA_CHAVE_SECRETA_ALEATORIA_DE_64_CARACTERES_AQUI
+    # Flag para rodar o seed de dados
+    AMBIENTE=dev 
     ```
 
-5.  **Rode o Servidor do Backend:**
+4.  **Rodar o Servidor Local (com auto-reload):**
     ```bash
     uvicorn src.main:app --reload --port 5000
     ```
-    * O servidor deve iniciar.
-    * Acesse [http://127.0.0.1:5000/docs](http://127.0.0.1:5000/docs) no seu navegador.
-    * Ao iniciar, o servidor criará o banco `local_api.db` e executará o *seed* (criando o usuário `gestor@repcom.com`).
 
 ---
 
-### 2. Configuração do Frontend (Vite)
+## 2. Configuração de Produção (Deploy no Railway/Supabase)
 
-O Frontend roda na porta `5173`.
+O deploy em produção é mais simples, pois depende apenas das variáveis de ambiente e do comando de start.
 
-1.  **Abra um SEGUNDO terminal.**
+### A. Preparação do `src/main.py` (IMPORTANTE!)
 
-2.  **Navegue até a pasta do frontend:**
-    ```bash
-    cd frontend
-    ```
+O nosso `main.py` atualmente executa `Base.metadata.create_all()` e `seed_initial_data()` toda vez que inicia. Isso é ótimo para desenvolvimento, mas **terrível** para produção (você não quer recriar tabelas ou o usuário admin a cada deploy).
 
-3.  **Instale as Dependências do Node.js:**
-    ```bash
-    npm install
-    ```
-    *(Se você receber erros de dependência (ERESOLVE), use o comando abaixo para ignorar conflitos de peer-deps):*
-    ```bash
-    npm install --legacy-peer-deps
-    ```
+Precisamos condicionar isso à variável `AMBIENTE=dev` que definimos no `.env` local.
 
-4.  **Crie o Arquivo de Ambiente (`.env`):**
-    Crie um arquivo chamado `.env` dentro da pasta `/frontend`.
+**Substitua** as seções 4 e 5 do seu `src/main.py`:
 
-    Copie e cole o conteúdo abaixo no arquivo `frontend/.env`:
+```python
+# /src/main.py
+# ... (importações) ...
+import os # <-- Adicione esta importação
 
-    ```ini
-    # frontend/.env
+# ... (código do app = FastAPI()) ...
+# ... (código do CORS) ...
 
-    # Aponta para a URL base da API do Backend que está rodando localmente
-    VITE_API_BASE_URL=[http://127.0.0.1:5000/api](http://127.0.0.1:5000/api)
-    ```
+# --- 4. CRIAÇÃO DE TABELAS E SEED (APENAS EM DEV) ---
+# Verifica se estamos em ambiente de desenvolvimento (definido no .env local)
+if os.getenv("AMBIENTE") == "dev":
+    print("MODO DE DESENVOLVIMENTO: Criando tabelas (se não existirem)...")
+    Base.metadata.create_all(bind=engine)
+    print("Tabelas verificadas.")
+    
+    # Executa a função de seed
+    seed_initial_data()
+else:
+    print("MODO DE PRODUÇÃO: Conectando ao banco de dados existente.")
 
-5.  **Rode o Servidor de Desenvolvimento do Frontend:**
-    ```bash
-    npm run dev
-    ```
-    * O servidor deve iniciar e abrir [http://localhost:5173](http://localhost:5173) no seu navegador.
 
----
-
-### ✅ Pronto para Testar!
-
-1.  Acesse [http://127.0.0.1:5000/docs](http://127.0.0.1:5000/docs) para testar a API.
-2.  Acesse [http://localhost:5173](http://localhost:5173) para usar a aplicação.
-
-**Credenciais de Teste (Gestor Padrão):**
-* **Email:** `gestor@repcom.com`
-* **Senha:** `123456`
+# --- 5. INCLUSÃO DAS ROTAS ---
+# ... (todo o seu app.include_router(...)) ...

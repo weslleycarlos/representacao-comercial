@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr
-from typing import Optional, List
-from datetime import datetime
+from typing import Optional, List, Any
+from datetime import datetime, date
 from decimal import Decimal
 
 # ============================================
@@ -398,6 +398,13 @@ class FormaPagamentoSchema(FormaPagamentoBase):
     class ConfigDict:
         from_attributes = True
 
+class FormaPagamentoUpdate(BaseModel):
+    """ Schema para atualizar uma Forma de Pagamento """
+    no_forma_pagamento: Optional[str] = None
+    fl_permite_parcelamento: Optional[bool] = None
+    qt_maximo_parcelas: Optional[int] = None
+    fl_ativa: Optional[bool] = None
+
 # ============================================
 # Schemas CRUD: Pedidos (Criação e Leitura)
 # ============================================
@@ -477,3 +484,206 @@ class PedidoUpdate(BaseModel):
 class PedidoCancelRequest(BaseModel):
     """ Schema para o body de POST /{id_pedido}/cancelar """
     motivo: str # Motivo do cancelamento (será salvo nas observações)
+
+class PedidoStatusUpdate(BaseModel):
+    """ Schema para o body de PUT /{id_pedido}/status """
+    # Valida o novo status contra os valores permitidos
+    novo_status: str
+    
+    # Validação (opcional, mas recomendada)
+    from pydantic import field_validator
+    
+    @field_validator('novo_status')
+    @classmethod
+    def validate_status(cls, v: str):
+        allowed_status = ['pendente', 'confirmado', 'em_separacao', 'enviado', 'entregue', 'cancelado']
+        if v not in allowed_status:
+            raise ValueError(f"Status '{v}' não é permitido. Valores permitidos: {allowed_status}")
+        return v
+
+# ============================================
+# Schemas para Dashboards e Relatórios
+# ============================================
+
+class VendaVendedorMesSchema(BaseModel):
+    """ Schema para a View VW_VENDAS_VENDEDOR_MES """
+    id_usuario: int
+    no_vendedor: Optional[str] = None
+    dt_mes_referencia: datetime
+    qt_pedidos: int
+    vl_total_vendas: Decimal
+    vl_ticket_medio: Decimal
+    
+    class ConfigDict:
+        from_attributes = True
+
+class ComissaoCalculadaSchema(BaseModel):
+    """ Schema para a View VW_COMISSOES_CALCULADAS """
+    id_pedido: int
+    nr_pedido: Optional[str] = None
+    no_vendedor: Optional[str] = None
+    no_empresa: Optional[str] = None
+    vl_total: Decimal
+    pc_comissao_aplicada: Decimal
+    vl_comissao_calculada: Decimal
+    dt_pedido: datetime
+    
+    class ConfigDict:
+        from_attributes = True
+
+class DashboardVendedorKpiSchema(BaseModel):
+    """ Schema de resposta para o Dashboard do Vendedor """
+    vendas_mes_atual: Decimal
+    comissao_mes_atual: Decimal
+    pedidos_mes_atual: int
+    ticket_medio_mes_atual: Decimal
+    # (Adicionaremos ranking de produtos e metas aqui no futuro)
+
+# ============================================
+# Schemas CRUD: Regras de Comissão
+# ============================================
+
+class RegraComissaoBase(BaseModel):
+    """ Schema base para regras de comissão """
+    pc_comissao: Decimal
+    id_empresa: Optional[int] = None # NULL = Regra da Organização
+    id_usuario: Optional[int] = None # NULL = Regra da Empresa/Organização
+    nr_prioridade: Optional[int] = 0
+    dt_inicio_vigencia: Optional[date] = None
+    dt_fim_vigencia: Optional[date] = None
+    fl_ativa: Optional[bool] = True
+
+class RegraComissaoCreate(RegraComissaoBase):
+    """ Schema para criar uma nova regra """
+    pass # id_organizacao virá do token
+
+class RegraComissaoUpdate(BaseModel):
+    """ Schema para atualizar uma regra """
+    pc_comissao: Optional[Decimal] = None
+    id_empresa: Optional[int] = None
+    id_usuario: Optional[int] = None
+    nr_prioridade: Optional[int] = None
+    dt_inicio_vigencia: Optional[date] = None
+    dt_fim_vigencia: Optional[date] = None
+    fl_ativa: Optional[bool] = None
+
+class RegraComissaoSchema(RegraComissaoBase):
+    """ Schema de resposta para ler uma regra (inclui relacionamentos) """
+    id_regra_comissao: int
+    id_organizacao: int
+
+    # Schemas aninhados para mostrar os nomes
+    empresa: Optional[EmpresaSchema] = None
+    usuario: Optional[UsuarioSchema] = None
+
+    class ConfigDict:
+        from_attributes = True
+
+class VendaEmpresaMesSchema(BaseModel):
+    """ Schema para a View VW_VENDAS_EMPRESA_MES """
+    id_empresa: int
+    no_empresa: Optional[str] = None
+    id_organizacao: int
+    dt_mes_referencia: datetime
+    qt_pedidos: int
+    vl_total_vendas: Decimal
+    qt_clientes_atendidos: int
+    
+    class ConfigDict:
+        from_attributes = True
+
+class VendaPorCidadeSchema(BaseModel):
+    """ Schema para a View VW_VENDAS_POR_CIDADE """
+    no_cidade: str
+    sg_estado: str
+    id_organizacao: int
+    dt_mes_referencia: datetime
+    qt_pedidos: int
+    vl_total_vendas: Decimal
+    
+    class ConfigDict:
+        from_attributes = True
+
+class GestorDashboardKpiSchema(BaseModel):
+    """ Schema de resposta para o Dashboard principal do Gestor """
+    vendas_mes_atual: Decimal
+    pedidos_mes_atual: int
+    ticket_medio_mes_atual: Decimal
+    clientes_atendidos_mes_atual: int
+    comissoes_pendentes_mes_atual: Decimal # (Assumindo que VW_COMISSOES lida com status)
+
+# ============================================
+# Schemas Super Admin: Organizações
+# ============================================
+
+class AdminGestorCreate(BaseModel):
+    """ Schema para os dados do primeiro gestor, aninhado na criação da organização """
+    ds_email: EmailStr
+    password: str
+    no_completo: str
+    nr_telefone: Optional[str] = None
+
+class AdminOrganizacaoCreate(BaseModel):
+    """ Schema para POST /api/admin/organizacoes """
+    no_organizacao: str
+    nr_cnpj: Optional[str] = None
+    ds_email_contato: Optional[EmailStr] = None
+    nr_telefone_contato: Optional[str] = None
+    tp_plano: str # ex: 'basico', 'premium'
+    qt_limite_usuarios: int
+    qt_limite_empresas: int
+    
+    # Dados do Gestor aninhados
+    gestor: AdminGestorCreate
+
+class AdminOrganizacaoUpdate(BaseModel):
+    """ Schema para PUT /api/admin/organizacoes/{id} """
+    no_organizacao: Optional[str] = None
+    nr_cnpj: Optional[str] = None
+    ds_email_contato: Optional[EmailStr] = None
+    nr_telefone_contato: Optional[str] = None
+    st_assinatura: Optional[str] = None # 'ativo', 'suspenso', 'cancelado'
+    tp_plano: Optional[str] = None
+    qt_limite_usuarios: Optional[int] = None
+    qt_limite_empresas: Optional[int] = None
+
+class LogUsuarioSchema(BaseModel):
+    """ Schema simplificado para o usuário dentro do log """
+    id_usuario: int
+    ds_email: EmailStr
+    no_completo: Optional[str] = None
+    
+    class ConfigDict:
+        from_attributes = True
+
+class LogAuditoriaSchema(BaseModel):
+    """ Schema de resposta para um item de log de auditoria """
+    id_log: int
+    id_organizacao: Optional[int] = None
+    id_usuario: Optional[int] = None
+    tp_entidade: str
+    id_entidade: int
+    tp_acao: str
+    ds_valores_antigos: Optional[dict] = None # Pydantic v2 lida com JSON
+    ds_valores_novos: Optional[dict] = None
+    ds_endereco_ip: Optional[str] = None
+    dt_acao: datetime
+    
+    # Relacionamento aninhado (usando o schema simplificado)
+    usuario: Optional[LogUsuarioSchema] = None
+    
+    class ConfigDict:
+        from_attributes = True
+
+# ============================================
+# Schemas Super Admin: Dashboard
+# ============================================
+
+class AdminDashboardKpiSchema(BaseModel):
+    """ Schema de resposta para o Dashboard principal do Super Admin """
+    total_organizacoes_ativas: int
+    total_organizacoes_suspensas: int
+    total_gestores_ativos: int
+    total_vendedores_ativos: int
+    total_pedidos_sistema: int       # Contagem total de pedidos (não cancelados)
+    valor_total_pedidos_sistema: Decimal # Soma do VL_TOTAL (não cancelados)

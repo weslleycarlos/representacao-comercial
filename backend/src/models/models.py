@@ -1,9 +1,6 @@
-# /src/models/models.py
-# REVISADO PARA FASTAPI (SQLAlchemy Puro)
-
 from sqlalchemy import (
     Column, Integer, String, DateTime, Boolean, Numeric, Text, BigInteger, Date,
-    ForeignKey, UniqueConstraint, JSON # <-- ADICIONE JSON AQUI
+    ForeignKey, UniqueConstraint, JSON, text, extract
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -379,3 +376,69 @@ class LogAuditoria(Base):
     # Relacionamentos
     organizacao = relationship('Organizacao', back_populates='logs_auditoria')
     usuario = relationship('Usuario', back_populates='logs_auditoria', foreign_keys=[id_usuario])
+
+# ============================================
+# VIEWS (Mapeadas como Tabelas Read-Only)
+# ============================================
+# NOTA: O Base.metadata.create_all() (em main.py) não tentará
+# criar estas "tabelas" pois elas já existem no DB (são Views).
+
+class VwVendasVendedorMes(Base):
+    """ Mapeia a View VW_VENDAS_VENDEDOR_MES """
+    __tablename__ = 'VW_VENDAS_VENDEDOR_MES'
+    
+    # Definimos as colunas exatamente como na sua View
+    # Precisamos de uma "chave primária" para o SQLAlchemy,
+    # mesmo que a View não tenha uma. Usamos uma combinação única.
+    id_usuario = Column('ID_USUARIO', Integer, primary_key=True)
+    no_vendedor = Column('NO_VENDEDOR', String)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer)
+    # Usamos .server_default para 'datas', pois elas não são definidas pelo Python
+    dt_mes_referencia = Column('DT_MES_REFERENCIA', DateTime, primary_key=True, server_default=text('CURRENT_TIMESTAMP'))
+    qt_pedidos = Column('QT_PEDIDOS', Integer)
+    vl_total_vendas = Column('VL_TOTAL_VENDAS', Numeric)
+    vl_ticket_medio = Column('VL_TICKET_MEDIO', Numeric)
+
+class VwComissoesCalculadas(Base):
+    """ Mapeia a View VW_COMISSOES_CALCULADAS """
+    __tablename__ = 'VW_COMISSOES_CALCULADAS'
+
+    # Precisamos definir uma chave primária para o SQLAlchemy
+    id_pedido = Column('ID_PEDIDO', Integer, primary_key=True) 
+    
+    nr_pedido = Column('NR_PEDIDO', String)
+    id_usuario = Column('ID_USUARIO', Integer)
+    no_vendedor = Column('NO_VENDEDOR', String)
+    id_empresa = Column('ID_EMPRESA', Integer)
+    no_empresa = Column('NO_EMPRESA', String)
+    vl_total = Column('VL_TOTAL', Numeric)
+    pc_comissao_aplicada = Column('PC_COMISSAO_APLICADA', Numeric)
+    vl_comissao_calculada = Column('VL_COMISSAO_CALCULADA', Numeric)
+    dt_pedido = Column('DT_PEDIDO', DateTime)
+
+class VwVendasEmpresaMes(Base):
+    """ Mapeia a View VW_VENDAS_EMPRESA_MES """
+    __tablename__ = 'VW_VENDAS_EMPRESA_MES'
+    
+    # Chave primária composta para o SQLAlchemy
+    id_empresa = Column('ID_EMPRESA', Integer, primary_key=True)
+    dt_mes_referencia = Column('DT_MES_REFERENCIA', DateTime, primary_key=True, server_default=text('CURRENT_TIMESTAMP'))
+    
+    no_empresa = Column('NO_EMPRESA', String)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer)
+    qt_pedidos = Column('QT_PEDIDOS', Integer)
+    vl_total_vendas = Column('VL_TOTAL_VENDAS', Numeric)
+    qt_clientes_atendidos = Column('QT_CLIENTES_ATENDIDOS', Integer)
+
+class VwVendasPorCidade(Base):
+    """ Mapeia a View VW_VENDAS_POR_CIDADE """
+    __tablename__ = 'VW_VENDAS_POR_CIDADE'
+
+    # Chave primária composta (complexa) para o SQLAlchemy
+    no_cidade = Column('NO_CIDADE', String, primary_key=True)
+    sg_estado = Column('SG_ESTADO', String, primary_key=True)
+    id_organizacao = Column('ID_ORGANIZACAO', Integer, primary_key=True)
+    dt_mes_referencia = Column('DT_MES_REFERENCIA', DateTime, primary_key=True, server_default=text('CURRENT_TIMESTAMP'))
+
+    qt_pedidos = Column('QT_PEDIDOS', Integer)
+    vl_total_vendas = Column('VL_TOTAL_VENDAS', Numeric)

@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-
+from src.models import models
 from src.core.config import settings
 from src.database import get_db
 from src.models.models import Usuario
@@ -129,3 +129,24 @@ async def get_current_vendedor_contexto(data: tuple = Depends(get_current_user_d
         )
         
     return token_data.id_usuario, token_data.id_organizacao, token_data.id_empresa_ativa
+
+async def get_current_super_admin(
+    current_user: models.Usuario = Depends(get_current_user)
+) -> models.Usuario:
+    """
+    Dependência que valida se o usuário é 'super_admin'.
+    """
+    if current_user.tp_usuario != 'super_admin':
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a Super Administradores."
+        )
+    
+    # Validação de segurança extra: Super Admin não pode pertencer a uma organização
+    if current_user.id_organizacao is not None:
+         raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Conta de Super Admin configurada incorretamente (associada a uma organização)."
+        )
+        
+    return current_user

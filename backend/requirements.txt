@@ -1,23 +1,21 @@
-bcrypt==4.3.0
-blinker==1.9.0
-certifi==2025.4.26
-charset-normalizer==3.4.2
-click==8.2.1
-colorama==0.4.6
+# /backend/requirements.txt
+
+# --- Core API Framework ---
 fastapi
-uvicorn[standard]
+uvicorn[standard]  # Servidor ASGI (inclui watchfiles para --reload)
 pydantic
 pydantic-settings
-python-jose[cryptography] 
-python-multipart
-greenlet==3.2.3
-idna==3.10
-Jinja2==3.1.6
-MarkupSafe==3.0.2
-psycopg2-binary==2.9.10
-python-dotenv==1.1.0
-requests==2.32.4
-SQLAlchemy==2.0.41
-typing_extensions==4.14.0
-urllib3==2.4.0
+pydantic[email]    # Para validação de EmailStr
+
+# --- Database (SQLAlchemy) ---
+sqlalchemy==2.0.41
+psycopg2-binary    # Driver do PostgreSQL (para produção no Railway/Supabase)
+# (Não listamos o 'sqlite3', pois é nativo do Python)
+
+# --- Autenticação & Segurança ---
+python-jose[cryptography]  # Para tokens JWT
+bcrypt                   # Para hash de senhas
+
+# --- Utilitários ---
+python-dotenv            # Para carregar o .env
 email-validator

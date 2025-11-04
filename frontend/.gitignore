@@ -1,28 +1,24 @@
-# Arquivos de log e cache
+# Logs
 logs
 *.log
 npm-debug.log*
-pnpm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-report.[0-9]*.[0-9]*.[0-9]*.[0-9]*.json
-# Cache de dependências do pnpm
-.pnpm-store/
+pnpm-debug.log*
+lerna-debug.log*
 
-# Dependências do Node.js (MUITO IMPORTANTE)
-/node_modules
+node_modules
+dist
+dist-ssr
+*.local
 
-# Pasta de build do Vite
-/dist
-
-# Arquivos de ambiente local (NUNCA ENVIE PARA O GITHUB)
-.env
-.env.local
-.env.*.local
-
-# Arquivos de sistema operacional
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
 .DS_Store
-Thumbs.db
-
-# Arquivos do editor de código (VS Code)
-.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

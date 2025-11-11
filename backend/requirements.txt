@@ -20,3 +20,4 @@ bcrypt                   # Para hash de senhas
 # --- Utilitários ---
 python-dotenv            # Para carregar o .env
 email-validator
+httpx

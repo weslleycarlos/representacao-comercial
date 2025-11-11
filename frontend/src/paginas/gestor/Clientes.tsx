@@ -1,47 +1,56 @@
-// /frontend/src/paginas/gestor/Empresas.tsx
+// /frontend/src/paginas/gestor/Clientes.tsx
 // Versão ajustada - UX e Layout melhorados
 
 import React, { useState } from 'react';
 import {
-  Box,
-  Button,
-  Typography,
-  Paper,
-  Alert,
-  LinearProgress,
-  Chip,
-  Tooltip
+  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { 
+  Add as AddIcon, 
+  Edit as EditIcon, 
+  LocationOn as LocationOnIcon, 
+  Contacts as ContactsIcon,
+  Delete as DeleteIcon 
+} from '@mui/icons-material';
 
-import { useDeleteEmpresa, useGetEmpresas } from '../../api/servicos/empresaService';
-import type { IEmpresaCompleta } from '../../tipos/schemas';
-import { ModalFormEmpresa } from '../../componentes/gestor/ModalFormEmpresa';
+import { useGetClientes, useDeleteCliente } from '../../api/servicos/clienteService';
+import type { IClienteCompleto } from '../../tipos/schemas';
+import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalConfirmarExclusao } from '../../componentes/layout/ModalConfirmarExclusao';
+import { ModalGerenciarEnderecos } from '../../componentes/gestor/ModalGerenciarEnderecos';
+import { ModalGerenciarContatos } from '../../componentes/gestor/ModalGerenciarContatos';
 
-export const PaginaEmpresas: React.FC = () => {
+export const PaginaClientes: React.FC = () => {
   const [modalFormAberto, setModalFormAberto] = useState(false);
-  const [empresaSelecionada, setEmpresaSelecionada] = useState<IEmpresaCompleta | undefined>(undefined);
+  const [modalEnderecosAberto, setModalEnderecosAberto] = useState(false);
+  const [modalContatosAberto, setModalContatosAberto] = useState(false);
+  const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | undefined>(undefined);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
-
+  
   const { 
-    data: empresas, 
-    isLoading: isLoadingEmpresas, 
+    data: clientes, 
+    isLoading: isLoadingClientes, 
     isError, 
     error 
-  } = useGetEmpresas();
+  } = useGetClientes();
 
-  const { mutate: deleteEmpresa, isPending: isDeleting } = useDeleteEmpresa();
-  
+  const { mutate: deleteCliente, isPending: isDeleting } = useDeleteCliente();
+
   // Definição das Colunas
   const colunas: GridColDef[] = [
     { 
-      field: 'no_empresa', 
-      headerName: 'Nome da Empresa', 
+      field: 'no_razao_social', 
+      headerName: 'Razão Social', 
       flex: 2,
       minWidth: 200,
+    },
+    { 
+      field: 'no_fantasia', 
+      headerName: 'Nome Fantasia', 
+      flex: 1.5,
+      minWidth: 150,
     },
     { 
       field: 'nr_cnpj', 
@@ -50,38 +59,26 @@ export const PaginaEmpresas: React.FC = () => {
       minWidth: 140,
     },
     { 
-      field: 'ds_email_contato', 
+      field: 'ds_email', 
       headerName: 'E-mail', 
       flex: 1.5,
       minWidth: 180,
     },
     { 
-      field: 'nr_telefone_contato', 
+      field: 'nr_telefone', 
       headerName: 'Telefone', 
       flex: 1,
       minWidth: 130,
     },
     { 
-      field: 'pc_comissao_padrao', 
-      headerName: 'Comissão', 
-      width: 110,
-      align: 'center',
-      headerAlign: 'center',
-      renderCell: (params) => (
-        <Typography variant="body2" fontWeight={500}>
-          {params.value}%
-        </Typography>
-      )
-    },
-    { 
-      field: 'fl_ativa', 
+      field: 'fl_ativo', 
       headerName: 'Status', 
       width: 100,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
         <Chip 
-          label={params.value ? "Ativa" : "Inativa"} 
+          label={params.value ? "Ativo" : "Inativo"} 
           color={params.value ? "success" : "default"} 
           size="small"
           sx={{ fontWeight: 500 }}
@@ -92,7 +89,7 @@ export const PaginaEmpresas: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      width: 100,
+      width: 140,
       getActions: (params) => [
         <GridActionsCellItem
           icon={
@@ -100,19 +97,39 @@ export const PaginaEmpresas: React.FC = () => {
               <EditIcon />
             </Tooltip>
           }
-          label="Editar"
-          onClick={() => handleOpenEdit(params.row as IEmpresaCompleta)}
+          label="Editar Cliente"
+          onClick={() => handleOpenEdit(params.row as IClienteCompleto)}
           showInMenu={false}
         />,
         <GridActionsCellItem
           icon={
-            <Tooltip title={params.row.fl_ativa ? "Desativar" : "Empresa já inativa"}>
+            <Tooltip title="Endereços">
+              <LocationOnIcon />
+            </Tooltip>
+          }
+          label="Gerenciar Endereços"
+          onClick={() => handleOpenEnderecos(params.row as IClienteCompleto)}
+          showInMenu={false}
+        />,
+        <GridActionsCellItem
+          icon={
+            <Tooltip title="Contatos">
+              <ContactsIcon />
+            </Tooltip>
+          }
+          label="Gerenciar Contatos"
+          onClick={() => handleOpenContatos(params.row as IClienteCompleto)}
+          showInMenu={false}
+        />,
+        <GridActionsCellItem
+          icon={
+            <Tooltip title={params.row.fl_ativo ? "Desativar" : "Cliente já inativo"}>
               <DeleteIcon />
             </Tooltip>
           }
-          label="Desativar"
+          label="Desativar Cliente"
           onClick={() => handleOpenDelete(params.id as number)}
-          disabled={!params.row.fl_ativa}
+          disabled={!params.row.fl_ativo}
           showInMenu={false}
         />,
       ],
@@ -120,35 +137,45 @@ export const PaginaEmpresas: React.FC = () => {
   ];
 
   // Funções de Manipulação
-  const handleOpenCreate = () => {
-    setEmpresaSelecionada(undefined);
-    setModalFormAberto(true);
-  };
-
-  const handleOpenEdit = (empresa: IEmpresaCompleta) => {
-    setEmpresaSelecionada(empresa);
-    setModalFormAberto(true);
-  };
-  
-  const handleCloseModal = () => {
-    setModalFormAberto(false);
-    setEmpresaSelecionada(undefined);
-  };
-
   const handleOpenDelete = (id: number) => {
     setIdParaExcluir(id);
     setModalExcluirAberto(true);
   };
 
+  const handleOpenContatos = (cliente: IClienteCompleto) => {
+    setClienteSelecionado(cliente);
+    setModalContatosAberto(true);
+  };
+
+  const handleOpenEnderecos = (cliente: IClienteCompleto) => {
+    setClienteSelecionado(cliente);
+    setModalEnderecosAberto(true);
+  };
+
   const handleConfirmDelete = () => {
     if (idParaExcluir) {
-      deleteEmpresa(idParaExcluir, {
+      deleteCliente(idParaExcluir, {
         onSuccess: () => {
           setModalExcluirAberto(false);
           setIdParaExcluir(null);
         }
       });
     }
+  };
+
+  const handleOpenCreate = () => {
+    setClienteSelecionado(undefined);
+    setModalFormAberto(true);
+  };
+
+  const handleOpenEdit = (cliente: IClienteCompleto) => {
+    setClienteSelecionado(cliente);
+    setModalFormAberto(true);
+  };
+
+  const handleCloseModal = () => {
+    setModalFormAberto(false);
+    setClienteSelecionado(undefined);
   };
 
   const handleCloseModalExcluir = () => {
@@ -167,10 +194,10 @@ export const PaginaEmpresas: React.FC = () => {
       }}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
-            Empresas
+            Clientes
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Gerencie as empresas representadas pela organização
+            Gerencie os clientes da sua organização
           </Typography>
         </Box>
         <Button
@@ -179,14 +206,14 @@ export const PaginaEmpresas: React.FC = () => {
           onClick={handleOpenCreate}
           size="large"
         >
-          Nova Empresa
+          Novo Cliente
         </Button>
       </Box>
 
       {/* Estado de Erro */}
       {isError && (
         <Alert severity="error" sx={{ mb: 3 }}>
-          Erro ao carregar empresas: {(error as any).message}
+          Erro ao carregar clientes: {(error as any).message}
         </Alert>
       )}
 
@@ -203,10 +230,10 @@ export const PaginaEmpresas: React.FC = () => {
         }}
       >
         <DataGrid
-          rows={empresas || []}
+          rows={clientes || []}
           columns={colunas}
-          getRowId={(row) => row.id_empresa}
-          loading={isLoadingEmpresas}
+          getRowId={(row) => row.id_cliente}
+          loading={isLoadingClientes}
           slots={{
             loadingOverlay: LinearProgress,
           }}
@@ -231,10 +258,10 @@ export const PaginaEmpresas: React.FC = () => {
       </Paper>
       
       {/* Modal de Adicionar/Editar */}
-      <ModalFormEmpresa
+      <ModalFormCliente
         open={modalFormAberto}
         onClose={handleCloseModal}
-        empresa={empresaSelecionada}
+        cliente={clienteSelecionado}
       />
       
       {/* Modal de Confirmação de Exclusão */}
@@ -242,10 +269,25 @@ export const PaginaEmpresas: React.FC = () => {
         open={modalExcluirAberto}
         onClose={handleCloseModalExcluir}
         onConfirm={handleConfirmDelete}
-        titulo="Desativar Empresa"
-        mensagem="Tem certeza que deseja desativar esta empresa? Esta ação pode ser revertida posteriormente."
+        titulo="Desativar Cliente"
+        mensagem="Tem certeza que deseja desativar este cliente? Esta ação pode ser revertida posteriormente."
         isLoading={isDeleting}
       />
+      {/* Renderiza apenas se um cliente estiver selecionado */}
+      {clienteSelecionado && (
+        <ModalGerenciarEnderecos
+          open={modalEnderecosAberto}
+          onClose={() => setModalEnderecosAberto(false)}
+          cliente={clienteSelecionado}
+        />
+      )}
+      {clienteSelecionado && (
+        <ModalGerenciarContatos
+          open={modalContatosAberto}
+          onClose={() => setModalContatosAberto(false)}
+          cliente={clienteSelecionado}
+        />
+      )}
     </Box>
   );
 };

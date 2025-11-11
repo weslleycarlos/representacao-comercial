@@ -1,4 +1,6 @@
 // /frontend/src/componentes/layout/ModalConfirmarExclusao.tsx
+// Versão ajustada - UX e Layout melhorados
+
 import React from 'react';
 import {
   Button,
@@ -7,17 +9,18 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material';
+import { WarningAmber as WarningIcon } from '@mui/icons-material';
 
-// Define as propriedades (props) que o modal aceitará
 interface ModalConfirmarExclusaoProps {
   open: boolean;
-  onClose: () => void;  // Função para fechar (botão "Cancelar")
-  onConfirm: () => void; // Função para confirmar (botão "Confirmar")
-  titulo: string;        // Ex: "Confirmar Desativação"
-  mensagem: string;      // Ex: "Tem certeza que deseja desativar esta empresa?"
-  isLoading?: boolean;    // Para mostrar o loading no botão de confirmar
+  onClose: () => void;
+  onConfirm: () => void;
+  titulo: string;
+  mensagem: string;
+  isLoading?: boolean;
 }
 
 export const ModalConfirmarExclusao: React.FC<ModalConfirmarExclusaoProps> = ({
@@ -26,41 +29,66 @@ export const ModalConfirmarExclusao: React.FC<ModalConfirmarExclusaoProps> = ({
   onConfirm,
   titulo,
   mensagem,
-  isLoading = false // Valor padrão
+  isLoading = false
 }) => {
   return (
     <Dialog
       open={open}
       onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
       aria-labelledby="confirm-dialog-title"
       aria-describedby="confirm-dialog-description"
     >
-      <DialogTitle id="confirm-dialog-title">
+      <DialogTitle 
+        id="confirm-dialog-title"
+        sx={{ 
+          pb: 1,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}
+      >
+        <WarningIcon color="error" />
         {titulo}
       </DialogTitle>
       
-      <DialogContent>
-        <DialogContentText id="confirm-dialog-description">
+      <Divider />
+      
+      <DialogContent sx={{ pt: 3 }}>
+        <DialogContentText 
+          id="confirm-dialog-description"
+          sx={{ color: 'text.primary' }}
+        >
           {mensagem}
         </DialogContentText>
       </DialogContent>
       
-      <DialogActions sx={{ p: 3 }}>
-        {/* Botão Cancelar */}
-        <Button onClick={onClose} color="inherit" disabled={isLoading}>
+      <Divider />
+      
+      <DialogActions sx={{ px: 3, py: 2, gap: 1 }}>
+        <Button 
+          onClick={onClose} 
+          color="inherit" 
+          disabled={isLoading}
+          size="large"
+          fullWidth
+        >
           Cancelar
         </Button>
         
-        {/* Botão Confirmar (Ação Destrutiva - cor 'error') */}
         <Button 
           onClick={onConfirm} 
-          color="error" // Vermelho para indicar perigo/exclusão
+          color="error"
           variant="contained" 
           disabled={isLoading}
-          // Mostra o ícone de loading se estiver em progresso
-          startIcon={isLoading ? <CircularProgress size={20} color="inherit" /> : null}
+          size="large"
+          fullWidth
         >
-          {isLoading ? 'Excluindo...' : 'Confirmar'}
+          {isLoading ? <CircularProgress size={24} color="inherit" /> : 'Confirmar'}
         </Button>
       </DialogActions>
     </Dialog>

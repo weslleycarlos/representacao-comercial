@@ -1,5 +1,6 @@
 // /frontend/src/api/servicos/authService.ts
 import { useMutation } from '@tanstack/react-query';
+import { type AxiosError } from 'axios';
 import apiClient from '../axios';
 import type { ILoginResponse } from '../../tipos/auth';
 import type { LoginFormData } from '../../tipos/validacao';
@@ -17,7 +18,7 @@ export const useLogin = () => {
     return data;
   };
 
-  return useMutation({
+  return useMutation<ILoginResponse, AxiosError<{ detail: string }>, LoginFormData>({
     mutationFn: loginMutation,
     // (Lógica 'onSuccess' ou 'onError' pode ser adicionada aqui ou na página)
   });

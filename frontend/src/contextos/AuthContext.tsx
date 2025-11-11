@@ -1,6 +1,7 @@
 // /frontend/src/contextos/AuthContext.tsx
-import { createContext, useState, ReactNode, useContext, useEffect } from 'react';
-import type { IAuthContext, ILoginResponse, IUsuario, IOrganizacao, IEmpresa } from '../tipos/auth';
+import { createContext, useState, type ReactNode, useContext, useEffect } from 'react';
+import type { IAuthContext, ILoginResponse} from '../tipos/auth';
+import type { IUsuario, IOrganizacao, IEmpresa} from '../tipos/schemas';
 import apiClient from '../api/axios'; // Importa nosso cliente Axios
 
 // 1. Cria o Contexto

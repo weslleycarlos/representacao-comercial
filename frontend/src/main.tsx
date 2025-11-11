@@ -27,7 +27,6 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <ThemeProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          {/* 2. ADICIONAR O AUTHPROVIDER AQUI */}
           <AuthProvider>
             <CssBaseline />
             <App />

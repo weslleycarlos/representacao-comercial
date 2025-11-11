@@ -8,6 +8,7 @@ from datetime import datetime
 from src.database import engine, Base, SessionLocal
 from src.models import models # Importa o models.py
 from src.routes.auth import auth_router
+from src.routes.utils import utils_router
 
 # Gestor
 from src.routes.gestor.logs import gestor_logs_router
@@ -137,6 +138,7 @@ seed_initial_data()
 
 # --- 5. INCLUSÃO DAS ROTAS ---
 app.include_router(auth_router)
+app.include_router(utils_router)
 # Admin
 app.include_router(admin_orgs_router)
 app.include_router(admin_logs_router)

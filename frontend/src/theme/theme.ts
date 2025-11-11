@@ -1,52 +1,72 @@
 // /frontend/src/theme/theme.ts
 import { createTheme } from '@mui/material/styles';
 
-// Estas são as cores do seu protótipo (Stitch)
 const cores = {
-  azulPrimario: '#4A90E2',     // Cor 'primary' (usada no dashboard)
-  fundoEscuro: '#101522',      // Cor 'background-dark'
-  fundoCartaoEscuro: '#192033', // Cor 'card-dark' (para Paper/Cards)
-  textoEscuro: '#ffffff',       // Cor 'text-dark'
-  textoSutilEscuro: '#92a0c9', // Cor 'subtle-dark'
-  bordaEscura: '#323f67',       // Cor 'border-dark'
+  azulPrimario: '#4A90E2',
+  azulClaro: '#63A4FF',
+  azulEscuro: '#2D5FA4',
+  fundoClaro: '#F8FAFC',
+  fundoCartaoClaro: '#FFFFFF',
+  textoPrimario: '#1A1F2C',
+  textoSecundario: '#5F6C87',
+  bordaClara: '#E2E8F0',
 };
 
-// Criamos o tema focando no 'dark mode'
 export const theme = createTheme({
   palette: {
-    // 1. Define o modo escuro como padrão
-    mode: 'dark', 
-    
-    // 2. Define as cores personalizadas
+    mode: 'light',
     primary: {
       main: cores.azulPrimario,
+      light: cores.azulClaro,
+      dark: cores.azulEscuro,
     },
     background: {
-      default: cores.fundoEscuro, // Fundo da página
-      paper: cores.fundoCartaoEscuro, // Fundo de componentes como Paper, Card, Menu
+      default: cores.fundoClaro,
+      paper: cores.fundoCartaoClaro,
     },
     text: {
-      primary: cores.textoEscuro,
-      secondary: cores.textoSutilEscuro,
+      primary: cores.textoPrimario,
+      secondary: cores.textoSecundario,
     },
-    divider: cores.bordaEscura, // Cor das bordas/divisórias
+    divider: cores.bordaClara,
   },
-  
-  // 3. Define a fonte do seu protótipo
   typography: {
     fontFamily: '"Manrope", "Roboto", "Helvetica", "Arial", sans-serif',
     h4: {
-      fontWeight: 800, // 'font-black' (peso 900) ou 800
-      letterSpacing: '-0.03em', // 'tracking-[-0.03em]'
+      fontWeight: 800,
+      letterSpacing: '-0.03em',
     },
     h5: {
-      fontWeight: 700, // 'font-bold'
+      fontWeight: 700,
     },
-    // (Podemos ajustar mais fontes depois)
+    body1: {
+      lineHeight: 1.6,
+    },
   },
-  
-  // 4. Define o arredondamento (border-radius)
   shape: {
-    borderRadius: 8, // (MUI usa 4 por padrão, 8 é mais moderno como no seu prototype "rounded-lg")
+    borderRadius: 8,
+  },
+  components: {
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'none',
+          fontWeight: 600,
+        },
+      },
+    },
+    MuiDialog: {
+      styleOverrides: {
+        paper: {
+          backgroundImage: 'none',
+          boxShadow: '0px 4px 16px rgba(0, 0, 0, 0.08)',
+        },
+      },
+    },
+    MuiTextField: {
+      defaultProps: {
+        variant: 'outlined',
+      },
+    },
   },
 });

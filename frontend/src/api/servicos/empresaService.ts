@@ -1,9 +1,9 @@
 // /frontend/src/api/servicos/empresaService.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../axios';
-import type { IEmpresa } from '../../tipos/auth'; // Reutiliza a interface
 import type { EmpresaFormData } from '../../tipos/validacao';
-import type { EmpresaCompletaSchema } from '../../tipos/schemas'; // Importa o schema de resposta completo
+import type { IEmpresa } from '../../tipos/schemas'; // Importa o schema básico
+import type { IEmpresaCompleta } from '../../tipos/schemas'; // Importa o schema de resposta completo
 
 // Define uma "chave" de cache para este recurso
 const EMPRESA_CACHE_KEY = 'empresas';
@@ -14,7 +14,7 @@ const EMPRESA_CACHE_KEY = 'empresas';
  * Gerencia cache, loading e erros automaticamente.
  */
 export const useGetEmpresas = () => {
-  const fetchEmpresas = async (): Promise<EmpresaCompletaSchema[]> => {
+  const fetchEmpresas = async (): Promise<IEmpresaCompleta[]> => {
     const { data } = await apiClient.get('/gestor/empresas/');
     return data;
   };

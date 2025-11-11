@@ -1,39 +1,24 @@
-// /frontend/src/componentes/layout/LayoutGestor.tsx
+// /frontend/src/componentes/layout/LayoutSuperAdmin.tsx
 // Versão ajustada - UX e Layout melhorados
 
 import React from 'react';
 import { Outlet, useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
-  Box,
-  Drawer,
-  AppBar,
-  Toolbar,
-  Typography,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Avatar,
-  Divider,
-  IconButton,
-  Tooltip,
+  Box, Drawer, AppBar, Toolbar, Typography, List, ListItem,
+  ListItemButton, ListItemIcon, ListItemText, Divider, Avatar,
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
-  ShoppingCart as ShoppingCartIcon,
-  Group as GroupIcon,
-  BarChart as BarChartIcon,
+  AdminPanelSettings as AdminPanelIcon,
   Business as BusinessIcon,
-  Settings as SettingsIcon,
   Logout as LogoutIcon,
-  People as PeopleIcon,
+  ArticleOutlined as LogsIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contextos/AuthContext';
 
 const DRAWER_WIDTH = 260;
 
-export const LayoutGestor: React.FC = () => {
+export const LayoutSuperAdmin: React.FC = () => {
   const { usuario, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -44,21 +29,36 @@ export const LayoutGestor: React.FC = () => {
   };
 
   const menuItems = [
-    { text: 'Dashboard', icon: <DashboardIcon />, path: '/gestor/dashboard' },
-    { text: 'Empresas', icon: <BusinessIcon />, path: '/gestor/empresas' },
-    { text: 'Vendedores', icon: <GroupIcon />, path: '/gestor/vendedores' },
-    { text: 'Clientes', icon: <PeopleIcon />, path: '/gestor/clientes' },
-    { text: 'Pedidos', icon: <ShoppingCartIcon />, path: '/gestor/pedidos' },
-    { text: 'Relatórios', icon: <BarChartIcon />, path: '/gestor/relatorios' },
+    { text: 'Dashboard', icon: <DashboardIcon />, path: '/admin/dashboard' },
+    { text: 'Organizações', icon: <BusinessIcon />, path: '/admin/organizacoes' },
+    { text: 'Logs do Sistema', icon: <LogsIcon />, path: '/admin/logs' },
   ];
 
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Perfil do Usuário */}
+      {/* Header com Logo/Título */}
+      <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Avatar 
+          sx={{ 
+            bgcolor: 'error.main',
+            width: 40,
+            height: 40,
+          }}
+        >
+          <AdminPanelIcon />
+        </Avatar>
+        <Typography variant="h6" fontWeight={700} color="text.primary">
+          Super Admin
+        </Typography>
+      </Box>
+      
+      <Divider />
+
+      {/* Perfil do Admin */}
       <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Avatar 
           sx={{ 
-            bgcolor: 'primary.main',
+            bgcolor: 'error.main',
             width: 44,
             height: 44,
             fontSize: '1.25rem',
@@ -74,14 +74,14 @@ export const LayoutGestor: React.FC = () => {
             noWrap
             sx={{ lineHeight: 1.3 }}
           >
-            {usuario?.no_completo || 'Gestor'}
+            {usuario?.no_completo || 'Administrador'}
           </Typography>
           <Typography 
             variant="caption" 
             color="text.secondary"
             noWrap
           >
-            {usuario?.tp_usuario === 'gestor' ? 'Gestor' : 'Usuário'}
+            Administrador do Sistema
           </Typography>
         </Box>
       </Box>
@@ -104,13 +104,13 @@ export const LayoutGestor: React.FC = () => {
                   sx={{
                     borderRadius: 1.5,
                     '&.Mui-selected': {
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
+                      bgcolor: 'error.main',
+                      color: 'error.contrastText',
                       '&:hover': {
-                        bgcolor: 'primary.dark',
+                        bgcolor: 'error.dark',
                       },
                       '& .MuiListItemIcon-root': {
-                        color: 'primary.contrastText',
+                        color: 'error.contrastText',
                       },
                     },
                   }}
@@ -139,25 +139,8 @@ export const LayoutGestor: React.FC = () => {
       
       <Divider />
       
-      {/* Menu Inferior */}
+      {/* Menu Inferior - Logout */}
       <List disablePadding sx={{ py: 1 }}>
-        <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
-          <ListItemButton 
-            component={RouterLink} 
-            to="/gestor/configuracoes"
-            selected={location.pathname === '/gestor/configuracoes'}
-            sx={{ borderRadius: 1.5 }}
-          >
-            <ListItemIcon sx={{ color: 'text.secondary', minWidth: 40 }}>
-              <SettingsIcon />
-            </ListItemIcon>
-            <ListItemText 
-              primary="Configurações"
-              primaryTypographyProps={{ fontSize: '0.9375rem' }}
-            />
-          </ListItemButton>
-        </ListItem>
-        
         <ListItem disablePadding sx={{ px: 1.5 }}>
           <ListItemButton 
             onClick={handleLogout}
@@ -201,11 +184,11 @@ export const LayoutGestor: React.FC = () => {
       >
         <Toolbar sx={{ justifyContent: 'space-between' }}>
           <Typography variant="h6" noWrap component="div" color="text.primary" fontWeight={600}>
-            {/* Título dinâmico da página pode vir aqui */}
+            Painel de Controle
           </Typography>
           
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* Espaço para ações do header (notificações, etc) */}
+            {/* Espaço para ações do header */}
           </Box>
         </Toolbar>
       </AppBar>

@@ -3,36 +3,36 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  Container, 
-  Paper, 
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  Container,
+  Paper,
   Alert,
-  Grid, // Para o layout 50/50
-  Avatar, // Para o Logo
-  Link, // Para "Esqueceu a senha?"
-  CircularProgress // Para o loading do botão
+  Grid,        // ou Grid2 se você importar especificamente
+  Link,
+  Avatar,
+  CircularProgress
 } from '@mui/material';
-import LockOutlinedIcon from '@mui/icons-material/LockOutlined'; // Ícone de cadeado
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 
 import { useAuth } from '../contextos/AuthContext';
 import { loginSchema, type LoginFormData } from '../tipos/validacao';
 import { useLogin } from '../api/servicos/authService';
 
-// URL da imagem de fundo (do seu protótipo)
-const imagemFundoUrl = "https://lh3.googleusercontent.com/aida-public/AB6AXuCm87jb9E_CnCr8niIekc3Lj__5LrNJKRpEouCmTiiOjvnT5rhiNOwkd9V3U1hvwjYJ_gUtLO6H6_J-gUN-xx0ulUTEdEWFMlb_ZlqsrecWD5n34AKNLOv8rhc6y8q5w_a5A9yUzdngGTCsH4mBHqrk3kccM0igBK2kofaNnEPNL246sfYkEJ-3V9VwAszzuoq_WXZy40AsRepCh2oSWPhUrZdv1sIEQ2VGXAPNmNt-4Wt2PMFFH8vYdjZIjj9Ohuv7tqxb-8OQt9M5";
+const imagemFundoUrl =
+  "https://lh3.googleusercontent.com/aida-public/AB6AXuCm87jb9E_CnCr8niIekc3Lj__5LrNJKRpEouCmTiiOjvnT5rhiNOwkd9V3U1hvwjYJ_gUtLO6H6_J-gUN-xx0ulUTEdEWFMlb_ZlqsrecWD5n34AKNLOv8rhc6y8q5w_a5A9yUzdngGTCsH4mBHqrk3kccM0igBK2kofaNnEPNL246sfYkEJ-3V9VwAszzuoq_WXZy40AsRepCh2oSWPhUrZdv1sIEQ2VGXAPNmNt-4Wt2PMFFH8vYdjZIjj9Ohuv7tqxb-8OQt9M5";
 
 export const PaginaLogin: React.FC = () => {
   const navigate = useNavigate();
-  const { login: authLogin } = useAuth(); 
-  
-  const { 
-    register, 
-    handleSubmit, 
-    formState: { errors } 
+  const { login: authLogin } = useAuth();
+
+  const {
+    register,
+    handleSubmit,
+    formState: { errors }
   } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema)
   });
@@ -43,48 +43,42 @@ export const PaginaLogin: React.FC = () => {
     executarLogin(data, {
       onSuccess: (responseData) => {
         authLogin(responseData);
-        // TODO: Mudar para / (que irá redirecionar baseado no tp_usuario)
-        navigate('/gestor/dashboard'); 
-      },
+        navigate('/');
+      }
     });
   };
 
   const apiErrorMessage = (error as any)?.response?.data?.detail;
 
   return (
-    // Container principal que ocupa a tela inteira
     <Grid container component="main" sx={{ height: '100vh' }}>
-      
-      {/* 1. Lado da Imagem (Inspirado no protótipo) */}
+      {/* Lado da Imagem */}
       <Grid
-        item
-        xs={false} // Oculto em telas pequenas
-        sm={4}
-        md={7}
+        size={{ sm: 4, md: 7 }}
+        display={{ xs: 'none', sm: 'block' }}
         sx={{
           backgroundImage: `url(${imagemFundoUrl})`,
           backgroundRepeat: 'no-repeat',
-          backgroundColor: (t) => t.palette.mode === 'dark' ? t.palette.grey[900] : t.palette.grey[50],
+          backgroundColor: (theme) =>
+            theme.palette.mode === 'dark'
+              ? theme.palette.grey[900]
+              : theme.palette.grey[50],
           backgroundSize: 'cover',
-          backgroundPosition: 'center',
+          backgroundPosition: 'center'
         }}
       />
-      
-      {/* 2. Lado do Formulário */}
-      <Grid 
-        item 
-        xs={12} 
-        sm={8} 
-        md={5} 
-        component={Paper} // Usa o Paper (cor 'background.paper' do tema)
-        elevation={6} 
-        square 
-        sx={{ 
-          // Centraliza o conteúdo do formulário verticalmente
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          justifyContent: 'center' 
+
+      {/* Lado do Formulário */}
+      <Grid
+        size={{ xs: 12, sm: 8, md: 5 }}
+        component={Paper}
+        elevation={6}
+        square
+        sx={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
       >
         <Container maxWidth="xs">
@@ -92,25 +86,24 @@ export const PaginaLogin: React.FC = () => {
             sx={{
               display: 'flex',
               flexDirection: 'column',
-              alignItems: 'center',
+              alignItems: 'center'
             }}
           >
-            {/* Ícone de Logo (Substitui o SVG do protótipo) */}
             <Avatar sx={{ m: 1, bgcolor: 'primary.main' }}>
               <LockOutlinedIcon />
             </Avatar>
-            
+
             <Typography component="h1" variant="h4" sx={{ mt: 2 }}>
               Bem-vindo de volta!
             </Typography>
             <Typography component="p" color="text.secondary" sx={{ mt: 1 }}>
               Insira suas credenciais para acessar o painel.
             </Typography>
-            
-            <Box 
-              component="form" 
-              onSubmit={handleSubmit(onSubmit)} 
-              noValidate 
+
+            <Box
+              component="form"
+              onSubmit={handleSubmit(onSubmit)}
+              noValidate
               sx={{ mt: 3, width: '100%' }}
             >
               <TextField
@@ -121,7 +114,7 @@ export const PaginaLogin: React.FC = () => {
                 label="Email"
                 autoComplete="email"
                 autoFocus
-                {...register("email")}
+                {...register('email')}
                 error={!!errors.email}
                 helperText={errors.email?.message}
               />
@@ -133,20 +126,17 @@ export const PaginaLogin: React.FC = () => {
                 type="password"
                 id="password"
                 autoComplete="current-password"
-                {...register("password")}
+                {...register('password')}
                 error={!!errors.password}
                 helperText={errors.password?.message}
               />
-              
+
               <Grid container sx={{ mt: 1, mb: 1 }}>
-                <Grid item xs>
+                <Grid size="grow">
                   <Link href="#" variant="body2" color="primary">
                     Esqueceu sua senha?
                   </Link>
                 </Grid>
-                {/* TODO: Adicionar link de Registro (Cadastro)
-                  (O protótipo tinha, mas nosso backend ainda não)
-                */}
               </Grid>
 
               {apiErrorMessage && (
@@ -159,12 +149,15 @@ export const PaginaLogin: React.FC = () => {
                 type="submit"
                 fullWidth
                 variant="contained"
-                sx={{ mt: 3, mb: 2, height: 48, fontWeight: 'bold' }} // Botão mais alto
+                sx={{ mt: 3, mb: 2, height: 48, fontWeight: 'bold' }}
                 disabled={isPending}
               >
-                {isPending ? <CircularProgress size={24} color="inherit" /> : 'Entrar'}
+                {isPending ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  'Entrar'
+                )}
               </Button>
-              
             </Box>
           </Box>
         </Container>

@@ -1,29 +1,32 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 // /frontend/src/componentes/gestor/ModalFormVendedor.tsx
+// Versão ajustada - UX e Layout melhorados
+
 import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
-  Checkbox, FormControlLabel,
-  Box
+  Checkbox, FormControlLabel, Box, Divider
 } from '@mui/material';
 
 import { type VendedorFormData, vendedorSchema } from '../../tipos/validacao';
-import type { VendedorSchema } from '../../tipos/schemas';
+import type { IVendedor } from '../../tipos/schemas';
 import { useCreateVendedor, useUpdateVendedor } from '../../api/servicos/vendedorService';
+import { MaskedInput } from '../utils/MaskedInput';
 
 interface ModalFormVendedorProps {
   open: boolean;
   onClose: () => void;
-  vendedor?: VendedorSchema; // Para modo de edição
+  vendedor?: IVendedor;
 }
 
 export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onClose, vendedor }) => {
   const isEditMode = !!vendedor;
 
   const { 
-    register, handleSubmit, formState: { errors }, reset, control
+    register, handleSubmit, formState: { errors }, reset, control, setValue, watch
   } = useForm<VendedorFormData>({
     resolver: zodResolver(vendedorSchema),
     defaultValues: {
@@ -40,21 +43,20 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
 
   const isSaving = isCreating || isUpdating;
   const mutationError = (createError || updateError) as any;
+  
+  const telefoneValue = watch('nr_telefone');
 
-  // Preenche o formulário para edição ou limpa para criação
   useEffect(() => {
     if (open) {
-      if (isEditMode) {
-        // Modo Edição: preenche com dados do vendedor (sem a senha)
+      if (isEditMode && vendedor) {
         reset({
           ds_email: vendedor.ds_email,
           no_completo: vendedor.no_completo,
           nr_telefone: vendedor.nr_telefone || '',
           fl_ativo: vendedor.fl_ativo,
-          password: '', // Senha fica em branco na edição
+          password: '',
         });
       } else {
-        // Modo Criação: limpa o formulário
         reset({
           ds_email: '',
           password: '',
@@ -67,23 +69,14 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
   }, [vendedor, isEditMode, reset, open]);
 
   const onSubmit = (data: VendedorFormData) => {
-    if (isEditMode) {
-      // Edição: Remove a senha se estiver vazia (não queremos atualizar)
+    if (isEditMode && vendedor) {
       const { password, ...updateData } = data;
-      
       const payload: Omit<VendedorFormData, 'password'> = updateData;
-      // (Se a senha foi digitada, faríamos uma chamada a uma rota /reset-password)
-      // Por enquanto, o PUT não altera a senha.
-
       updateVendedor({ id: vendedor.id_usuario, data: payload }, {
         onSuccess: () => onClose(),
       });
     } else {
-      // Criação: Senha é obrigatória
-      if (!data.password) {
-        // (O Zod já deve pegar isso, mas é uma garantia)
-        return; 
-      }
+      if (!data.password) return; 
       createVendedor(data, {
         onSuccess: () => onClose(),
       });
@@ -93,17 +86,32 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
   const apiErrorMessage = mutationError?.response?.data?.detail;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{isEditMode ? 'Editar Vendedor' : 'Adicionar Novo Vendedor'}</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {isEditMode ? 'Editar Vendedor' : 'Novo Vendedor'}
+      </DialogTitle>
+      
+      <Divider />
       
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {apiErrorMessage}
+            </Alert>
           )}
 
-          <Grid container spacing={2}>
-            <Grid item xs={12}>
+          <Grid container spacing={2.5}>
+            {/* Linha 1: Nome */}
+            <Grid size={12}>
               <TextField
                 {...register("no_completo")}
                 label="Nome Completo"
@@ -114,10 +122,12 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
                 helperText={errors.no_completo?.message}
               />
             </Grid>
-            <Grid item xs={12} sm={8}>
+
+            {/* Linha 2: E-mail e Telefone */}
+            <Grid size={{ xs: 12, sm: 7 }}>
               <TextField
                 {...register("ds_email")}
-                label="Email"
+                label="E-mail"
                 type="email"
                 required
                 fullWidth
@@ -125,16 +135,22 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
                 helperText={errors.ds_email?.message}
               />
             </Grid>
-            <Grid item xs={12} sm={4}>
-              <TextField
-                {...register("nr_telefone")}
+            
+            <Grid size={{ xs: 12, sm: 5 }}>
+              <MaskedInput
+                mask="telefone"
                 label="Telefone"
                 fullWidth
+                value={telefoneValue || ""}
+                onChange={(value) => setValue('nr_telefone', value)}
+                error={!!errors.nr_telefone}
+                helperText={errors.nr_telefone?.message}
               />
             </Grid>
             
-            {!isEditMode && ( // Só mostra o campo Senha no modo CREATE
-              <Grid item xs={12}>
+            {/* Linha 3: Senha (somente no modo criação) */}
+            {!isEditMode && (
+              <Grid size={12}>
                 <TextField
                   {...register("password")}
                   label="Senha Provisória"
@@ -147,7 +163,8 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
               </Grid>
             )}
 
-            <Grid item xs={12}>
+            {/* Linha 4: Checkbox Ativo */}
+            <Grid size={12}>
               <FormControlLabel
                 control={
                   <Controller
@@ -164,11 +181,23 @@ export const ModalFormVendedor: React.FC<ModalFormVendedorProps> = ({ open, onCl
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={onClose} color="inherit" disabled={isSaving}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={onClose} 
+            color="inherit" 
+            disabled={isSaving}
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isSaving}
+            size="large"
+          >
             {isSaving ? <CircularProgress size={24} /> : 'Salvar'}
           </Button>
         </DialogActions>

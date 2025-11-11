@@ -135,9 +135,22 @@ class ClienteBase(BaseModel):
     no_fantasia: Optional[str] = None
     ds_email: Optional[EmailStr] = None
     nr_telefone: Optional[str] = None
+    nr_inscricao_estadual: Optional[str] = None
+    ds_observacoes: Optional[str] = None
 
 class ClienteCreate(ClienteBase):
     pass
+
+class ClienteUpdate(BaseModel):
+    """ Schema para atualizar um Cliente (PUT/PATCH) - todos os campos opcionais """
+    no_razao_social: Optional[str] = None
+    nr_cnpj: Optional[str] = None
+    no_fantasia: Optional[str] = None
+    nr_inscricao_estadual: Optional[str] = None
+    ds_email: Optional[EmailStr] = None
+    nr_telefone: Optional[str] = None
+    ds_observacoes: Optional[str] = None
+    fl_ativo: Optional[bool] = None
 
 class ClienteSchema(ClienteBase):
     id_cliente: int
@@ -333,6 +346,18 @@ class EnderecoBase(BaseModel):
     sg_estado: str # Ex: 'SP'
     nr_cep: str
     fl_principal: Optional[bool] = False
+
+class EnderecoUpdate(BaseModel):
+    """ Schema para atualizar um Endereço (PUT) """
+    tp_endereco: Optional[str] = None
+    ds_logradouro: Optional[str] = None
+    nr_endereco: Optional[str] = None
+    ds_complemento: Optional[str] = None
+    no_bairro: Optional[str] = None
+    no_cidade: Optional[str] = None
+    sg_estado: Optional[str] = None
+    nr_cep: Optional[str] = None
+    fl_principal: Optional[bool] = None
 
 class EnderecoCreate(EnderecoBase):
     pass # id_cliente virá da URL

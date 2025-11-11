@@ -1,14 +1,15 @@
 # /src/routes/gestor/clientes.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.exc import IntegrityError
 from typing import List
-
+from datetime import datetime
 from src.database import get_db
 from src.models.models import Cliente, Endereco, Contato
+from src.models import models
 from src.schemas import (
     ClienteCreate, ClienteCompletoSchema, EnderecoCreate, EnderecoSchema,
-    ContatoCreate, ContatoSchema, ContatoUpdate
+    ContatoCreate, ContatoSchema, ContatoUpdate, ClienteUpdate, EnderecoUpdate
 )
 from src.core.security import get_current_gestor_org_id
 
@@ -19,14 +20,18 @@ gestor_clientes_router = APIRouter(
     dependencies=[Depends(get_current_gestor_org_id)] # Protege todas as rotas
 )
 
-def get_cliente_by_id(db: Session, id_cliente: int, id_organizacao: int) -> Cliente:
+def get_cliente_by_id(db: Session, id_cliente: int, id_organizacao: int) -> models.Cliente:
     """
     Função helper para buscar um cliente, garantindo que ele pertença
-    à organização do gestor.
+    à organização do gestor E carregando os relacionamentos.
     """
-    cliente = db.query(Cliente).filter(
-        Cliente.id_cliente == id_cliente,
-        Cliente.id_organizacao == id_organizacao
+    cliente = db.query(models.Cliente).options(
+        # Eager load dos relacionamentos aninhados
+        joinedload(models.Cliente.enderecos),
+        joinedload(models.Cliente.contatos)
+    ).filter(
+        models.Cliente.id_cliente == id_cliente,
+        models.Cliente.id_organizacao == id_organizacao
     ).first()
     
     if not cliente:
@@ -35,6 +40,22 @@ def get_cliente_by_id(db: Session, id_cliente: int, id_organizacao: int) -> Clie
             detail="Cliente não encontrado ou não pertence a esta organização."
         )
     return cliente
+
+
+# --- Helper para Endereço ---
+def get_endereco_by_id(db: Session, id_endereco: int, id_organizacao: int) -> models.Endereco:
+    """ Valida se o endereço pertence à organização do gestor """
+    endereco = db.query(models.Endereco).join(models.Cliente).filter(
+        models.Endereco.id_endereco == id_endereco,
+        models.Cliente.id_organizacao == id_organizacao
+    ).first()
+    
+    if not endereco:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Endereço não encontrado ou não pertence a esta organização."
+        )
+    return endereco
 
 def get_contato_by_id(db: Session, id_contato: int, id_organizacao: int) -> Contato:
     """
@@ -169,6 +190,53 @@ def add_endereco_ao_cliente(
             detail=str(e)
         )
 
+@gestor_clientes_router.get("/{id_cliente}/enderecos", response_model=List[EnderecoSchema])
+def get_enderecos_do_cliente(
+    id_cliente: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista todos os endereços de um cliente específico.
+    """
+    # Valida o cliente
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    
+    # Retorna os endereços (já carregados pelo relacionamento, mas podemos buscar)
+    return db_cliente.enderecos
+
+@gestor_clientes_router.put("/enderecos/{id_endereco}", response_model=EnderecoSchema)
+def update_endereco(
+    id_endereco: int,
+    endereco_in: EnderecoUpdate,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ Atualiza um endereço """
+    db_endereco = get_endereco_by_id(db, id_endereco, id_organizacao) # Valida
+    
+    update_data = endereco_in.model_dump(exclude_unset=True)
+    
+    for key, value in update_data.items():
+        setattr(db_endereco, key, value)
+        
+    db.commit()
+    db.refresh(db_endereco)
+    return db_endereco
+
+@gestor_clientes_router.delete("/enderecos/{id_endereco}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_endereco(
+    id_endereco: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ Exclui um endereço """
+    db_endereco = get_endereco_by_id(db, id_endereco, id_organizacao) # Valida
+        
+    db.delete(db_endereco)
+    db.commit()
+    return
+
 @gestor_clientes_router.delete("/enderecos/{id_endereco}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_endereco(
     id_endereco: int,
@@ -202,6 +270,21 @@ def delete_endereco(
 # ============================================
 # CRUD de Contatos (TB_CONTATOS)
 # ============================================
+
+@gestor_clientes_router.get("/{id_cliente}/contatos", response_model=List[ContatoSchema])
+def get_contatos_do_cliente(
+    id_cliente: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Lista todos os contatos de um cliente específico.
+    """
+    # Valida se o cliente pertence à organização
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    
+    # Retorna a lista de contatos do relacionamento
+    return db_cliente.contatos
 
 @gestor_clientes_router.post("/{id_cliente}/contatos", response_model=ContatoSchema, status_code=status.HTTP_201_CREATED)
 def add_contato_ao_cliente(
@@ -286,3 +369,82 @@ def delete_contato(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e)
         )
+    
+# ============================================
+# CRUD de Clientes (Continuação)
+# ============================================
+
+@gestor_clientes_router.put("/{id_cliente}", response_model=ClienteCompletoSchema)
+def update_cliente(
+    id_cliente: int,
+    cliente_in: ClienteUpdate, # Schema de atualização (todos os campos opcionais)
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Atualiza os dados de um cliente.
+    """
+    # get_cliente_by_id já valida a organização
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    
+    update_data = cliente_in.model_dump(exclude_unset=True)
+    
+    # Validação de CNPJ (se estiver sendo alterado)
+    if 'nr_cnpj' in update_data and update_data['nr_cnpj'] != db_cliente.nr_cnpj:
+        existing_cnpj = db.query(models.Cliente).filter(
+            models.Cliente.id_organizacao == id_organizacao,
+            models.Cliente.nr_cnpj == update_data['nr_cnpj'],
+            models.Cliente.id_cliente != id_cliente
+        ).first()
+        if existing_cnpj:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"O CNPJ {update_data['nr_cnpj']} já está em uso."
+            )
+
+    # Aplica as atualizações
+    for key, value in update_data.items():
+        setattr(db_cliente, key, value)
+        
+    try:
+        db.commit()
+        db.refresh(db_cliente)
+        # Retorna o objeto completo (Pydantic v2 fará a conversão)
+        return db_cliente
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+
+@gestor_clientes_router.delete("/{id_cliente}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_cliente(
+    id_cliente: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """
+    Desativa (Soft Delete) um cliente.
+    """
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    
+    if not db_cliente.fl_ativo:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Cliente já estava desativado."
+        )
+
+    db_cliente.fl_ativo = False
+    db_cliente.dt_exclusao = datetime.utcnow()
+    
+    try:
+        db.commit()
+        return # Retorna 204 No Content
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
+    

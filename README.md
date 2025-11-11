@@ -1,53 +1,132 @@
-# Backend API - Sistema de Representação Comercial
+# Sistema de Representação Comercial (RepCom)
 
-Este diretório contém o backend da API para o sistema RepCom, construído com FastAPI e SQLAlchemy.
+Este é um projeto monorepo para um sistema SaaS multi-tenant de representação comercial.
 
-## Stack Tecnológica
-
-* **Framework:** FastAPI
-* **Servidor:** Uvicorn (desenvolvimento), Gunicorn (produção)
-* **Banco de Dados:** SQLAlchemy ORM
-* **Driver de DB (Produção):** PostgreSQL (via `psycopg2-binary`)
-* **Autenticação:** Tokens JWT (via `python-jose`)
-* **Validação:** Pydantic
+* **/backend**: API em FastAPI (Python)
+* **/frontend**: Aplicação em React (Vite + TypeScript + MUI)
 
 ---
 
-## 1. Configuração de Desenvolvimento Local
+## 🚀 Stack Tecnológica
 
-(Resumo dos passos que já fizemos)
+### Backend (FastAPI)
+* **Framework:** FastAPI
+* **Servidor:** Uvicorn (dev), Gunicorn (prod)
+* **Banco de Dados:** SQLAlchemy ORM (PostgreSQL em produção, SQLite em dev)
+* **Autenticação:** Tokens JWT (via `python-jose`)
+* **Validação:** Pydantic
 
-1.  **Criar Ambiente Virtual:**
+### Frontend (React)
+* **Base:** Vite + React + TypeScript
+* **UI:** Material-UI (MUI)
+* **Roteamento:** `react-router-dom`
+* **Gerenciamento de API/Cache:** `TanStack Query` (React Query)
+* **Cliente HTTP:** `axios`
+* **Formulários:** `React Hook Form` + `Zod`
+
+---
+
+## 1. Configuração do Backend (FastAPI)
+
+O Backend roda na porta `5000`.
+
+1.  **Navegue até a pasta:**
     ```bash
     cd backend
-    python -m venv venv
-    source venv/Scripts/activate # (ou ./venv/bin/activate)
     ```
 
-2.  **Instalar Dependências:**
+2.  **Crie o Ambiente Virtual:**
+    ```bash
+    python -m venv venv
+    ```
+
+3.  **Ative o Ambiente Virtual:**
+    * **No Windows (CMD ou PowerShell):**
+        ```bash
+        .\venv\Scripts\activate
+        ```
+    * **No Windows (Git Bash) ou macOS/Linux:**
+        ```bash
+        source venv/Scripts/activate
+        ```
+
+4.  **Instale as Dependências:**
     ```bash
     pip install -r requirements.txt
     ```
 
-3.  **Configurar `.env` Local:**
-    Crie `backend/.env` com sua string de conexão local (SQLite) e uma chave secreta.
+5.  **Configurar `.env` Local:**
+    Crie um arquivo chamado `.env` dentro da pasta `/backend`.
     ```ini
-    # Use o caminho absoluto para o seu arquivo .db
-    DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/representacao-comercial/backend/local_api.db
-    SECRET_KEY=uma_chave_secreta_de_teste_longa_e_aleatoria
+    # /backend/.env
     
-    # Flag para rodar o seed de dados
+    # Use o caminho absoluto para o seu arquivo .db (use barras /)
+    # Ex: DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/repcom/backend/local_api.db
+    DATABASE_URL=sqlite:///C:/COLOQUE/SEU/CAMINHO/ABSOLUTO/AQUI/backend/local_api.db
+
+    # Gere uma chave forte ([https://1password.com/pt-br/password-generator/](https://1password.com/pt-br/password-generator/))
+    SECRET_KEY=SUA_CHAVE_SECRETA_ALEATORIA_DE_64_CARACTERES_AQUI
+    
+    # Flag para rodar o seed de dados (criação de tabelas e usuários admin)
     AMBIENTE=dev 
     ```
 
-4.  **Rodar o Servidor Local (com auto-reload):**
+6.  **Rodar o Servidor Local (com auto-reload):**
     ```bash
     uvicorn src.main:app --reload --port 5000
     ```
+    * A API estará acessível em: `http://127.0.0.1:5000/docs`
 
 ---
 
-## 2. Configuração de Produção (Deploy no Railway/Supabase)
+## 2. Configuração do Frontend (Vite + React)
+
+O Frontend roda na porta `5173`.
+
+1.  **Abra um SEGUNDO terminal.**
+
+2.  **Navegue até a pasta:**
+    ```bash
+    cd frontend
+    ```
+
+3.  **Instale as Dependências:**
+    ```bash
+    npm install
+    ```
+    * *Nota: Se você encontrar erros `ERESOLVE` (conflitos de dependência), use o comando alternativo:*
+        ```bash
+        npm install --legacy-peer-deps
+        ```
+
+4.  **Configurar `.env` Local:**
+    Crie um arquivo chamado `.env` dentro da pasta `/frontend`.
+    ```ini
+    # /frontend/.env
+    
+    # Aponta para a API do Backend que está rodando localmente
+    VITE_API_BASE_URL=[http://127.0.0.1:5000/api](http://127.0.0.1:5000/api)
+    ```
+
+5.  **Rodar o Servidor de Desenvolvimento:**
+    ```bash
+    npm run dev
+    ```
+    * A aplicação estará acessível em: `http://localhost:5173`
+
+---
+
+## 3. Rodando o Projeto (Resumo)
+
+1.  **Terminal 1 (Backend):** `cd backend` -> `.\venv\Scripts\activate` -> `uvicorn src.main:app --reload --port 5000`
+2.  **Terminal 2 (Frontend):** `cd frontend` -> `npm run dev`
+3.  **Acessar a Aplicação:** `http://localhost:5173`
+
+---
+
+## 4. Configuração de Produção (Deploy no Railway/Supabase)
+
+(Esta seção foi mantida do seu arquivo original)
 
 O deploy em produção é mais simples, pois depende apenas das variáveis de ambiente e do comando de start.
 

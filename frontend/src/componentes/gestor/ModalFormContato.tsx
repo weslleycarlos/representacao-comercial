@@ -1,12 +1,15 @@
 // /frontend/src/componentes/gestor/ModalFormContato.tsx
+// Versão ajustada - UX e Layout melhorados
+
 import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
-  Checkbox, FormControlLabel, Box
+  Checkbox, FormControlLabel, Box, Divider
 } from '@mui/material';
+
 import { MaskedInput } from '../utils/MaskedInput';
 import { type ContatoFormData, contatoSchema } from '../../tipos/validacao';
 import type { IContato } from '../../tipos/schemas';
@@ -16,7 +19,7 @@ interface ModalFormContatoProps {
   open: boolean;
   onClose: () => void;
   idCliente: number;
-  contato?: IContato; // Para modo de edição
+  contato?: IContato;
 }
 
 export const ModalFormContato: React.FC<ModalFormContatoProps> = ({ open, onClose, idCliente, contato }) => {
@@ -30,20 +33,19 @@ export const ModalFormContato: React.FC<ModalFormContatoProps> = ({ open, onClos
     defaultValues: { fl_principal: false }
   });
 
-  // Hooks de Mutação
   const { mutate: addContato, isPending: isAdding, error: addError } = useAddContato();
   const { mutate: updateContato, isPending: isUpdating, error: updateError } = useUpdateContato();
 
   const isSaving = isAdding || isUpdating;
   const mutationError = addError || updateError;
-  const telefoneValue = watch('nr_telefone'); // Observa o valor do telefone
-  // Preenche o formulário para edição ou limpa para criação
+  const telefoneValue = watch('nr_telefone');
+
   useEffect(() => {
     if (open) {
-      if (isEditMode) {
-        reset(contato); // Preenche
+      if (isEditMode && contato) {
+        reset(contato);
       } else {
-        reset({ // Limpa
+        reset({
           no_contato: '',
           ds_cargo: '',
           ds_email: '',
@@ -69,18 +71,32 @@ export const ModalFormContato: React.FC<ModalFormContatoProps> = ({ open, onClos
   const apiErrorMessage = (mutationError as any)?.response?.data?.detail;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{isEditMode ? 'Editar Contato' : 'Adicionar Novo Contato'}</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="sm" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {isEditMode ? 'Editar Contato' : 'Novo Contato'}
+      </DialogTitle>
+      
+      <Divider />
       
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {apiErrorMessage}
+            </Alert>
           )}
 
-          <Grid container spacing={2}>
-            
-            <Grid xs={12} sm={7}>
+          <Grid container spacing={2.5}>
+            {/* Linha 1: Nome e Cargo */}
+            <Grid size={{ xs: 12, sm: 7 }}>
               <TextField
                 {...register("no_contato")}
                 label="Nome do Contato"
@@ -91,36 +107,44 @@ export const ModalFormContato: React.FC<ModalFormContatoProps> = ({ open, onClos
                 helperText={errors.no_contato?.message}
               />
             </Grid>
-            <Grid xs={12} sm={5}>
+            
+            <Grid size={{ xs: 12, sm: 5 }}>
               <TextField
                 {...register("ds_cargo")}
-                label="Cargo (Ex: Comprador)"
+                label="Cargo"
                 fullWidth
+                placeholder="Ex: Comprador"
+                error={!!errors.ds_cargo}
+                helperText={errors.ds_cargo?.message}
               />
             </Grid>
             
-            <Grid xs={12} sm={7}>
+            {/* Linha 2: E-mail e Telefone */}
+            <Grid size={{ xs: 12, sm: 7 }}>
               <TextField
                 {...register("ds_email")}
-                label="Email"
+                label="E-mail"
                 type="email"
                 fullWidth
                 error={!!errors.ds_email}
                 helperText={errors.ds_email?.message}
               />
             </Grid>
-            <Grid xs={12} sm={5}>
+            
+            <Grid size={{ xs: 12, sm: 5 }}>
               <MaskedInput
                 mask="telefone"
                 label="Telefone"
                 fullWidth
-                // --- ADICIONE ESTAS DUAS PROPS ---
                 value={telefoneValue || ""}
                 onChange={(value) => setValue('nr_telefone', value)}
+                error={!!errors.nr_telefone}
+                helperText={errors.nr_telefone?.message}
               />
             </Grid>
             
-            <Grid xs={12}>
+            {/* Linha 3: Checkbox */}
+            <Grid size={12}>
               <FormControlLabel
                 control={
                   <Controller
@@ -137,12 +161,24 @@ export const ModalFormContato: React.FC<ModalFormContatoProps> = ({ open, onClos
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={onClose} color="inherit" disabled={isSaving}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={onClose} 
+            color="inherit" 
+            disabled={isSaving}
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
-            {isSaving ? <CircularProgress size={24} /> : 'Salvar Contato'}
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isSaving}
+            size="large"
+          >
+            {isSaving ? <CircularProgress size={24} /> : 'Salvar'}
           </Button>
         </DialogActions>
       </Box>

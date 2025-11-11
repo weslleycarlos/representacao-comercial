@@ -98,7 +98,7 @@ class EmpresaBase(BaseModel):
     ds_email_contato: Optional[EmailStr] = None
     nr_telefone_contato: Optional[str] = None
     ds_site: Optional[str] = None
-    pc_comissao_padrao: Optional[Decimal] = 0.00
+    pc_comissao_padrao: Optional[Decimal] = 0.00 # type: ignore
     fl_ativa: Optional[bool] = True
 
 class EmpresaCreate(EmpresaBase):
@@ -122,8 +122,6 @@ class EmpresaCompletaSchema(EmpresaSchema):
     dt_criacao: datetime
     dt_atualizacao: datetime
     
-    class ConfigDict:
-        from_attributes = True
 
 # ============================================
 # Schemas CRUD: Clientes
@@ -169,7 +167,7 @@ class VariacaoProdutoBase(BaseModel):
     ds_tamanho: Optional[str] = None
     ds_cor: Optional[str] = None
     cd_sku: Optional[str] = None
-    vl_ajuste_preco: Optional[Decimal] = 0.00
+    vl_ajuste_preco: Optional[Decimal] = 0.00 # pyright: ignore[reportAssignmentType]
     qt_estoque: Optional[int] = 0
     fl_ativa: Optional[bool] = True
 
@@ -229,7 +227,6 @@ class CategoriaProdutoSchema(CategoriaProdutoBase):
 class ProdutoBase(BaseModel):
     cd_produto: str
     ds_produto: str
-    vl_base: Decimal
     sg_unidade_medida: Optional[str] = "UN"
     fl_ativo: Optional[bool] = True
 
@@ -240,25 +237,120 @@ class ProdutoCreate(ProdutoBase):
 class ProdutoUpdate(BaseModel):
     cd_produto: Optional[str] = None
     ds_produto: Optional[str] = None
-    vl_base: Optional[Decimal] = None
     sg_unidade_medida: Optional[str] = None
     fl_ativo: Optional[bool] = None
     id_categoria: Optional[int] = None
 
-class ProdutoCompletoSchema(ProdutoBase):
-    """ Schema para GET /produtos/{id} - Inclui os relacionamentos """
+class ProdutoSchemaSimples(ProdutoBase):
     id_produto: int
     id_empresa: int
     id_categoria: Optional[int] = None
     dt_criacao: datetime
     
-    # Relacionamentos Aninhados
     variacoes: List[VariacaoProdutoSchema] = []
     categoria: Optional[CategoriaProdutoSchema] = None
+    
+    # 'listas_de_preco' é OMITIDO AQUI para quebrar o ciclo.
+    
+    class ConfigDict:
+        from_attributes = True
+
+# ============================================
+# Schemas CRUD: Itens do Catálogo (Preços)
+# ============================================
+
+class ItemCatalogoBase(BaseModel):
+    id_produto: int
+    vl_preco_catalogo: Decimal
+    fl_ativo_no_catalogo: Optional[bool] = True
+
+class ItemCatalogoCreate(ItemCatalogoBase):
+    pass # id_catalogo virá da URL
+
+class ItemCatalogoUpdate(BaseModel):
+    vl_preco_catalogo: Optional[Decimal] = None
+    fl_ativo_no_catalogo: Optional[bool] = None
+
+class ItemCatalogoSchema(ItemCatalogoBase):
+    id_item_catalogo: int
+    id_catalogo: int
+    
+    # Usa o schema simples (sem 'listas_de_preco')
+    produto: Optional['ProdutoSchemaSimples'] = None 
     
     class ConfigDict:
         from_attributes = True
         
+class ItemCatalogoAninhadoSchema(ItemCatalogoBase):
+    id_item_catalogo: int
+    id_catalogo: int
+    # O campo 'produto' é OMITIDO AQUI para quebrar o ciclo.
+    
+    class ConfigDict:
+        from_attributes = True
+
+class ProdutoCompletoSchema(ProdutoBase):
+    id_produto: int
+    id_empresa: int
+    id_categoria: Optional[int] = None
+    dt_criacao: datetime
+    
+    variacoes: List[VariacaoProdutoSchema] = []
+    categoria: Optional[CategoriaProdutoSchema] = None
+    
+    # Usa o schema aninhado (sem 'produto')
+    listas_de_preco: List['ItemCatalogoAninhadoSchema'] = [] 
+    
+    class ConfigDict:
+        from_attributes = True
+        
+class ItemCatalogoVendaSchema(BaseModel):
+    """
+    Schema de resposta para o VENDEDOR.
+    Combina o Produto (DNA) com o ItemCatalogo (Preço)
+    """
+    id_item_catalogo: int
+    id_catalogo: int
+    
+    # Dados do Preço
+    vl_preco_catalogo: Decimal
+    fl_ativo_no_catalogo: bool
+    
+    # Dados do Produto (Aninhados)
+    produto: ProdutoCompletoSchema # Usa o schema completo (com variações, etc)
+    
+    class ConfigDict:
+        from_attributes = True
+
+# ============================================
+# Schemas CRUD: Catálogos (Listas de Preço)
+# ============================================
+
+class CatalogoBase(BaseModel):
+    no_catalogo: str
+    ds_descricao: Optional[str] = None
+    dt_inicio_vigencia: Optional[date] = None
+    dt_fim_vigencia: Optional[date] = None
+    fl_ativo: Optional[bool] = True
+
+class CatalogoCreate(CatalogoBase):
+    id_empresa: int # A qual empresa este catálogo pertence
+
+class CatalogoUpdate(BaseModel):
+    no_catalogo: Optional[str] = None
+    ds_descricao: Optional[str] = None
+    dt_inicio_vigencia: Optional[date] = None
+    dt_fim_vigencia: Optional[date] = None
+    fl_ativo: Optional[bool] = None
+
+class CatalogoSchema(CatalogoBase):
+    id_catalogo: int
+    id_empresa: int
+    dt_criacao: datetime
+    
+    class ConfigDict:
+        from_attributes = True
+ 
         
 # ============================================
 # Schemas CRUD: Vendedores (Usuários)
@@ -286,9 +378,6 @@ class VendedorSchema(UsuarioSchema):
     e adiciona a lista de empresas vinculadas.
     """
     empresas_vinculadas: List[EmpresaSchema] = [] # Lista de empresas que ele representa
-    
-    class ConfigDict:
-        from_attributes = True
 
 # --- Schemas para Vínculo Vendedor <-> Empresa ---
 
@@ -380,29 +469,9 @@ class ClienteCompletoSchema(ClienteBase):
     enderecos: List[EnderecoSchema] = []
     contatos: List[ContatoSchema] = []
     
-    class ConfigDict:
-        from_attributes = True
+class ConfigDict:
+    from_attributes = True
         
-
-# ============================================
-# Schemas de Leitura: Histórico de Preços
-# ============================================
-
-class HistoricoPrecoSchema(BaseModel):
-    id_historico: int
-    id_produto: int
-    vl_anterior: Decimal
-    vl_novo: Decimal
-    ds_motivo_alteracao: Optional[str] = None
-    id_usuario_alteracao: Optional[int] = None
-    dt_alteracao: datetime
-    
-    # Opcional: Adicionar dados do usuário que alterou
-    # usuario_alteracao: Optional[UsuarioSchema] = None 
-    
-    class ConfigDict:
-        from_attributes = True
-
 # ============================================
 # Schemas CRUD: Formas de Pagamento
 # ============================================
@@ -439,9 +508,7 @@ class ItemPedidoCreate(BaseModel):
     id_produto: int
     id_variacao: Optional[int] = None # ID da TB_VARIACOES_PRODUTOS
     qt_quantidade: int
-    vl_unitario: Decimal # Preço unitário (pode ter sido modificado no front)
-    pc_desconto_item: Optional[Decimal] = 0.00
-    # vl_total_item será calculado no backend
+    pc_desconto_item: Optional[Decimal] = 0.00 # pyright: ignore[reportAssignmentType]
 
 class PedidoCreate(BaseModel):
     """ Schema para o corpo (body) da requisição de POST /pedidos """
@@ -450,7 +517,7 @@ class PedidoCreate(BaseModel):
     id_endereco_cobranca: int
     id_forma_pagamento: int
     
-    pc_desconto: Optional[Decimal] = 0.00
+    pc_desconto: Optional[Decimal] = 0.00 # type: ignore
     ds_observacoes: Optional[str] = None
     
     # Lista de itens
@@ -712,3 +779,12 @@ class AdminDashboardKpiSchema(BaseModel):
     total_vendedores_ativos: int
     total_pedidos_sistema: int       # Contagem total de pedidos (não cancelados)
     valor_total_pedidos_sistema: Decimal # Soma do VL_TOTAL (não cancelados)
+    
+# ============================================
+# RESOLUÇÃO DE REFERÊNCIAS (FINAL DO ARQUIVO)
+# ============================================
+# Isso resolve as referências circulares (strings)
+ItemCatalogoSchema.model_rebuild()
+ProdutoCompletoSchema.model_rebuild()
+ProdutoSchemaSimples.model_rebuild()
+ItemCatalogoAninhadoSchema.model_rebuild()

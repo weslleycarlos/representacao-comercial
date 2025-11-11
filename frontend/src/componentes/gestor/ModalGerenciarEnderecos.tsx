@@ -1,8 +1,19 @@
 // /frontend/src/componentes/gestor/ModalGerenciarEnderecos.tsx
 import React, { useState } from 'react';
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions, Button,
-  Box, Typography, IconButton, Paper, LinearProgress, Alert, Chip
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Box,
+  Typography,
+  Paper,
+  LinearProgress,
+  Alert,
+  Chip,
+  Divider,
+  Tooltip,
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
@@ -22,17 +33,17 @@ export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = (
   // Estado para o modal filho (formulário)
   const [formOpen, setFormOpen] = useState(false);
   const [enderecoSelecionado, setEnderecoSelecionado] = useState<IEndereco | undefined>(undefined);
-  
+
   // Estado para o modal de exclusão
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
 
   // 1. Hook de Busca (TanStack Query)
-  const { 
-    data: enderecos, 
-    isLoading, 
-    isError, 
-    error 
+  const {
+    data: enderecos,
+    isLoading,
+    isError,
+    error,
   } = useGetEnderecosPorCliente(cliente.id_cliente);
 
   // 2. Hook de Mutação (Delete)
@@ -40,31 +51,57 @@ export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = (
 
   // 3. Colunas da Tabela
   const colunas: GridColDef[] = [
-    { field: 'tp_endereco', headerName: 'Tipo', width: 100,
+    {
+      field: 'tp_endereco',
+      headerName: 'Tipo',
+      width: 100,
       renderCell: (params) => (
         <Chip label={params.value} size="small" variant="outlined" />
-      )
+      ),
     },
     { field: 'ds_logradouro', headerName: 'Logradouro', flex: 2 },
     { field: 'no_cidade', headerName: 'Cidade', flex: 1 },
     { field: 'sg_estado', headerName: 'UF', width: 60 },
-    { field: 'fl_principal', headerName: 'Principal', width: 100,
-      renderCell: (params) => (params.value ? 'Sim' : 'Não')
+    {
+      field: 'fl_principal',
+      headerName: 'Principal',
+      width: 100,
+      align: 'center',
+      headerAlign: 'center',
+      renderCell: (params) => (
+        <Chip
+          label={params.value ? 'Sim' : 'Não'}
+          color={params.value ? 'primary' : 'default'}
+          size="small"
+          sx={{ fontWeight: 500 }}
+        />
+      ),
     },
     {
       field: 'actions',
       type: 'actions',
+      headerName: 'Ações',
       width: 100,
       getActions: (params) => [
         <GridActionsCellItem
-          icon={<EditIcon />}
+          icon={
+            <Tooltip title="Editar">
+              <EditIcon />
+            </Tooltip>
+          }
           label="Editar"
           onClick={() => handleOpenEdit(params.row as IEndereco)}
+          showInMenu={false}
         />,
         <GridActionsCellItem
-          icon={<DeleteIcon />}
+          icon={
+            <Tooltip title="Excluir">
+              <DeleteIcon />
+            </Tooltip>
+          }
           label="Excluir"
           onClick={() => handleOpenDelete(params.id as number)}
+          showInMenu={false}
         />,
       ],
     },
@@ -75,7 +112,7 @@ export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = (
     setEnderecoSelecionado(undefined);
     setFormOpen(true);
   };
-  
+
   const handleOpenEdit = (endereco: IEndereco) => {
     setEnderecoSelecionado(endereco);
     setFormOpen(true);
@@ -90,69 +127,128 @@ export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = (
     if (idParaExcluir) {
       deleteEndereco(
         { idEndereco: idParaExcluir, idCliente: cliente.id_cliente },
-        { onSuccess: () => setDeleteOpen(false) }
+        {
+          onSuccess: () => {
+            setDeleteOpen(false);
+            setIdParaExcluir(null);
+          },
+        }
       );
     }
   };
 
+  const handleCloseDelete = () => {
+    setDeleteOpen(false);
+    setIdParaExcluir(null);
+  };
+
+  const handleCloseForm = () => {
+    setFormOpen(false);
+    setEnderecoSelecionado(undefined);
+  };
+
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth>
-        <DialogTitle>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{
+          sx: { borderRadius: 2 },
+        }}
+      >
+        <DialogTitle sx={{ pb: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <Box>
-              Gerenciar Endereços
-              <Typography variant="body2" color="text.secondary">
-                Cliente: {cliente.no_razao_social}
+              <Typography variant="h6" fontWeight={600}>
+                Gerenciar Endereços
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                {cliente.no_razao_social}
               </Typography>
             </Box>
             <Button
               variant="contained"
               startIcon={<AddIcon />}
               onClick={handleOpenCreate}
+              size="large"
             >
               Adicionar Endereço
             </Button>
           </Box>
         </DialogTitle>
-        
-        <DialogContent sx={{ minHeight: '400px' }}>
-          {isError && <Alert severity="error">Erro: {(error as any).message}</Alert>}
-          
-          <Paper elevation={0} sx={{ height: 400, width: '100%', mt: 2 }}>
+
+        <Divider />
+
+        <DialogContent sx={{ pt: 2 }}>
+          {isError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              Erro ao carregar endereços: {(error as any).message}
+            </Alert>
+          )}
+
+          <Paper
+            elevation={0}
+            sx={{
+              height: 450,
+              width: '100%',
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 2,
+            }}
+          >
             <DataGrid
               rows={enderecos || []}
               columns={colunas}
               getRowId={(row) => row.id_endereco}
               loading={isLoading}
               slots={{ loadingOverlay: LinearProgress }}
-              density="compact"
+              disableRowSelectionOnClick
+              initialState={{
+                pagination: {
+                  paginationModel: { pageSize: 10 },
+                },
+              }}
+              pageSizeOptions={[5, 10, 25]}
+              sx={{
+                border: 0,
+                '& .MuiDataGrid-columnHeaders': {
+                  backgroundColor: 'background.default',
+                  borderRadius: 0,
+                },
+                '& .MuiDataGrid-row:hover': {
+                  backgroundColor: 'action.hover',
+                },
+              }}
             />
           </Paper>
         </DialogContent>
-        
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={onClose}>Fechar</Button>
+
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={onClose} variant="contained" size="large" fullWidth>
+            Fechar
+          </Button>
         </DialogActions>
       </Dialog>
 
       {/* Modal Filho (Formulário) */}
-      {formOpen && (
-        <ModalFormEndereco
-          open={formOpen}
-          onClose={() => setFormOpen(false)}
-          idCliente={cliente.id_cliente}
-          endereco={enderecoSelecionado}
-        />
-      )}
-      
+      <ModalFormEndereco
+        open={formOpen}
+        onClose={handleCloseForm}
+        idCliente={cliente.id_cliente}
+        endereco={enderecoSelecionado}
+      />
+
       {/* Modal Filho (Exclusão) */}
       <ModalConfirmarExclusao
         open={deleteOpen}
-        onClose={() => setDeleteOpen(false)}
+        onClose={handleCloseDelete}
         onConfirm={handleConfirmDelete}
-        titulo="Confirmar Exclusão"
-        mensagem="Tem certeza que deseja excluir este endereço?"
+        titulo="Excluir Endereço"
+        mensagem="Tem certeza que deseja excluir este endereço? Esta ação não pode ser desfeita."
         isLoading={isDeleting}
       />
     </>

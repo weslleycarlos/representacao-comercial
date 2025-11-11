@@ -1,26 +1,47 @@
 # /src/routes/gestor/produtos.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 
 from src.database import get_db
 from src.models import models # Importa todos os modelos
 from src.schemas import (
+    # Schemas de Categoria
     CategoriaProdutoCreate, CategoriaProdutoSchema, CategoriaProdutoUpdate,
+    # Schemas de Produto (agora sem preço)
     ProdutoCreate, ProdutoUpdate, ProdutoCompletoSchema,
+    # Schemas de Variação
     VariacaoProdutoCreate, VariacaoProdutoUpdate, VariacaoProdutoSchema,
-    HistoricoPrecoSchema
+    # NOVOS Schemas de Catálogo
+    CatalogoCreate, CatalogoUpdate, CatalogoSchema,
+    # NOVOS Schemas de Itens de Catálogo (Preços)
+    ItemCatalogoCreate, ItemCatalogoUpdate, ItemCatalogoSchema
 )
 from src.core.security import get_current_gestor_org_id
 
 # Cria o router
 gestor_produtos_router = APIRouter(
-    prefix="/api/gestor",
-    tags=["5. Gestor - Produtos e Catálogo"],
-    dependencies=[Depends(get_current_gestor_org_id)] # Protege todas as rotas
+    prefix="/api/gestor/catalogo", # Mudei o prefixo para /catalogo (mais genérico)
+    tags=["5. Gestor - Catálogo (Produtos e Preços)"], # Tag atualizada
+    dependencies=[Depends(get_current_gestor_org_id)]
 )
 
 # --- Funções Helper de Validação ---
+
+def get_categoria_by_id(db: Session, id_categoria: int, id_organizacao: int) -> models.CategoriaProduto:
+    """ Valida se a categoria existe e pertence à organização do gestor """
+    categoria = db.query(models.CategoriaProduto).filter(
+        models.CategoriaProduto.id_categoria == id_categoria,
+        models.CategoriaProduto.id_organizacao == id_organizacao
+    ).first()
+    
+    if not categoria:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Categoria não encontrada ou não pertence a esta organização."
+        )
+    return categoria
+
 
 def get_produto_by_id(db: Session, id_produto: int, id_organizacao: int) -> models.Produto:
     """ Valida se o produto existe e pertence à organização do gestor (via Empresa) """
@@ -36,19 +57,15 @@ def get_produto_by_id(db: Session, id_produto: int, id_organizacao: int) -> mode
         )
     return produto
 
-def get_categoria_by_id(db: Session, id_categoria: int, id_organizacao: int) -> models.CategoriaProduto:
-    """ Valida se a categoria existe e pertence à organização do gestor """
-    categoria = db.query(models.CategoriaProduto).filter(
-        models.CategoriaProduto.id_categoria == id_categoria,
-        models.CategoriaProduto.id_organizacao == id_organizacao
+def get_catalogo_by_id(db: Session, id_catalogo: int, id_organizacao: int) -> models.Catalogo:
+    catalogo = db.query(models.Catalogo).join(models.Empresa).filter(
+        models.Catalogo.id_catalogo == id_catalogo,
+        models.Empresa.id_organizacao == id_organizacao
     ).first()
-    
-    if not categoria:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Categoria não encontrada ou não pertence a esta organização."
-        )
-    return categoria
+    if not catalogo:
+        raise HTTPException(status_code=404, detail="Catálogo não encontrado.")
+    return catalogo
+
 
 # ============================================
 # CRUD de Categorias (TB_CATEGORIAS_PRODUTOS)
@@ -118,21 +135,20 @@ def create_produto(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """ Cria um novo produto, vinculando-o a uma empresa da organização """
+    """ Cria um novo PRODUTO (definição, sem preço) """
     # 1. Valida a Empresa
     db_empresa = db.query(models.Empresa).filter(
         models.Empresa.id_empresa == produto_in.id_empresa,
         models.Empresa.id_organizacao == id_organizacao,
-        models.Empresa.fl_ativa == True
     ).first()
     if not db_empresa:
-        raise HTTPException(status_code=404, detail="Empresa não encontrada ou inativa.")
+        raise HTTPException(status_code=404, detail="Empresa não encontrada.")
 
     # 2. Valida a Categoria (se informada)
     if produto_in.id_categoria:
         get_categoria_by_id(db, produto_in.id_categoria, id_organizacao)
         
-    # 3. Valida a constraint UK_PRODUTOS_CODIGO_EMPRESA
+    # 3. Valida a constraint UK (Código + Empresa)
     existing_prod = db.query(models.Produto).filter(
         models.Produto.id_empresa == produto_in.id_empresa,
         models.Produto.cd_produto == produto_in.cd_produto
@@ -140,30 +156,32 @@ def create_produto(
     if existing_prod:
         raise HTTPException(status_code=409, detail="Este código de produto já existe para esta empresa.")
         
+    # O vl_base não existe mais no schema, então o model_dump() não o inclui
     db_produto = models.Produto(**produto_in.model_dump())
     
     db.add(db_produto)
     db.commit()
     db.refresh(db_produto)
-    return db_produto # Pydantic v2 lidará com a conversão
+    return db_produto
 
 @gestor_produtos_router.get("/produtos", response_model=List[ProdutoCompletoSchema])
 def get_produtos_da_organizacao(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db),
-    id_empresa: Optional[int] = None, # Filtro opcional
-    skip: int = 0,
-    limit: int = 100
+    id_empresa: Optional[int] = None
 ):
-    """ Lista todos os produtos da organização, com filtro opcional por empresa """
+    """ Lista todos os PRODUTOS (definições) da organização """
     query = db.query(models.Produto).join(models.Empresa).filter(
         models.Empresa.id_organizacao == id_organizacao
-    ).options(joinedload(models.Produto.variacoes)) # Eager load das variações
+    ).options(
+        joinedload(models.Produto.variacoes),
+        joinedload(models.Produto.listas_de_preco) # Carrega as listas de preço
+    )
     
     if id_empresa:
         query = query.filter(models.Produto.id_empresa == id_empresa)
         
-    produtos = query.order_by(models.Produto.ds_produto).offset(skip).limit(limit).all()
+    produtos = query.order_by(models.Produto.ds_produto).all()
     return produtos
 
 @gestor_produtos_router.get("/produtos/{id_produto}", response_model=ProdutoCompletoSchema)
@@ -172,12 +190,11 @@ def get_produto(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """ Busca um produto específico com suas variações e categoria """
-    # options(joinedload(...)) faz o "eager loading" dos relacionamentos
-    # para evitar queries N+1 quando o Pydantic for serializar.
+    """ Busca um PRODUTO (definição) com suas variações e listas de preço """
     db_produto = db.query(models.Produto).options(
         joinedload(models.Produto.variacoes),
-        joinedload(models.Produto.categoria)
+        joinedload(models.Produto.categoria),
+        joinedload(models.Produto.listas_de_preco) # Carrega as listas
     ).join(models.Empresa).filter(
         models.Produto.id_produto == id_produto,
         models.Empresa.id_organizacao == id_organizacao
@@ -185,7 +202,6 @@ def get_produto(
     
     if not db_produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
-        
     return db_produto
 
 @gestor_produtos_router.put("/produtos/{id_produto}", response_model=ProdutoCompletoSchema)
@@ -195,11 +211,9 @@ def update_produto(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """ Atualiza um produto """
-    db_produto = get_produto_by_id(db, id_produto, id_organizacao) # Valida e busca
+    """ Atualiza um PRODUTO (definição) """
+    db_produto = get_produto_by_id(db, id_produto, id_organizacao)
     update_data = produto_in.model_dump(exclude_unset=True)
-
-    # (Lógica de trigger para TB_HISTORICO_PRECOS deve estar no banco)
     
     for key, value in update_data.items():
         setattr(db_produto, key, value)
@@ -267,23 +281,188 @@ def update_variacao(
     return db_variacao
 
 # ============================================
-# Leitura de Histórico (TB_HISTORICO_PRECOS)
+# (NOVO) CRUD de Catálogos (TB_CATALOGOS)
 # ============================================
 
-@gestor_produtos_router.get("/produtos/{id_produto}/historico-precos", response_model=List[HistoricoPrecoSchema])
-def get_historico_precos_produto(
-    id_produto: int,
+@gestor_produtos_router.post("/catalogos", response_model=CatalogoSchema, status_code=status.HTTP_201_CREATED)
+def create_catalogo(
+    catalogo_in: CatalogoCreate,
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """
-    Lista o histórico de alterações de preço para um produto específico.
-    """
-    # Valida se o produto pertence à organização
-    db_produto = get_produto_by_id(db, id_produto, id_organizacao)
+    """ (NOVO) Cria uma "capa" de catálogo (ex: Verão 2025) """
+    # Valida a Empresa
+    db_empresa = db.query(models.Empresa).filter(
+        models.Empresa.id_empresa == catalogo_in.id_empresa,
+        models.Empresa.id_organizacao == id_organizacao
+    ).first()
+    if not db_empresa:
+        raise HTTPException(status_code=404, detail="Empresa não encontrada.")
+
+    db_catalogo = models.Catalogo(**catalogo_in.model_dump())
+    db.add(db_catalogo)
+    db.commit()
+    db.refresh(db_catalogo)
+    return db_catalogo
+
+@gestor_produtos_router.get("/catalogos", response_model=List[CatalogoSchema])
+def get_catalogos_da_organizacao(
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db),
+    id_empresa: Optional[int] = None # Filtro obrigatório
+):
+    """ (NOVO) Lista os catálogos (listas de preço) da organização, filtrados por empresa """
+    if not id_empresa:
+        raise HTTPException(status_code=400, detail="O 'id_empresa' é obrigatório para listar catálogos.")
+
+    query = db.query(models.Catalogo).join(models.Empresa).filter(
+        models.Empresa.id_organizacao == id_organizacao,
+        models.Catalogo.id_empresa == id_empresa
+    )
     
-    historico = db.query(models.HistoricoPreco).filter(
-        models.HistoricoPreco.id_produto == db_produto.id_produto
-    ).order_by(models.HistoricoPreco.dt_alteracao.desc()).all()
+    catalogos = query.order_by(models.Catalogo.no_catalogo).all()
+    return catalogos
+
+@gestor_produtos_router.put("/catalogos/{id_catalogo}", response_model=CatalogoSchema)
+def update_catalogo(
+    id_catalogo: int,
+    catalogo_in: CatalogoUpdate, # O schema de atualização (campos opcionais)
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ (NOVO) Atualiza uma "capa" de catálogo """
+    # O helper valida se o catálogo pertence à organização
+    db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
     
-    return historico
+    update_data = catalogo_in.model_dump(exclude_unset=True)
+    
+    # Validação (se o nome estiver sendo alterado)
+    if 'no_catalogo' in update_data:
+        existing = db.query(models.Catalogo).filter(
+            models.Catalogo.id_empresa == db_catalogo.id_empresa,
+            models.Catalogo.no_catalogo == update_data['no_catalogo'],
+            models.Catalogo.id_catalogo != id_catalogo
+        ).first()
+        if existing:
+            raise HTTPException(status_code=409, detail="Este nome de catálogo já está em uso nesta empresa.")
+
+    for key, value in update_data.items():
+        setattr(db_catalogo, key, value)
+        
+    db.commit()
+    db.refresh(db_catalogo)
+    return db_catalogo
+
+# ============================================
+# (NOVO) CRUD de Itens de Catálogo (TB_ITENS_CATALOGO)
+# ============================================
+
+@gestor_produtos_router.post("/catalogos/{id_catalogo}/itens", response_model=ItemCatalogoSchema, status_code=status.HTTP_201_CREATED)
+def add_item_ao_catalogo(
+    id_catalogo: int,
+    item_in: ItemCatalogoCreate,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ (NOVO) Adiciona um produto e seu preço a um catálogo """
+    # 1. Valida o Catálogo
+    db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
+    
+    # 2. Valida o Produto (e se pertence à mesma empresa do catálogo)
+    db_produto = get_produto_by_id(db, item_in.id_produto, id_organizacao)
+    if db_produto.id_empresa != db_catalogo.id_empresa:
+        raise HTTPException(status_code=400, detail="Produto não pertence à mesma empresa do catálogo.")
+        
+    # 3. (UK_CATALOGO_PRODUTO será validada pelo DB, mas podemos checar)
+    existing = db.query(models.ItemCatalogo).filter(
+        models.ItemCatalogo.id_catalogo == id_catalogo,
+        models.ItemCatalogo.id_produto == item_in.id_produto
+    ).first()
+    if existing:
+        raise HTTPException(status_code=409, detail="Este produto já está neste catálogo.")
+
+    db_item = models.ItemCatalogo(
+        **item_in.model_dump(),
+        id_catalogo=id_catalogo
+    )
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@gestor_produtos_router.get("/catalogos/{id_catalogo}/itens", response_model=List[ItemCatalogoSchema])
+def get_itens_do_catalogo(
+    id_catalogo: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ (NOVO) Lista todos os produtos (e seus preços) de um catálogo """
+    
+    # Valida o catálogo (get_catalogo_by_id já valida a organização)
+    db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
+
+    # --- ESTA É A QUERY CORRETA ---
+    # Ela carrega o ItemCatalogo E o 'produto' relacionado.
+    # O 'response_model=List[ItemCatalogoSchema]' usará o
+    # 'ProdutoSchemaSimples' (definido no schema) para serializar
+    # o 'produto', quebrando o ciclo.
+    itens = db.query(models.ItemCatalogo).options(
+        # Carrega o relacionamento 'produto'
+        joinedload(models.ItemCatalogo.produto).options(
+            # E, dentro de 'produto', carrega 'variacoes' e 'categoria'
+            selectinload(models.Produto.variacoes),
+            joinedload(models.Produto.categoria)
+        )
+    ).filter(
+        models.ItemCatalogo.id_catalogo == db_catalogo.id_catalogo
+    ).all()
+    # --- FIM DA QUERY ---
+        
+    return itens
+
+def get_item_catalogo_by_id(db: Session, id_item_catalogo: int, id_organizacao: int) -> models.ItemCatalogo:
+    """ Helper que valida se o item pertence à organização """
+    item = db.query(models.ItemCatalogo).join(
+        models.Catalogo, models.ItemCatalogo.id_catalogo == models.Catalogo.id_catalogo
+    ).join(
+        models.Empresa, models.Catalogo.id_empresa == models.Empresa.id_empresa
+    ).filter(
+        models.ItemCatalogo.id_item_catalogo == id_item_catalogo,
+        models.Empresa.id_organizacao == id_organizacao
+    ).first()
+    
+    if not item:
+        raise HTTPException(status_code=404, detail="Item de catálogo não encontrado.")
+    return item
+
+@gestor_produtos_router.put("/itens/{id_item_catalogo}", response_model=ItemCatalogoSchema)
+def update_item_catalogo(
+    id_item_catalogo: int,
+    item_in: ItemCatalogoUpdate,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ (NOVO) Atualiza um item (preço) em um catálogo """
+    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao) # Valida
+    
+    update_data = item_in.model_dump(exclude_unset=True)
+    
+    for key, value in update_data.items():
+        setattr(db_item, key, value)
+        
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+
+@gestor_produtos_router.delete("/itens/{id_item_catalogo}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_item_catalogo(
+    id_item_catalogo: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ (NOVO) Remove um item (produto) de um catálogo """
+    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao) # Valida
+        
+    db.delete(db_item)
+    db.commit()
+    return

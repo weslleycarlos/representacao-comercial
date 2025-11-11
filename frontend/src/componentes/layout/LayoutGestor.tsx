@@ -28,6 +28,7 @@ import {
   Settings as SettingsIcon,
   Logout as LogoutIcon,
   People as PeopleIcon,
+  Category as CategoryIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contextos/AuthContext';
 
@@ -48,6 +49,7 @@ export const LayoutGestor: React.FC = () => {
     { text: 'Empresas', icon: <BusinessIcon />, path: '/gestor/empresas' },
     { text: 'Vendedores', icon: <GroupIcon />, path: '/gestor/vendedores' },
     { text: 'Clientes', icon: <PeopleIcon />, path: '/gestor/clientes' },
+    { text: 'Catálogo', icon: <CategoryIcon />, path: '/gestor/catalogo' },
     { text: 'Pedidos', icon: <ShoppingCartIcon />, path: '/gestor/pedidos' },
     { text: 'Relatórios', icon: <BarChartIcon />, path: '/gestor/relatorios' },
   ];

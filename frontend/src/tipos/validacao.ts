@@ -16,7 +16,6 @@ export const loginSchema = z.object({
   password: z.string()
     .min(1, { message: 'A senha é obrigatória.' })
 });
-
 // Exporta o tipo TypeScript inferido do schema Zod
 export type LoginFormData = z.infer<typeof loginSchema>;
 
@@ -28,7 +27,6 @@ export const empresaSchema = z.object({
     .min(18, { message: 'O CNPJ deve ter 18 caracteres.' })
     .regex(cnpjRegex, { message: 'Formato de CNPJ inválido.' }),
     // (Podemos adicionar uma validação de CNPJ real aqui depois)
-  
   // Opcionais (baseado no EmpresaUpdate)
   nr_inscricao_estadual: z.string().optional(),
   ds_email_contato: z.string().email({ message: 'Email inválido.' }).optional().or(z.literal('')),
@@ -40,23 +38,20 @@ export const empresaSchema = z.object({
     .optional(),
   fl_ativa: z.boolean().default(true),
 });
-
 // Exporta o tipo TypeScript inferido
 export type EmpresaFormData = z.infer<typeof empresaSchema>;
+
 
 // Validação para o formulário de Vendedor (Gestor)
 export const vendedorSchema = z.object({
   // Baseado no VendedorCreate do Pydantic
   ds_email: z.string().min(1, "O email é obrigatório.").email("Email inválido."),
-  
   // A senha só é obrigatória na criação, não na edição
   password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres.").optional().or(z.literal('')),
-  
   no_completo: z.string().min(3, { message: 'O nome completo é obrigatório.' }),
   nr_telefone: z.string().optional().or(z.literal('')),
   fl_ativo: z.boolean().default(true),
 });
-
 // Exporta o tipo TypeScript inferido
 export type VendedorFormData = z.infer<typeof vendedorSchema>;
 
@@ -76,6 +71,8 @@ export const clienteSchema = z.object({
   ds_observacoes: z.string().optional().or(z.literal('')),
   fl_ativo: z.boolean().default(true),
 });
+// Exporta o tipo TypeScript inferido
+export type ClienteFormData = z.infer<typeof clienteSchema>;
 
 // Validação para o formulário de Endereço (Cliente)
 export const enderecoSchema = z.object({
@@ -91,6 +88,9 @@ export const enderecoSchema = z.object({
     .regex(cepRegex, { message: "Formato de CEP inválido (00000-000)." }),
   fl_principal: z.boolean().default(false),
 });
+// Exporta o tipo TypeScript inferido
+export type EnderecoFormData = z.infer<typeof enderecoSchema>;
+
 
 // Validação para o formulário de Contato (Cliente)
 export const contatoSchema = z.object({
@@ -100,12 +100,63 @@ export const contatoSchema = z.object({
   nr_telefone: z.string().optional().or(z.literal('')),
   fl_principal: z.boolean().default(false),
 });
-
 // Exporta o tipo TypeScript inferido
 export type ContatoFormData = z.infer<typeof contatoSchema>;
 
-// Exporta o tipo TypeScript inferido
-export type ClienteFormData = z.infer<typeof clienteSchema>;
 
-// Exporta o tipo TypeScript inferido
-export type EnderecoFormData = z.infer<typeof enderecoSchema>;
+export const produtoSchema = z.object({
+  cd_produto: z.string().min(1, "O código é obrigatório."),
+  ds_produto: z.string().min(3, "A descrição é obrigatória."),
+  sg_unidade_medida: z.string().optional().or(z.literal('')),
+  fl_ativo: z.boolean().default(true),
+  id_empresa: z.number().describe("A empresa é obrigatória."),
+  id_categoria: z.coerce.number()
+    .nullable()
+    .optional()
+    .transform(val => val === 0 ? null : val),
+});
+export type ProdutoFormData = z.infer<typeof produtoSchema>;
+
+
+export const catalogoSchema = z.object({
+  no_catalogo: z.string().min(3, "O nome do catálogo é obrigatório."),
+  ds_descricao: z.string().optional().or(z.literal('')),
+  dt_inicio_vigencia: z.preprocess((val) => (val === "" ? null : val), 
+      z.coerce.date().optional().nullable()
+  ),
+  dt_fim_vigencia: z.preprocess((val) => (val === "" ? null : val), 
+      z.coerce.date().optional().nullable()
+  ),
+  fl_ativo: z.boolean().default(true),
+  id_empresa: z.number().describe("A empresa é obrigatória."),
+});
+export type CatalogoFormData = z.infer<typeof catalogoSchema>;
+
+export const itemCatalogoSchema = z.object({
+  id_produto: z.number().describe("O produto é obrigatório."),
+  vl_preco_catalogo: z.coerce.number()
+    .min(0.01, "O preço deve ser maior que zero."),
+  fl_ativo_no_catalogo: z.boolean().default(true),
+});
+export type ItemCatalogoFormData = z.infer<typeof itemCatalogoSchema>;
+
+const itemPedidoSchema = z.object({
+  id_produto: z.number(),
+  id_variacao: z.number().optional().nullable(),
+  qt_quantidade: z.coerce.number().min(1, "Quantidade deve ser pelo menos 1"),
+  pc_desconto_item: z.coerce.number().min(0).optional().default(0),
+});
+
+export const pedidoCreateSchema = z.object({
+  id_cliente: z.number().min(1, "Cliente é obrigatório."),
+  id_endereco_entrega: z.number().min(1, "Endereço de entrega é obrigatório."),
+  id_endereco_cobranca: z.number().min(1, "Endereço de cobrança é obrigatório."),
+  id_forma_pagamento: z.number().min(1, "Forma de pagamento é obrigatória."),
+  
+  pc_desconto: z.coerce.number().min(0).optional().default(0),
+  ds_observacoes: z.string().optional().or(z.literal('')),
+  
+  itens: z.array(itemPedidoSchema).min(1, "O pedido deve ter pelo menos um item."),
+});
+
+export type PedidoCreateFormData = z.infer<typeof pedidoCreateSchema>;

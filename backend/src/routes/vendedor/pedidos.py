@@ -1,34 +1,36 @@
-# /src/routes/vendedor/pedidos.py
+# /backend/src/routes/vendedor/pedidos.py
+# (VERSÃO CORRIGIDA - 100% SÍNCRONA, SEM async/await)
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy.exc import IntegrityError
 from typing import List
 from decimal import Decimal
+from datetime import datetime # <-- Importação necessária para o PUT/cancelar
 
 from src.database import get_db
 from src.models import models
-from src.schemas import PedidoCreate, PedidoCompletoSchema, FormaPagamentoSchema, PedidoUpdate, PedidoCancelRequest
+from src.schemas import (
+    PedidoCreate, PedidoCompletoSchema, FormaPagamentoSchema,
+    PedidoUpdate, PedidoCancelRequest
+)
 from src.core.security import get_current_vendedor_contexto
 
 # Cria o router
 vendedor_pedidos_router = APIRouter(
     prefix="/api/vendedor/pedidos",
     tags=["6. Vendedor - Pedidos"],
-    # Aplica a segurança de VENDEDOR COM CONTEXTO em TODAS as rotas
     dependencies=[Depends(get_current_vendedor_contexto)]
 )
 
-async def get_pedido_by_id_vendedor(
+# --- FUNÇÃO HELPER (Corrigida para 'def' síncrono) ---
+def get_pedido_by_id_vendedor(
     db: Session, 
     id_pedido: int, 
     id_usuario: int
 ) -> models.Pedido:
     """
-    Função helper para buscar um pedido, garantindo que ele pertença
-    ao vendedor logado e carregando todos os relacionamentos necessários.
+    Função helper síncrona para buscar um pedido.
     """
-    # Eager load (carregamento otimizado) de todos os relacionamentos
-    # que o PedidoCompletoSchema precisa.
     pedido = db.query(models.Pedido).options(
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.vendedor),
@@ -36,10 +38,10 @@ async def get_pedido_by_id_vendedor(
         joinedload(models.Pedido.forma_pagamento),
         joinedload(models.Pedido.endereco_entrega),
         joinedload(models.Pedido.endereco_cobranca),
-        joinedload(models.Pedido.itens).joinedload(models.ItemPedido.produto) # Carrega itens e produtos
+        joinedload(models.Pedido.itens).joinedload(models.ItemPedido.produto)
     ).filter(
         models.Pedido.id_pedido == id_pedido,
-        models.Pedido.id_usuario == id_usuario # Garante que é DO vendedor
+        models.Pedido.id_usuario == id_usuario
     ).first()
 
     if not pedido:
@@ -49,6 +51,7 @@ async def get_pedido_by_id_vendedor(
         )
     return pedido
 
+# --- ROTA CREATE (Corrigida para chamar a função síncrona) ---
 @vendedor_pedidos_router.post("/", response_model=PedidoCompletoSchema, status_code=status.HTTP_201_CREATED)
 def create_pedido(
     pedido_in: PedidoCreate,
@@ -56,58 +59,62 @@ def create_pedido(
     db: Session = Depends(get_db)
 ):
     """
-    Cria um novo pedido para a empresa ativa do vendedor.
+    Cria um novo pedido (lógica de preço síncrona).
     """
     id_usuario, id_organizacao, id_empresa_ativa = contexto
     
     if not pedido_in.itens:
         raise HTTPException(status_code=422, detail="O pedido deve conter pelo menos um item.")
 
-    # --- Início da Transação ---
+    catalogo_ativo = db.query(models.Catalogo).filter(
+        models.Catalogo.id_empresa == id_empresa_ativa,
+        models.Catalogo.fl_ativo == True
+    ).first()
+    
+    if not catalogo_ativo:
+        raise HTTPException(status_code=400, detail="Nenhum catálogo de preços ativo encontrado para esta empresa.")
+
     try:
-        # 1. Validar Cliente e Endereços (se pertencem à organização)
-        db_cliente = db.query(models.Cliente).filter(
-            models.Cliente.id_cliente == pedido_in.id_cliente,
-            models.Cliente.id_organizacao == id_organizacao,
-            models.Cliente.fl_ativo == True
-        ).first()
-        if not db_cliente:
-            raise HTTPException(status_code=404, detail="Cliente não encontrado ou inativo.")
-        
-        # (Validação similar para Endereços e Forma de Pagamento...)
+        db_cliente = db.get(models.Cliente, pedido_in.id_cliente)
+        if not db_cliente or db_cliente.id_organizacao != id_organizacao:
+            raise HTTPException(status_code=404, detail="Cliente não encontrado.")
 
         vl_total_calculado = Decimal(0.00)
         db_itens_pedido = []
 
-        # 2. Validar Itens e Calcular Total
         for item_in in pedido_in.itens:
-            # Valida se o produto existe E pertence à EMPRESA ATIVA
-            db_produto = db.query(models.Produto).filter(
-                models.Produto.id_produto == item_in.id_produto,
-                models.Produto.id_empresa == id_empresa_ativa,
-                models.Produto.fl_ativo == True
+            item_catalogo = db.query(models.ItemCatalogo).filter(
+                models.ItemCatalogo.id_catalogo == catalogo_ativo.id_catalogo,
+                models.ItemCatalogo.id_produto == item_in.id_produto,
+                models.ItemCatalogo.fl_ativo_no_catalogo == True
             ).first()
-            if not db_produto:
-                raise HTTPException(status_code=404, detail=f"Produto ID {item_in.id_produto} não encontrado nesta empresa.")
             
-            # (Aqui entraria a validação de variação e estoque, se necessário)
+            if not item_catalogo:
+                raise HTTPException(status_code=404, detail=f"Produto ID {item_in.id_produto} não encontrado ou inativo no catálogo.")
+
+            preco_base = item_catalogo.vl_preco_catalogo
             
-            vl_total_item = (item_in.vl_unitario * item_in.qt_quantidade) * (1 - (item_in.pc_desconto_item / 100))
+            if item_in.id_variacao:
+                variacao = db.get(models.VariacaoProduto, item_in.id_variacao)
+                if not variacao or variacao.id_produto != item_in.id_produto:
+                    raise HTTPException(status_code=404, detail="Variação inválida.")
+                preco_base += variacao.vl_ajuste_preco
+
+            vl_unitario_seguro = preco_base
+            vl_total_item = (vl_unitario_seguro * item_in.qt_quantidade) * (1 - (item_in.pc_desconto_item / 100))
             vl_total_calculado += vl_total_item
             
             db_itens_pedido.append(models.ItemPedido(
                 id_produto=item_in.id_produto,
                 id_variacao=item_in.id_variacao,
                 qt_quantidade=item_in.qt_quantidade,
-                vl_unitario=item_in.vl_unitario,
+                vl_unitario=vl_unitario_seguro,
                 pc_desconto_item=item_in.pc_desconto_item,
                 vl_total_item=vl_total_item
             ))
 
-        # 3. Aplicar Desconto Geral do Pedido
         vl_final_pedido = vl_total_calculado * (1 - (pedido_in.pc_desconto / 100))
 
-        # 4. Criar o Pedido (TB_PEDIDOS)
         db_pedido = models.Pedido(
             id_usuario=id_usuario,
             id_empresa=id_empresa_ativa,
@@ -117,30 +124,17 @@ def create_pedido(
             id_forma_pagamento=pedido_in.id_forma_pagamento,
             pc_desconto=pedido_in.pc_desconto,
             vl_total=vl_final_pedido,
-            st_pedido='pendente', # Status inicial
+            st_pedido='pendente',
             ds_observacoes=pedido_in.ds_observacoes,
-            # nr_pedido (deve ser gerado pelo trigger no seu DB)
         )
         
-        # 5. Associar Itens ao Pedido
         db_pedido.itens.extend(db_itens_pedido)
-        
         db.add(db_pedido)
-        
-        # (Seu trigger/function de comissão deve ser acionado aqui)
-        
         db.commit()
         db.refresh(db_pedido)
         
-        # Recarrega o pedido com todos os relacionamentos para o retorno
-        db_pedido_completo = db.query(models.Pedido).options(
-            joinedload(models.Pedido.cliente),
-            joinedload(models.Pedido.vendedor),
-            joinedload(models.Pedido.empresa),
-            joinedload(models.Pedido.itens),
-            joinedload(models.Pedido.forma_pagamento) # <-- ADICIONE AQUI
-        ).get(db_pedido.id_pedido)
-
+        # --- CORREÇÃO AQUI (Removido 'await') ---
+        db_pedido_completo = get_pedido_by_id_vendedor(db, db_pedido.id_pedido, id_usuario)
         return db_pedido_completo
 
     except HTTPException as e:
@@ -153,6 +147,7 @@ def create_pedido(
             detail=f"Erro interno ao criar pedido: {str(e)}"
         )
 
+# --- ROTA GET (Corrigida para 'def' síncrono) ---
 @vendedor_pedidos_router.get("/", response_model=List[PedidoCompletoSchema])
 def get_meus_pedidos(
     contexto: tuple = Depends(get_current_vendedor_contexto),
@@ -160,68 +155,53 @@ def get_meus_pedidos(
     skip: int = 0,
     limit: int = 25
 ):
-    """
-    Lista todos os pedidos feitos pelo Vendedor logado.
-    """
     id_usuario, _, _ = contexto
     
     pedidos = db.query(models.Pedido).options(
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.empresa),
-        joinedload(models.Pedido.forma_pagamento) # <-- ADICIONE AQUI
+        joinedload(models.Pedido.forma_pagamento)
     ).filter(
         models.Pedido.id_usuario == id_usuario
     ).order_by(models.Pedido.dt_pedido.desc()).offset(skip).limit(limit).all()
     
     return pedidos
 
+# --- ROTA GET ID (Corrigida para 'def' síncrono) ---
 @vendedor_pedidos_router.get("/{id_pedido}", response_model=PedidoCompletoSchema)
-async def get_meu_pedido_especifico(
+def get_meu_pedido_especifico(
     id_pedido: int,
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db)
 ):
-    """
-    Busca os detalhes de um pedido específico feito pelo vendedor.
-    """
     id_usuario, _, _ = contexto
-    
-    # A função helper já faz a busca, validação e eager loading
-    db_pedido = await get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
-    
-    return db_pedido # Pydantic v2 fará a conversão
+    # --- CORREÇÃO AQUI (Removido 'await') ---
+    db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
+    return db_pedido
 
-
+# --- ROTA PUT (Corrigida para 'def' síncrono) ---
 @vendedor_pedidos_router.put("/{id_pedido}", response_model=PedidoCompletoSchema)
-async def update_meu_pedido(
+def update_meu_pedido(
     id_pedido: int,
     pedido_in: PedidoUpdate,
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db)
 ):
-    """
-    Atualiza um pedido (ex: observações ou desconto geral).
-    SÓ É PERMITIDO se o status for 'pendente'.
-    """
     id_usuario, _, _ = contexto
-    db_pedido = await get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
+    # --- CORREÇÃO AQUI (Removido 'await') ---
+    db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
 
-    # Regra de Negócio (PRD): Só pode editar se "pendente"
     if db_pedido.st_pedido != 'pendente':
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Não é possível editar um pedido com status '{db_pedido.st_pedido}'."
         )
 
-    # Pega os dados que foram enviados (excluindo os que não vieram)
     update_data = pedido_in.model_dump(exclude_unset=True)
     
-    # (Lógica de recálculo de total se o desconto for alterado)
     if 'pc_desconto' in update_data:
-        # Lógica de recálculo complexa iria aqui...
-        # Por enquanto, apenas atualizamos o campo.
         db_pedido.pc_desconto = update_data['pc_desconto']
-        # (Seu trigger no DB deve recalcular o vl_total se o pc_desconto mudar)
+        # (Idealmente, o trigger no DB recalcula o vl_total aqui)
 
     if 'ds_observacoes' in update_data:
         db_pedido.ds_observacoes = update_data['ds_observacoes']
@@ -237,20 +217,18 @@ async def update_meu_pedido(
             detail=str(e)
         )
 
+# --- ROTA CANCELAR (Corrigida para 'def' síncrono) ---
 @vendedor_pedidos_router.post("/{id_pedido}/cancelar", response_model=PedidoCompletoSchema)
-async def cancelar_meu_pedido(
+def cancelar_meu_pedido(
     id_pedido: int,
     cancel_in: PedidoCancelRequest,
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db)
 ):
-    """
-    Muda o status de um pedido para 'cancelado'.
-    """
     id_usuario, _, _ = contexto
-    db_pedido = await get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
+    # --- CORREÇÃO AQUI (Removido 'await') ---
+    db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
 
-    # Regra de Negócio: Não pode cancelar pedido já finalizado
     if db_pedido.st_pedido in ('cancelado', 'entregue'):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -258,7 +236,6 @@ async def cancelar_meu_pedido(
         )
     
     db_pedido.st_pedido = 'cancelado'
-    # Adiciona o motivo às observações
     db_pedido.ds_observacoes = (db_pedido.ds_observacoes or "") + \
         f"\n[CANCELADO PELO VENDEDOR]: {cancel_in.motivo}"
 

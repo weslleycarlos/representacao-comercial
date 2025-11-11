@@ -58,7 +58,6 @@ class Usuario(Base):
     empresas_vinculadas = relationship('UsuarioEmpresa', back_populates='usuario', cascade='all, delete-orphan')
     pedidos = relationship('Pedido', back_populates='vendedor', foreign_keys='Pedido.id_usuario')
     comissoes_pedido = relationship('ComissaoPedido', back_populates='vendedor', foreign_keys='ComissaoPedido.id_usuario')
-    historico_precos = relationship('HistoricoPreco', back_populates='usuario_alteracao', foreign_keys='HistoricoPreco.id_usuario_alteracao')
     logs_auditoria = relationship('LogAuditoria', back_populates='usuario', foreign_keys='LogAuditoria.id_usuario')
     regras_comissao = relationship('RegraComissao', back_populates='usuario', foreign_keys='RegraComissao.id_usuario')
 
@@ -94,6 +93,8 @@ class Empresa(Base):
     produtos = relationship('Produto', back_populates='empresa', cascade='all, delete-orphan')
     regras_comissao = relationship('RegraComissao', back_populates='empresa', cascade='all, delete-orphan')
     pedidos = relationship('Pedido', back_populates='empresa', cascade='all, delete-orphan')
+    catalogos = relationship('Catalogo', back_populates='empresa', cascade='all, delete-orphan')
+    
 
 class UsuarioEmpresa(Base):
     __tablename__ = 'TB_USUARIO_EMPRESAS'
@@ -188,6 +189,7 @@ class CategoriaProduto(Base):
     parent = relationship('CategoriaProduto', remote_side=[id_categoria], backref='children')
 
 class Produto(Base):
+    """ Mapeia a tabela TB_PRODUTOS (Sem VL_BASE) """
     __tablename__ = 'TB_PRODUTOS'
     
     id_produto = Column('ID_PRODUTO', Integer, primary_key=True)
@@ -195,7 +197,6 @@ class Produto(Base):
     id_categoria = Column('ID_CATEGORIA', Integer, ForeignKey('TB_CATEGORIAS_PRODUTOS.ID_CATEGORIA'))
     cd_produto = Column('CD_PRODUTO', String(50), nullable=False)
     ds_produto = Column('DS_PRODUTO', Text, nullable=False)
-    vl_base = Column('VL_BASE', Numeric(15,2), nullable=False)
     sg_unidade_medida = Column('SG_UNIDADE_MEDIDA', String(10))
     fl_ativo = Column('FL_ATIVO', Boolean, default=True)
     dt_exclusao = Column('DT_EXCLUSAO', DateTime)
@@ -204,11 +205,12 @@ class Produto(Base):
     
     __table_args__ = (UniqueConstraint('ID_EMPRESA', 'CD_PRODUTO', name='UK_PRODUTOS_CODIGO_EMPRESA'),)
     
+    # Relacionamentos
     empresa = relationship('Empresa', back_populates='produtos')
     categoria = relationship('CategoriaProduto', back_populates='produtos')
     variacoes = relationship('VariacaoProduto', back_populates='produto', cascade='all, delete-orphan')
-    historico_precos = relationship('HistoricoPreco', back_populates='produto', cascade='all, delete-orphan')
     itens_pedido = relationship('ItemPedido', back_populates='produto')
+    listas_de_preco = relationship('ItemCatalogo', back_populates='produto', cascade='all, delete-orphan')
 
 class VariacaoProduto(Base):
     __tablename__ = 'TB_VARIACOES_PRODUTOS'
@@ -226,19 +228,6 @@ class VariacaoProduto(Base):
     produto = relationship('Produto', back_populates='variacoes')
     itens_pedido = relationship('ItemPedido', back_populates='variacao')
 
-class HistoricoPreco(Base):
-    __tablename__ = 'TB_HISTORICO_PRECOS'
-    
-    id_historico = Column('ID_HISTORICO', Integer, primary_key=True)
-    id_produto = Column('ID_PRODUTO', Integer, ForeignKey('TB_PRODUTOS.ID_PRODUTO', ondelete='CASCADE'), nullable=False)
-    vl_anterior = Column('VL_ANTERIOR', Numeric(15,2), nullable=False)
-    vl_novo = Column('VL_NOVO', Numeric(15,2), nullable=False)
-    ds_motivo_alteracao = Column('DS_MOTIVO_ALTERACAO', String(200))
-    id_usuario_alteracao = Column('ID_USUARIO_ALTERACAO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO'))
-    dt_alteracao = Column('DT_ALTERACAO', DateTime, default=datetime.utcnow)
-    
-    produto = relationship('Produto', back_populates='historico_precos')
-    usuario_alteracao = relationship('Usuario', back_populates='historico_precos', foreign_keys=[id_usuario_alteracao])
 
 # ============================================
 # PAGAMENTOS E COMISSÕES
@@ -376,6 +365,46 @@ class LogAuditoria(Base):
     # Relacionamentos
     organizacao = relationship('Organizacao', back_populates='logs_auditoria')
     usuario = relationship('Usuario', back_populates='logs_auditoria', foreign_keys=[id_usuario])
+    
+# ============================================
+# CATÁLOGOS E LISTAS DE PREÇO (NOVO)
+# ============================================
+
+class Catalogo(Base):
+    """ Mapeia a tabela TB_CATALOGOS """
+    __tablename__ = 'TB_CATALOGOS'
+    
+    id_catalogo = Column('ID_CATALOGO', Integer, primary_key=True)
+    id_empresa = Column('ID_EMPRESA', Integer, ForeignKey('TB_EMPRESAS.ID_EMPRESA', ondelete='CASCADE'), nullable=False)
+    no_catalogo = Column('NO_CATALOGO', String(150), nullable=False)
+    ds_descricao = Column('DS_DESCRICAO', Text)
+    dt_inicio_vigencia = Column('DT_INICIO_VIGENCIA', Date)
+    dt_fim_vigencia = Column('DT_FIM_VIGENCIA', Date)
+    fl_ativo = Column('FL_ATIVO', Boolean, default=True)
+    dt_criacao = Column('DT_CRIACAO', DateTime, default=datetime.utcnow)
+    dt_atualizacao = Column('DT_ATUALIZACAO', DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    __table_args__ = (UniqueConstraint('ID_EMPRESA', 'NO_CATALOGO', name='UK_CATALOGO_NOME_EMPRESA'),)
+    
+    # Relacionamentos
+    empresa = relationship('Empresa', back_populates='catalogos')
+    itens_catalogo = relationship('ItemCatalogo', back_populates='catalogo', cascade='all, delete-orphan')
+
+class ItemCatalogo(Base):
+    """ Mapeia a tabela TB_ITENS_CATALOGO (Lista de Preços) """
+    __tablename__ = 'TB_ITENS_CATALOGO'
+    
+    id_item_catalogo = Column('ID_ITEM_CATALOGO', Integer, primary_key=True)
+    id_catalogo = Column('ID_CATALOGO', Integer, ForeignKey('TB_CATALOGOS.ID_CATALOGO', ondelete='CASCADE'), nullable=False)
+    id_produto = Column('ID_PRODUTO', Integer, ForeignKey('TB_PRODUTOS.ID_PRODUTO', ondelete='CASCADE'), nullable=False)
+    vl_preco_catalogo = Column('VL_PRECO_CATALOGO', Numeric(15,2), nullable=False)
+    fl_ativo_no_catalogo = Column('FL_ATIVO_NO_CATALOGO', Boolean, default=True)
+    
+    __table_args__ = (UniqueConstraint('ID_CATALOGO', 'ID_PRODUTO', name='UK_CATALOGO_PRODUTO'),)
+    
+    # Relacionamentos
+    catalogo = relationship('Catalogo', back_populates='itens_catalogo')
+    produto = relationship('Produto', back_populates='listas_de_preco')
 
 # ============================================
 # VIEWS (Mapeadas como Tabelas Read-Only)

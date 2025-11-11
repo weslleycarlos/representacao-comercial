@@ -8,6 +8,7 @@ import { PaginaEmpresas } from './paginas/gestor/Empresas';
 import { PaginaVendedores } from './paginas/gestor/Vendedores';
 import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
 import { PaginaClientes } from './paginas/gestor/Clientes';
+import { PaginaCatalogo } from './paginas/gestor/Catalogo';
 // (Importe as outras páginas do gestor quando as criarmos)
 
 // Layouts e Rotas
@@ -57,6 +58,7 @@ function App() {
           <Route path="/gestor/empresas" element={<PaginaEmpresas />} />
           <Route path="/gestor/vendedores" element={<PaginaVendedores />} />
           <Route path="/gestor/clientes" element={<PaginaClientes />} />
+          <Route path="/gestor/catalogo" element={<PaginaCatalogo />} />
           <Route path="/gestor/pedidos" element={<h1>Página de Pedidos (Gestor)</h1>} />
           <Route path="/gestor/relatorios" element={<h1>Página de Relatórios (Gestor)</h1>} />
           <Route path="/gestor/configuracoes" element={<h1>Página de Configs (Gestor)</h1>} />

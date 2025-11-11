@@ -1,3 +1,4 @@
+from decimal import Decimal
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,7 +16,7 @@ from src.routes.gestor.logs import gestor_logs_router
 from src.routes.gestor.empresas import gestor_empresas_router
 from src.routes.gestor.vendedores import gestor_vendedores_router
 from src.routes.gestor.clientes import gestor_clientes_router
-from src.routes.gestor.produtos import gestor_produtos_router
+from src.routes.gestor.produtos import gestor_produtos_router as gestor_catalogo_router
 from src.routes.gestor.config import gestor_config_router
 from src.routes.gestor.relatorios import gestor_relatorios_router
 from src.routes.gestor.pedidos import gestor_pedidos_router
@@ -66,30 +67,27 @@ def seed_initial_data():
     db: Session = SessionLocal()
     try:
         print("Verificando dados iniciais (seed)...")
-
-        # 1. Verifica/Cria o Super Admin (Global)
-        super_admin = db.query(models.Usuario).filter(
-            models.Usuario.tp_usuario == 'super_admin'
-        ).first()
-
+        
+        # 1. Verifica/Cria o Super Admin
+        super_admin = db.query(models.Usuario).filter(models.Usuario.tp_usuario == 'super_admin').first()
         if not super_admin:
             print("Criando Super Admin padrão...")
             super_admin = models.Usuario(
-                id_organizacao=None, # Super Admin é global (sem organização)
-                ds_email="admin@repcom.com", # Email de teste Super Admin
+                id_organizacao=None,
+                ds_email="admin@repcom.com",
                 tp_usuario="super_admin",
                 no_completo="Admin Global",
                 fl_ativo=True
             )
-            super_admin.set_password("admin123") # SENHA DE TESTE (Mude em produção)
+            super_admin.set_password("admin123")
             db.add(super_admin)
-            db.commit()
-
-        # 2. Verifica/Cria a Organização Padrão (para Gestor)
+            db.commit() # Commit para obter o ID do super_admin
+        
+        # 2. Verifica/Cria a Organização Padrão
         org = db.query(models.Organizacao).first()
-        if org is None:
+        if not org:
             print("Nenhuma organização encontrada. Criando Organização Padrão e Gestor...")
-
+            
             # 2.1. Cria a Organização
             org = models.Organizacao(
                 no_organizacao="Organização Padrão (Teste)",
@@ -99,34 +97,72 @@ def seed_initial_data():
                 qt_limite_empresas=10
             )
             db.add(org)
-            db.flush() # Garante que org.id_organizacao esteja disponível
+            db.flush() # Pega o ID da Org
 
             # 2.2. Cria o Usuário Gestor
             gestor = models.Usuario(
                 id_organizacao=org.id_organizacao,
-                ds_email="gestor@repcom.com", # Email de teste
+                ds_email="gestor@repcom.com",
                 tp_usuario="gestor",
                 no_completo="Gestor Padrão",
                 fl_ativo=True,
-                id_usuario_criador=super_admin.id_usuario # Criado pelo Super Admin
+                id_usuario_criador=super_admin.id_usuario
             )
-            gestor.set_password("123456") # Senha de teste
+            gestor.set_password("123456")
             db.add(gestor)
-
+            
             # 2.3. Cria Formas de Pagamento Padrão (Globais)
             payment_methods = [
                 models.FormaPagamento(no_forma_pagamento='Dinheiro', fl_ativa=True, id_organizacao=None),
-                models.FormaPagamento(no_forma_pagamento='Cartão de Crédito', fl_ativa=True, id_organizacao=None),
                 models.FormaPagamento(no_forma_pagamento='PIX', fl_ativa=True, id_organizacao=None),
-                models.FormaPagamento(no_forma_pagamento='Boleto', fl_ativa=True, id_organizacao=None)
             ]
             db.bulk_save_objects(payment_methods)
+            
+            # --- 2.4 (NOVO) CRIA DADOS DE TESTE (Empresa, Produto, Catálogo, Preço) ---
+            
+            # Cria 1 Empresa Representada (vinculada à Org)
+            empresa_teste = models.Empresa(
+                id_organizacao=org.id_organizacao,
+                no_empresa="Empresa Teste (Sementes)",
+                nr_cnpj="00.000.000/0001-00",
+                pc_comissao_padrao=5.0
+            )
+            db.add(empresa_teste)
+            db.flush() # Pega o ID da Empresa
+
+            # Cria 1 Produto (vinculado à Empresa)
+            produto_teste = models.Produto(
+                id_empresa=empresa_teste.id_empresa,
+                cd_produto="PROD-001",
+                ds_produto="Produto de Teste (Ex: Camiseta)"
+            )
+            db.add(produto_teste)
+            db.flush() # Pega o ID do Produto
+
+            # Cria 1 Catálogo (vinculado à Empresa)
+            catalogo_teste = models.Catalogo(
+                id_empresa=empresa_teste.id_empresa,
+                no_catalogo="Lista de Preços Padrão 2025",
+                fl_ativo=True # <-- Marcado como ativo para venda
+            )
+            db.add(catalogo_teste)
+            db.flush() # Pega o ID do Catálogo
+
+            # Cria 1 Preço (vinculando Produto ao Catálogo)
+            item_catalogo = models.ItemCatalogo(
+                id_catalogo=catalogo_teste.id_catalogo,
+                id_produto=produto_teste.id_produto,
+                vl_preco_catalogo=Decimal("120.50") # Define o preço
+            )
+            db.add(item_catalogo)
+            
+            # --- FIM DO NOVO BLOCO ---
 
             db.commit()
             print("Dados iniciais criados com sucesso.")
         else:
             print("Banco de dados já populado.")
-
+            
     except Exception as e:
         print(f"Erro ao popular dados: {e}")
         db.rollback()
@@ -147,7 +183,7 @@ app.include_router(admin_dashboard_router)
 app.include_router(gestor_empresas_router)
 app.include_router(gestor_vendedores_router)
 app.include_router(gestor_clientes_router)
-app.include_router(gestor_produtos_router)
+app.include_router(gestor_catalogo_router)
 app.include_router(gestor_config_router)
 app.include_router(gestor_relatorios_router)
 app.include_router(gestor_pedidos_router)

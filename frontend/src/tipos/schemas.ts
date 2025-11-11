@@ -12,7 +12,6 @@ export interface IOrganizacao {
   nr_cnpj?: string;
   st_assinatura?: string;
   tp_plano?: string;
-  // (Campos completos podem ser adicionados se o 'AdminOrganizacaoCreate' precisar deles)
 }
 
 export interface IEmpresa {
@@ -35,6 +34,11 @@ export interface IUsuario {
   dt_ultimo_acesso?: string;
 }
 
+export interface IVendedor extends IUsuario {
+  // Um Vendedor é um IUsuario + suas empresas
+  empresas_vinculadas: IEmpresa[]; 
+}
+
 // ============================================
 // TIPOS COMPOSTOS (Respostas de API)
 // ============================================
@@ -49,10 +53,10 @@ export interface IEmpresaCompleta extends IEmpresa {
 }
 
 export interface IVendedor extends IUsuario {
-  // Um Vendedor é um IUsuario + suas empresas
   empresas_vinculadas: IEmpresa[]; 
 }
 
+// --- Clientes ---
 export interface IEndereco {
   id_endereco: number;
   id_cliente: number;
@@ -82,29 +86,23 @@ export interface ICliente {
   id_organizacao: number;
   nr_cnpj: string;
   no_razao_social: string;
-  no_fantasia?: string;
-  nr_inscricao_estadual?: string;
-  ds_email?: string;
-  nr_telefone?: string;
-  ds_observacoes?: string;
+  // ... (outros campos base)
   fl_ativo: boolean;
   dt_criacao: string;
 }
 
 export interface IClienteCompleto extends ICliente {
-  // Um Cliente completo inclui seus endereços e contatos
   enderecos: IEndereco[];
   contatos: IContato[];
 }
+
+// --- Catálogo e Produtos (REVISADOS) ---
 
 export interface ICategoriaProduto {
   id_categoria: number;
   id_organizacao: number;
   no_categoria: string;
   id_categoria_pai?: number;
-  ds_categoria?: string;
-  fl_ativa: boolean;
-  // (podemos adicionar 'children' aqui se precisarmos de árvore)
 }
 
 export interface IVariacaoProduto {
@@ -113,27 +111,79 @@ export interface IVariacaoProduto {
   ds_tamanho?: string;
   ds_cor?: string;
   cd_sku?: string;
-  vl_ajuste_preco: number;
+  vl_ajuste_preco: number; // Decimal vira number
   qt_estoque: number;
   fl_ativa: boolean;
 }
 
 export interface IProduto {
+  // (Este é o "DNA" do produto - SEM PREÇO)
   id_produto: number;
   id_empresa: number;
   id_categoria?: number;
   cd_produto: string;
   ds_produto: string;
-  vl_base: number;
   sg_unidade_medida?: string;
   fl_ativo: boolean;
   dt_criacao: string;
 }
 
-export interface IProdutoCompleto extends IProduto {
-  // Um Produto completo inclui suas variações e categoria
+export interface IProdutoSimples extends IProduto {
   variacoes: IVariacaoProduto[];
   categoria?: ICategoriaProduto;
+}
+
+export interface IProdutoCompleto extends IProduto {
+  variacoes: IVariacaoProduto[];
+  categoria?: ICategoriaProduto;
+  // listas_de_preco: IItemCatalogo[]; // (Adicionado abaixo)
+}
+
+export interface ICatalogo {
+  id_catalogo: number;
+  id_empresa: number;
+  no_catalogo: string;
+  ds_descricao?: string;
+  dt_inicio_vigencia?: string;
+  dt_fim_vigencia?: string;
+  fl_ativo: boolean;
+}
+
+export interface IItemCatalogo {
+  id_item_catalogo: number;
+  id_catalogo: number;
+  id_produto: number;
+  vl_preco_catalogo: number;
+  fl_ativo_no_catalogo: boolean;
+  produto?: IProdutoSimples;
+}
+
+export interface IItemCatalogoAninhado {
+  // (Este é o 'ItemCatalogoAninhadoSchema' do backend)
+  // (É igual ao IItemCatalogo, mas SEM o 'produto')
+  id_item_catalogo: number;
+  id_catalogo: number;
+  id_produto: number;
+  vl_preco_catalogo: number;
+  fl_ativo_no_catalogo: boolean;
+}
+
+// (Adicionando o relacionamento que faltava no IProdutoCompleto)
+export interface IProdutoCompleto extends IProduto {
+  variacoes: IVariacaoProduto[];
+  categoria?: ICategoriaProduto;
+  listas_de_preco: IItemCatalogoAninhado[];
+}
+
+export interface IItemCatalogoVenda {
+  // (Este é o schema que o VENDEDOR vê no catálogo)
+  id_item_catalogo: number;
+  id_catalogo: number;
+  vl_preco_catalogo: number;
+  fl_ativo_no_catalogo: boolean;
+  
+  // O produto aninhado (com suas variações)
+  produto: IProdutoCompleto; 
 }
 
 export interface IFormaPagamento {
@@ -169,8 +219,6 @@ export interface IItemPedido {
   vl_unitario: number;
   pc_desconto_item: number;
   vl_total_item: number;
-  
-  // Detalhes do produto (para exibir no carrinho)
   produto?: IProduto; 
 }
 

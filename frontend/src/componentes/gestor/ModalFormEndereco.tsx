@@ -1,4 +1,6 @@
 // /frontend/src/componentes/gestor/ModalFormEndereco.tsx
+// Versão ajustada - UX e Layout melhorados
+
 import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -6,7 +8,7 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
   Checkbox, FormControlLabel, Box, InputAdornment, IconButton,
-  MenuItem // Para o 'Tipo'
+  MenuItem, Divider
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
 
@@ -20,7 +22,7 @@ interface ModalFormEnderecoProps {
   open: boolean;
   onClose: () => void;
   idCliente: number;
-  endereco?: IEndereco; // Para modo de edição
+  endereco?: IEndereco;
 }
 
 export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onClose, idCliente, endereco }) => {
@@ -37,7 +39,6 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
     }
   });
 
-  // Hooks de Mutação
   const { mutate: buscarCEP, isPending: isBuscandoCEP, error: erroCEP } = useConsultaCEP();
   const { mutate: addEndereco, isPending: isAdding, error: addError } = useAddEndereco();
   const { mutate: updateEndereco, isPending: isUpdating, error: updateError } = useUpdateEndereco();
@@ -47,13 +48,12 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
   
   const cepValue = watch('nr_cep');
 
-  // Preenche o formulário para edição ou limpa para criação
   useEffect(() => {
     if (open) {
-      if (isEditMode) {
-        reset(endereco); // Preenche
+      if (isEditMode && endereco) {
+        reset(endereco);
       } else {
-        reset({ // Limpa
+        reset({
           tp_endereco: 'entrega',
           ds_logradouro: '',
           nr_endereco: '',
@@ -68,12 +68,10 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
     }
   }, [endereco, isEditMode, reset, open]);
 
-  // Handler da busca por CEP
   const handleBuscaCEP = () => {
     const cep = watch('nr_cep');
     buscarCEP(cep, {
       onSuccess: (data) => {
-        // A BrasilAPI retorna 'street', 'neighborhood', 'city', 'state'
         setValue('ds_logradouro', data.street || '', { shouldValidate: true });
         setValue('no_bairro', data.neighborhood || '', { shouldValidate: true });
         setValue('no_cidade', data.city || '', { shouldValidate: true });
@@ -97,19 +95,33 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
   const apiErrorMessage = (mutationError as any)?.response?.data?.detail;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{isEditMode ? 'Editar Endereço' : 'Adicionar Novo Endereço'}</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {isEditMode ? 'Editar Endereço' : 'Novo Endereço'}
+      </DialogTitle>
+      
+      <Divider />
       
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {apiErrorMessage}
+            </Alert>
           )}
 
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             
-            {/* Linha 1: CEP (com Lupa) e Tipo */}
-            <Grid xs={12} sm={6}>
+            {/* Linha 1: CEP e Tipo */}
+            <Grid size={{ xs: 12, sm: 6 }}>
               <MaskedInput
                 mask="cep"
                 label="CEP"
@@ -124,10 +136,11 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
                   endAdornment: (
                     <InputAdornment position="end">
                       <IconButton
-                        aria-label="buscar cep"
+                        aria-label="buscar dados do cep"
                         onClick={handleBuscaCEP}
                         disabled={isBuscandoCEP || (cepValue || "").replace(/\D/g, '').length !== 8}
                         edge="end"
+                        size="small"
                         color="primary"
                       >
                         {isBuscandoCEP ? <CircularProgress size={20} /> : <SearchIcon />}
@@ -137,10 +150,11 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
                 }}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...register("tp_endereco")}
-                label="Tipo"
+                label="Tipo de Endereço"
                 required
                 fullWidth
                 select
@@ -155,67 +169,81 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
             </Grid>
 
             {/* Linha 2: Logradouro e Número */}
-            <Grid xs={12} sm={9}>
+            <Grid size={{ xs: 12, sm: 9 }}>
               <TextField
                 {...register("ds_logradouro")}
-                label="Logradouro (Rua, Av.)"
+                label="Logradouro"
                 required
                 fullWidth
-                InputLabelProps={{ shrink: true }} // Para o auto-complete
+                placeholder="Rua, Avenida, etc."
+                InputLabelProps={{ shrink: true }}
                 error={!!errors.ds_logradouro}
                 helperText={errors.ds_logradouro?.message}
               />
             </Grid>
-            <Grid xs={12} sm={3}>
+            
+            <Grid size={{ xs: 12, sm: 3 }}>
               <TextField
                 {...register("nr_endereco")}
                 label="Número"
                 fullWidth
+                error={!!errors.nr_endereco}
+                helperText={errors.nr_endereco?.message}
               />
             </Grid>
 
             {/* Linha 3: Complemento e Bairro */}
-            <Grid xs={12} sm={6}>
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...register("ds_complemento")}
                 label="Complemento"
                 fullWidth
+                placeholder="Apto, Bloco, Sala, etc."
+                error={!!errors.ds_complemento}
+                helperText={errors.ds_complemento?.message}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...register("no_bairro")}
                 label="Bairro"
                 fullWidth
-                InputLabelProps={{ shrink: true }} // Para o auto-complete
+                InputLabelProps={{ shrink: true }}
+                error={!!errors.no_bairro}
+                helperText={errors.no_bairro?.message}
               />
             </Grid>
 
             {/* Linha 4: Cidade e Estado */}
-            <Grid xs={12} sm={8}>
+            <Grid size={{ xs: 12, sm: 8 }}>
               <TextField
                 {...register("no_cidade")}
                 label="Cidade"
                 required
                 fullWidth
-                InputLabelProps={{ shrink: true }} // Para o auto-complete
+                InputLabelProps={{ shrink: true }}
                 error={!!errors.no_cidade}
                 helperText={errors.no_cidade?.message}
               />
             </Grid>
-            <Grid xs={12} sm={4}>
+            
+            <Grid size={{ xs: 12, sm: 4 }}>
               <TextField
                 {...register("sg_estado")}
-                label="Estado (UF)"
+                label="UF"
                 required
                 fullWidth
-                InputLabelProps={{ shrink: true }} // Para o auto-complete
+                placeholder="SP"
+                InputLabelProps={{ shrink: true }}
                 error={!!errors.sg_estado}
                 helperText={errors.sg_estado?.message}
+                inputProps={{ maxLength: 2, style: { textTransform: 'uppercase' } }}
               />
             </Grid>
             
-            <Grid xs={12}>
+            {/* Linha 5: Checkbox */}
+            <Grid size={12}>
               <FormControlLabel
                 control={
                   <Controller
@@ -232,12 +260,24 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={onClose} color="inherit" disabled={isSaving}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={onClose} 
+            color="inherit" 
+            disabled={isSaving}
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
-            {isSaving ? <CircularProgress size={24} /> : 'Salvar Endereço'}
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isSaving}
+            size="large"
+          >
+            {isSaving ? <CircularProgress size={24} /> : 'Salvar'}
           </Button>
         </DialogActions>
       </Box>

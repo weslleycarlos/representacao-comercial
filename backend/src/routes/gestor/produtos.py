@@ -396,28 +396,32 @@ def get_itens_do_catalogo(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """ (NOVO) Lista todos os produtos (e seus preços) de um catálogo """
+    """ Lista todos os produtos (e seus preços) de um catálogo """
     
-    # Valida o catálogo (get_catalogo_by_id já valida a organização)
+    # Valida o catálogo
     db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
 
-    # --- ESTA É A QUERY CORRETA ---
-    # Ela carrega o ItemCatalogo E o 'produto' relacionado.
-    # O 'response_model=List[ItemCatalogoSchema]' usará o
-    # 'ProdutoSchemaSimples' (definido no schema) para serializar
-    # o 'produto', quebrando o ciclo.
-    itens = db.query(models.ItemCatalogo).options(
-        # Carrega o relacionamento 'produto'
-        joinedload(models.ItemCatalogo.produto).options(
-            # E, dentro de 'produto', carrega 'variacoes' e 'categoria'
-            selectinload(models.Produto.variacoes),
-            joinedload(models.Produto.categoria)
-        )
-    ).filter(
+    # ✅ QUERY CORRIGIDA COM EAGER LOADING EXPLÍCITO
+    itens = db.query(models.ItemCatalogo).filter(
         models.ItemCatalogo.id_catalogo == db_catalogo.id_catalogo
+    ).options(
+        # Carrega o produto COM TODAS as suas relações
+        joinedload(models.ItemCatalogo.produto).selectinload(models.Produto.variacoes),
+        joinedload(models.ItemCatalogo.produto).selectinload(models.Produto.categoria)
     ).all()
-    # --- FIM DA QUERY ---
-        
+    
+    # ✅ DEBUG: Imprime os dados carregados
+    print(f"\n=== DEBUG: Itens carregados ===")
+    for item in itens:
+        print(f"Item ID: {item.id_item_catalogo}")
+        print(f"  Produto: {item.produto}")
+        if item.produto:
+            print(f"    CD: {item.produto.cd_produto}")
+            print(f"    DS: {item.produto.ds_produto}")
+            print(f"    Variações: {len(item.produto.variacoes)}")
+            print(f"    Categoria: {item.produto.categoria}")
+    print("=" * 40 + "\n")
+    
     return itens
 
 def get_item_catalogo_by_id(db: Session, id_item_catalogo: int, id_organizacao: int) -> models.ItemCatalogo:

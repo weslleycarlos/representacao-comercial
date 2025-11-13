@@ -784,7 +784,10 @@ class AdminDashboardKpiSchema(BaseModel):
 # RESOLUÇÃO DE REFERÊNCIAS (FINAL DO ARQUIVO)
 # ============================================
 # Isso resolve as referências circulares (strings)
-ItemCatalogoSchema.model_rebuild()
-ProdutoCompletoSchema.model_rebuild()
+# 1. Resolvemos os schemas 'aninhados' (folhas) primeiro.
 ProdutoSchemaSimples.model_rebuild()
 ItemCatalogoAninhadoSchema.model_rebuild()
+
+# 2. Agora, resolvemos os schemas 'pais' (troncos) que dependem deles.
+ItemCatalogoSchema.model_rebuild()
+ProdutoCompletoSchema.model_rebuild()

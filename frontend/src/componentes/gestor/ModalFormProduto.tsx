@@ -1,23 +1,24 @@
 // /frontend/src/componentes/gestor/ModalFormProduto.tsx
+// Versão ajustada - UX e Layout melhorados
+
 import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
-  Checkbox, FormControlLabel, Box, MenuItem
+  Checkbox, FormControlLabel, Box, MenuItem, Divider
 } from '@mui/material';
 
 import { type ProdutoFormData, produtoSchema } from '../../tipos/validacao';
 import type { IProdutoCompleto, ICategoriaProduto } from '../../tipos/schemas';
 import { useCreateProduto, useUpdateProduto } from '../../api/servicos/gestorCatalogoService';
-// (Precisaremos do hook useGetCategorias quando o criarmos)
 
 interface ModalFormProdutoProps {
   open: boolean;
   onClose: () => void;
-  idEmpresa: number; // A qual empresa este produto pertence
-  produto?: IProdutoCompleto; // Para modo de edição
+  idEmpresa: number;
+  produto?: IProdutoCompleto;
   categorias: ICategoriaProduto[];
   isLoadingCategorias: boolean;
 }
@@ -34,7 +35,7 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
     defaultValues: {
       fl_ativo: true,
       sg_unidade_medida: 'UN',
-      id_empresa: idEmpresa, // Pré-define o ID da empresa
+      id_empresa: idEmpresa,
     }
   });
 
@@ -46,10 +47,10 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
 
   useEffect(() => {
     if (open) {
-      if (isEditMode) {
-        reset(produto); // Preenche
+      if (isEditMode && produto) {
+        reset(produto);
       } else {
-        reset({ // Limpa
+        reset({
           cd_produto: '',
           ds_produto: '',
           sg_unidade_medida: 'UN',
@@ -63,7 +64,6 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
 
   const onSubmit = (data: ProdutoFormData) => {
     if (isEditMode && produto) {
-      // (Omitimos id_empresa pois não deve ser alterado na edição)
       const { id_empresa, ...updateData } = data;
       updateProduto({ idProduto: produto.id_produto, data: updateData }, {
         onSuccess: () => onClose(),
@@ -78,37 +78,58 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
   const apiErrorMessage = (mutationError as any)?.response?.data?.detail;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{isEditMode ? 'Editar Produto' : 'Adicionar Novo Produto (Definição)'}</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {isEditMode ? 'Editar Produto' : 'Novo Produto'}
+      </DialogTitle>
+      
+      <Divider />
       
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {apiErrorMessage}
+            </Alert>
           )}
 
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             
-            <Grid xs={12} sm={6}>
+            {/* Linha 1: Código e Unidade */}
+            <Grid size={{ xs: 12, sm: 7 }}>
               <TextField
                 {...register("cd_produto")}
-                label="Código (SKU)"
+                label="Código do Produto"
                 required
                 fullWidth
                 autoFocus
+                placeholder="Ex: SKU-001"
                 error={!!errors.cd_produto}
                 helperText={errors.cd_produto?.message}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            
+            <Grid size={{ xs: 12, sm: 5 }}>
               <TextField
                 {...register("sg_unidade_medida")}
-                label="Unidade (UN, CX, KG)"
+                label="Unidade"
                 fullWidth
+                placeholder="Ex: UN, CX, KG"
+                error={!!errors.sg_unidade_medida}
+                helperText={errors.sg_unidade_medida?.message}
               />
             </Grid>
 
-            <Grid xs={12}>
+            {/* Linha 2: Descrição */}
+            <Grid size={12}>
               <TextField
                 {...register("ds_produto")}
                 label="Descrição do Produto"
@@ -121,19 +142,25 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
               />
             </Grid>
             
-            <Grid xs={12}>
+            {/* Linha 3: Categoria */}
+            <Grid size={12}>
               <TextField
                 {...register("id_categoria")}
                 label="Categoria"
                 select
                 fullWidth
-                // Converte null/undefined para string vazia para o TextField
                 value={watch('id_categoria') || ''}
-                disabled={isLoadingCategorias} // Desabilita enquanto carrega
+                disabled={isLoadingCategorias}
+                error={!!errors.id_categoria}
+                helperText={errors.id_categoria?.message}
+                InputProps={{
+                  startAdornment: isLoadingCategorias ? (
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                  ) : null,
+                }}
               >
-                {/* Remove o comentário e adiciona o map */}
                 <MenuItem value="" disabled>
-                  {isLoadingCategorias ? 'Carregando...' : 'Selecione...'}
+                  <em>{isLoadingCategorias ? 'Carregando categorias...' : 'Selecione uma categoria...'}</em>
                 </MenuItem>
                 
                 {categorias.map((categoria) => (
@@ -144,7 +171,8 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
               </TextField>
             </Grid>
             
-            <Grid xs={12}>
+            {/* Linha 4: Checkbox */}
+            <Grid size={12}>
               <FormControlLabel
                 control={
                   <Controller
@@ -155,17 +183,29 @@ export const ModalFormProduto: React.FC<ModalFormProdutoProps> = ({
                     )}
                   />
                 }
-                label="Produto Ativo (pode ser vendido)"
+                label="Produto ativo"
               />
             </Grid>
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={onClose} color="inherit" disabled={isSaving}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={onClose} 
+            color="inherit" 
+            disabled={isSaving}
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isSaving}
+            size="large"
+          >
             {isSaving ? <CircularProgress size={24} /> : 'Salvar'}
           </Button>
         </DialogActions>

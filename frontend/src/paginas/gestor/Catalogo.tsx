@@ -51,14 +51,16 @@ export const PaginaCatalogo: React.FC = () => {
         flexWrap: 'wrap',
         gap: 2
       }}>
+        {empresaSelecionada && (
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Catálogo
           </Typography>
+          
           <Typography variant="body2" color="text.secondary">
-            Gerencie produtos e listas de preço por empresa
+            Gerencie produtos e listas de preço de {empresaSelecionada.no_empresa}
           </Typography>
-        </Box>
+        </Box>)}
         
         {/* Seletor de Empresa */}
         <TextField
@@ -122,20 +124,7 @@ export const PaginaCatalogo: React.FC = () => {
             borderRadius: 2,
           }}
         >
-          {/* Info da Empresa Selecionada */}
-          {empresaSelecionada && (
-            <Box sx={{ 
-              px: 3, 
-              py: 2, 
-              bgcolor: 'background.default',
-              borderBottom: '1px solid',
-              borderColor: 'divider'
-            }}>
-              <Typography variant="body2" color="text.secondary">
-                Gerenciando catálogo de {empresaSelecionada.no_empresa}
-              </Typography>
-            </Box>
-          )}
+
 
           {/* Tabs */}
           <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>

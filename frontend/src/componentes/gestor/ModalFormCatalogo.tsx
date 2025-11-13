@@ -1,5 +1,5 @@
 // /frontend/src/componentes/gestor/ModalFormCatalogo.tsx
-// (VERSÃO CORRIGIDA)
+// Versão ajustada - UX e Layout melhorados
 
 import React, { useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -7,12 +7,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
-  Checkbox, FormControlLabel, Box
+  Checkbox, FormControlLabel, Box, Divider
 } from '@mui/material';
 
 import { type CatalogoFormData, catalogoSchema } from '../../tipos/validacao';
 import type { ICatalogo } from '../../tipos/schemas';
-// --- 1. IMPORTAR O NOVO HOOK ---
 import { useCreateCatalogo, useUpdateCatalogo } from '../../api/servicos/gestorCatalogoService';
 
 interface ModalFormCatalogoProps {
@@ -22,11 +21,10 @@ interface ModalFormCatalogoProps {
   catalogo?: ICatalogo;
 }
 
-// Helper para converter string de data (YYYY-MM-DD) para <input type="date">
+// Helper para converter data ISO para formato do input
 const formatDataParaInput = (dateString?: string | null): string => {
   if (!dateString) return "";
   try {
-    // Tenta extrair apenas a data (ignorando fuso horário)
     return dateString.split('T')[0];
   } catch (e) {
     return "";
@@ -48,19 +46,15 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
     }
   });
 
-  // --- 2. USAR O NOVO HOOK ---
   const { mutate: createCatalogo, isPending: isCreating, error: createError } = useCreateCatalogo();
   const { mutate: updateCatalogo, isPending: isUpdating, error: updateError } = useUpdateCatalogo();
 
-
-  const isSaving = isCreating || isUpdating; // <-- ATUALIZADO
-  const mutationError = createError || updateError; // <-- ATUALIZADO
+  const isSaving = isCreating || isUpdating;
+  const mutationError = createError || updateError;
 
   useEffect(() => {
     if (open) {
       if (isEditMode && catalogo) {
-        // --- 3. CORREÇÃO DO RESET (Bug da Data) ---
-        // Converte as datas (string ISO) para o formato "YYYY-MM-DD" que o input type="date" espera
         reset({
           ...catalogo,
           dt_inicio_vigencia: formatDataParaInput(catalogo.dt_inicio_vigencia),
@@ -80,14 +74,10 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
   }, [catalogo, isEditMode, reset, open, idEmpresa]);
 
   const onSubmit = (data: CatalogoFormData) => {
-    // --- 4. CORREÇÃO DO SUBMIT (Bug da Edição) ---
     if (isEditMode && catalogo) {
-      // (Filtra os dados que não mudaram para otimizar o PUT)
       const updateData: Partial<CatalogoFormData> = {};
       
-      // Compara o formulário com o objeto 'catalogo' original
       (Object.keys(data) as Array<keyof CatalogoFormData>).forEach(key => {
-         // Converte as datas para o formato ISO (se mudaram)
          if (key === 'dt_inicio_vigencia' || key === 'dt_fim_vigencia') {
             const formDate = data[key] ? new Date(data[key]!).toISOString().split('T')[0] : null;
             const originalDate = catalogo[key] ? new Date(catalogo[key]!).toISOString().split('T')[0] : null;
@@ -112,40 +102,61 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
   const apiErrorMessage = (mutationError as any)?.response?.data?.detail;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>{isEditMode ? 'Editar Catálogo' : 'Adicionar Novo Catálogo'}</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      maxWidth="md" 
+      fullWidth
+      PaperProps={{
+        sx: { borderRadius: 2 }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1 }}>
+        {isEditMode ? 'Editar Catálogo' : 'Novo Catálogo'}
+      </DialogTitle>
+      
+      <Divider />
       
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
-        <DialogContent>
+        <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
+            <Alert severity="error" sx={{ mb: 3 }}>
+              {apiErrorMessage}
+            </Alert>
           )}
 
-          <Grid container spacing={2}>
+          <Grid container spacing={2.5}>
             
-            <Grid xs={12}>
+            {/* Linha 1: Nome */}
+            <Grid size={12}>
               <TextField
                 {...register("no_catalogo")}
-                label="Nome do Catálogo (Ex: Verão 2025)"
+                label="Nome do Catálogo"
                 required
                 fullWidth
                 autoFocus
+                placeholder="Ex: Verão 2025"
                 error={!!errors.no_catalogo}
                 helperText={errors.no_catalogo?.message}
               />
             </Grid>
 
-            <Grid xs={12}>
+            {/* Linha 2: Descrição */}
+            <Grid size={12}>
               <TextField
                 {...register("ds_descricao")}
                 label="Descrição"
                 fullWidth
                 multiline
-                rows={2}
+                rows={3}
+                placeholder="Detalhes sobre este catálogo..."
+                error={!!errors.ds_descricao}
+                helperText={errors.ds_descricao?.message}
               />
             </Grid>
             
-            <Grid xs={12} sm={6}>
+            {/* Linha 3: Datas */}
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...register("dt_inicio_vigencia")}
                 label="Início da Vigência"
@@ -156,7 +167,8 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
                 helperText={errors.dt_inicio_vigencia?.message}
               />
             </Grid>
-            <Grid xs={12} sm={6}>
+            
+            <Grid size={{ xs: 12, sm: 6 }}>
               <TextField
                 {...register("dt_fim_vigencia")}
                 label="Fim da Vigência"
@@ -168,7 +180,8 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
               />
             </Grid>
             
-            <Grid xs={12}>
+            {/* Linha 4: Checkbox */}
+            <Grid size={12}>
               <FormControlLabel
                 control={
                   <Controller
@@ -179,17 +192,29 @@ export const ModalFormCatalogo: React.FC<ModalFormCatalogoProps> = ({
                     )}
                   />
                 }
-                label="Catálogo Ativo (Vendedores podem usar)"
+                label="Catálogo ativo"
               />
             </Grid>
           </Grid>
         </DialogContent>
 
-        <DialogActions sx={{ p: 3 }}>
-          <Button onClick={onClose} color="inherit" disabled={isSaving}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button 
+            onClick={onClose} 
+            color="inherit" 
+            disabled={isSaving}
+            size="large"
+          >
             Cancelar
           </Button>
-          <Button type="submit" variant="contained" disabled={isSaving}>
+          <Button 
+            type="submit" 
+            variant="contained" 
+            disabled={isSaving}
+            size="large"
+          >
             {isSaving ? <CircularProgress size={24} /> : 'Salvar'}
           </Button>
         </DialogActions>

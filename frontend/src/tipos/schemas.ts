@@ -43,6 +43,9 @@ export interface IVendedor extends IUsuario {
 // TIPOS COMPOSTOS (Respostas de API)
 // ============================================
 
+
+
+
 export interface IEmpresaCompleta extends IEmpresa {
   nr_inscricao_estadual?: string;
   ds_email_contato?: string;
@@ -296,6 +299,21 @@ export function mapRowToLogAuditoria(row: Record<string, unknown>): ILogAuditori
     usuario: (row['usuario'] as unknown) as IUsuario | undefined,
   };
 }
+
+// ============================================
+// TIPOS DE AUTENTICAÇÃO (Tokens e Respostas)
+// ============================================
+
+export interface IToken {
+  access_token: string;
+  token_type: string;
+}
+
+export interface ISelectCompanyResponse {
+  token: IToken;
+  empresa_ativa: IEmpresa;
+}
+
 // ============================================
 // TIPOS DE DASHBOARD (Respostas das Views)
 // ============================================

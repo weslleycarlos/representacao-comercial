@@ -9,12 +9,13 @@ import { PaginaVendedores } from './paginas/gestor/Vendedores';
 import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
 import { PaginaClientes } from './paginas/gestor/Clientes';
 import { PaginaCatalogo } from './paginas/gestor/Catalogo';
-// (Importe as outras páginas do gestor quando as criarmos)
+import { PaginaVendedorCatalogo } from './paginas/vendedor/Catalogo';
 
 // Layouts e Rotas
 import { RotaProtegida } from './rotas/RotaProtegida';
 import { LayoutGestor } from './componentes/layout/LayoutGestor';
-import { LayoutSuperAdmin } from './componentes/layout/LayoutSuperAdmin'; // <-- IMPORTAR
+import { LayoutSuperAdmin } from './componentes/layout/LayoutSuperAdmin';
+import { LayoutVendedor } from './componentes/layout/LayoutVendedor';
 import { useAuth } from './contextos/AuthContext';
 
 function App() {
@@ -32,8 +33,7 @@ function App() {
     // Roteamento baseado no Papel (Role)
     switch (usuario.tp_usuario) {
       case 'super_admin':
-        // 2. MUDAR O REDIRECT
-        return <Navigate to="/admin/dashboard" replace />; 
+        return <Navigate to="/admin/dashboard" replace />;
       case 'gestor':
         return <Navigate to="/gestor/dashboard" replace />;
       case 'vendedor':
@@ -68,18 +68,20 @@ function App() {
       {/* --- Rotas do SUPER ADMIN --- */}
       <Route element={<RotaProtegida permissoes={['super_admin']} />}>
         <Route element={<LayoutSuperAdmin />}>
-        <Route path="/admin/dashboard" element={<PaginaAdminDashboard />} />
+          <Route path="/admin/dashboard" element={<PaginaAdminDashboard />} />
           <Route path="/admin/organizacoes" element={<h1>Página de Organizações (Admin)</h1>} />
           <Route path="/admin/logs" element={<h1>Página de Logs (Admin)</h1>} />
-          {/* (Adicionaremos o dashboard do admin aqui) */}
         </Route>
       </Route>
 
       {/* --- Rotas do VENDEDOR --- */}
-      {/* (Adicionaremos o LayoutVendedor e as rotas aqui) */}
       <Route element={<RotaProtegida permissoes={['vendedor']} />}>
-         {/* <Route element={<LayoutVendedor />}> ... </Route> */}
-         <Route path="/vendedor/dashboard" element={<h1>Dashboard do Vendedor</h1>} />
+        <Route element={<LayoutVendedor />}>
+          <Route path="/vendedor/dashboard" element={<h1>Dashboard do Vendedor</h1>} />
+          <Route path="/vendedor/catalogo" element={<PaginaVendedorCatalogo />} />
+          <Route path="/vendedor/pedidos" element={<h1>Página de Pedidos (Vendedor)</h1>} />
+          <Route path="/vendedor/clientes" element={<h1>Página de Clientes (Vendedor)</h1>} />
+        </Route>
       </Route>
 
       {/* Página 404 */}

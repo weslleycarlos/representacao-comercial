@@ -24,4 +24,20 @@ export const useLogin = () => {
   });
 };
 
+export const useSelectCompany = () => {
+  // (Não precisamos invalidar caches aqui, pois a UI irá recarregar)
+  
+  const selectCompany = async (idEmpresa: number): Promise<ISelectCompanyResponse> => {
+    const { data } = await apiClient.post('/auth/select-company', {
+      id_empresa: idEmpresa,
+    });
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: selectCompany,
+    // (onSuccess será tratado na página)
+  });
+};
+
 // (Futuramente, adicionaremos aqui 'useSelectCompany' e 'useGetMe')

@@ -1,5 +1,5 @@
 // /frontend/src/componentes/layout/LayoutVendedor.tsx
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -26,20 +26,21 @@ import {
 
 import { useAuth } from '../../contextos/AuthContext';
 import { PaginaSelecionarEmpresa } from '../../paginas/vendedor/PaginaSelecionarEmpresa';
+import { ModalSelecionarEmpresa } from '../auth/ModalSelecionarEmpresa';
 
 const DRAWER_WIDTH = 260;
 
 export const LayoutVendedor: React.FC = () => {
-  const { usuario, logout, empresaAtiva, selecionarEmpresa } = useAuth();
+  const { usuario, logout, empresaAtiva } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation(); // ✅ Adicionado
 
-  // --- O GUARDA-COSTAS ---
+  // --- ADICIONE ESTE STATE ---
+  const [modalTrocarEmpresaAberto, setModalTrocarEmpresaAberto] = useState(false);
+
   if (!empresaAtiva) {
-    // Se nenhuma empresa estiver ativa na sessão, força a seleção.
     return <PaginaSelecionarEmpresa />;
   }
-  // --- FIM DO GUARDA-COSTAS ---
 
   const handleLogout = () => {
     logout();
@@ -47,10 +48,8 @@ export const LayoutVendedor: React.FC = () => {
   };
 
   const handleTrocarEmpresa = () => {
-    // Limpa a empresa ativa e o token (volta para o login inicial)
-    selecionarEmpresa(null, localStorage.getItem('authToken_inicial') || '');
-    logout();
-    navigate('/login');
+    // Em vez de deslogar, abre o modal
+    setModalTrocarEmpresaAberto(true);
   };
 
   const menuItems = [
@@ -246,6 +245,12 @@ export const LayoutVendedor: React.FC = () => {
         <Toolbar />
         <Outlet />
       </Box>
+
+      {/* --- MODAL DE TROCA DE EMPRESA --- */}
+      <ModalSelecionarEmpresa
+        open={modalTrocarEmpresaAberto}
+        onClose={() => setModalTrocarEmpresaAberto(false)}
+      />
     </Box>
   );
 };

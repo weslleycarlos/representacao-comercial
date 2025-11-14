@@ -3,11 +3,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../axios';
 import type { 
   ICategoriaProduto, 
-  IItemCatalogoVenda, // O que o Vendedor VÊ
-  IPedidoCompleto 
+  IItemCatalogoVenda,
+  IEndereco,
+  IPedidoCompleto,
+  IClienteCompleto
 } from '../../tipos/schemas';
 import type { 
-  PedidoCreateFormData // (O que o Vendedor ENVIA)
+  PedidoCreateFormData,
+  ClienteFormData,
+  EnderecoFormData
 } from '../../tipos/validacao';
 import type { IVendedor } from '../../tipos/schemas';
 import type { VendedorFormData } from '../../tipos/validacao';
@@ -17,6 +21,7 @@ const VENDEDOR_CACHE_KEY = 'vendedores';
 const VENDEDOR_CATALOGO_KEY = 'catalogoVendedor';
 const VENDEDOR_CATEGORIAS_KEY = 'categoriasVendedor';
 const VENDEDOR_PEDIDOS_KEY = 'pedidosVendedor';
+const CLIENTE_CACHE_KEY = 'clientes';
 
 // --- QUERY (Hook para GET) ---
 export const useGetVendedores = () => {
@@ -121,7 +126,6 @@ export const useGetCatalogoVenda = (idCategoria?: number) => {
   };
 
   return useQuery({
-    // A chave de cache muda se a categoria mudar
     queryKey: [VENDEDOR_CATALOGO_KEY, { idCategoria }], 
     queryFn: fetchCatalogo,
   });
@@ -180,5 +184,124 @@ export const useGetMeusPedidos = () => {
   return useQuery({
     queryKey: [VENDEDOR_PEDIDOS_KEY],
     queryFn: fetchPedidos,
+  });
+};
+
+
+/**
+ * Hook (useQuery) para o VENDEDOR buscar clientes da organização
+ */
+export const useGetVendedorClientes = () => {
+  const fetchClientes = async (): Promise<IClienteCompleto[]> => {
+    // --- ESTA É A ROTA CORRETA ---
+    const { data } = await apiClient.get('/vendedor/clientes/');
+    return data;
+  };
+
+  return useQuery({
+    queryKey: [CLIENTE_CACHE_KEY, { ativo: true }], // (Mesma chave do gestor)
+    queryFn: fetchClientes,
+  });
+};
+
+/**
+ * Hook (useMutation) para o VENDEDOR criar um novo cliente
+ */
+export const useCreateVendedorCliente = () => {
+  const queryClient = useQueryClient();
+
+  const createCliente = async (clienteData: ClienteFormData): Promise<IClienteCompleto> => {
+    // --- ESTA É A ROTA CORRETA ---
+    const { data } = await apiClient.post('/vendedor/clientes/', clienteData);
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: createCliente,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [CLIENTE_CACHE_KEY] });
+    },
+  });
+};
+
+// ============================================
+// ENDEREÇOS (Vendedor)
+// ============================================
+
+const VENDEDOR_ENDERECO_CACHE_KEY = (idCliente: number) => ['vendedor', 'enderecos', idCliente];
+
+export const useGetVendedorEnderecos = (idCliente: number) => {
+  const fetchEnderecos = async (): Promise<IEndereco[]> => {
+    // Chama a nova rota do Vendedor
+    const { data } = await apiClient.get(`/vendedor/clientes/${idCliente}/enderecos`);
+    return data;
+  };
+
+  return useQuery({
+    queryKey: VENDEDOR_ENDERECO_CACHE_KEY(idCliente),
+    queryFn: fetchEnderecos,
+    enabled: !!idCliente, 
+  });
+};
+
+export const useAddVendedorEndereco = () => {
+  const queryClient = useQueryClient();
+  interface AddPayload { idCliente: number; data: EnderecoFormData; }
+
+  const addEndereco = async (payload: AddPayload): Promise<IEndereco> => {
+    const { data } = await apiClient.post(
+      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
+      payload.data
+    );
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: addEndereco,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+    },
+  });
+};
+
+export const useUpdateVendedorEndereco = () => {
+  const queryClient = useQueryClient();
+  interface UpdatePayload { idEndereco: number; idCliente: number; data: Partial<EnderecoFormData>; }
+
+  const updateEndereco = async (payload: UpdatePayload): Promise<IEndereco> => {
+    const { data } = await apiClient.put(
+      `/vendedor/enderecos/${payload.idEndereco}`, // Rota do Vendedor
+      payload.data
+    );
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: updateEndereco,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+    },
+  });
+};
+
+export const useDeleteVendedorEndereco = () => {
+  const queryClient = useQueryClient();
+  interface DeletePayload { idEndereco: number; idCliente: number; }
+
+  const deleteEndereco = async (payload: DeletePayload): Promise<void> => {
+    await apiClient.delete(`/vendedor/enderecos/${payload.idEndereco}`); // Rota do Vendedor
+  };
+
+  return useMutation({
+    mutationFn: deleteEndereco,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+    },
   });
 };

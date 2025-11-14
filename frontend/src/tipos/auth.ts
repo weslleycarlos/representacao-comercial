@@ -4,27 +4,24 @@
 import type { 
   IUsuario, 
   IOrganizacao, 
-  IEmpresa 
-} from './schemas'; // Importa os tipos base do nosso arquivo mestre
+  IEmpresa,
+  IToken
+} from './schemas';
 
 // 1. Espelha o LoginResponse do FastAPI
 export interface ILoginResponse {
-  token: {
-    access_token: string;
-    token_type: string;
-  };
+  token: IToken; // <-- Usa o tipo importado
   usuario: IUsuario;
   organizacao?: IOrganizacao;
   empresas_vinculadas: IEmpresa[];
 }
-
 // 2. Define o que vamos armazenar em nosso Contexto de Autenticação
 export interface IAuthContext {
   usuario: IUsuario | null;
   organizacao: IOrganizacao | null;
   empresaAtiva: IEmpresa | null;
   empresasVinculadas: IEmpresa[];
-  token: string | null;
+  token: string | null; // (O token JWT é armazenado como string)
   estaLogado: boolean;
   login: (data: ILoginResponse) => void;
   logout: () => void;

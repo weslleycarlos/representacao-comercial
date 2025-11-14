@@ -14,7 +14,7 @@ import {
   Delete as DeleteIcon 
 } from '@mui/icons-material';
 
-import { useGetClientes, useDeleteCliente } from '../../api/servicos/clienteService';
+import { useGetClientes, useDeleteCliente, useCreateCliente, useUpdateCliente, useGetEnderecosPorCliente, useAddEndereco, useUpdateEndereco, useDeleteEndereco } from '../../api/servicos/clienteService';
 import type { IClienteCompleto } from '../../tipos/schemas';
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalConfirmarExclusao } from '../../componentes/layout/ModalConfirmarExclusao';
@@ -28,6 +28,10 @@ export const PaginaClientes: React.FC = () => {
   const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | undefined>(undefined);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
+  const getEnderecosHook = useGetEnderecosPorCliente(clienteSelecionado?.id_cliente || 0);
+  const addEnderecoHook = useAddEndereco();
+  const updateEnderecoHook = useUpdateEndereco();
+  const deleteEnderecoHook = useDeleteEndereco();
   
   const { 
     data: clientes, 
@@ -37,7 +41,18 @@ export const PaginaClientes: React.FC = () => {
   } = useGetClientes();
 
   const { mutate: deleteCliente, isPending: isDeleting } = useDeleteCliente();
+  const { mutate: createCliente, isPending: isCreating, error: createError } = useCreateCliente();
+  const { mutate: updateCliente, isPending: isUpdating, error: updateError } = useUpdateCliente();
 
+  const handleSaveCliente = (data: ClienteFormData, options: { onSuccess: () => void }) => {
+    if (clienteSelecionado) {
+      // Modo Edição (Gestor)
+      updateCliente({ id: clienteSelecionado.id_cliente, data }, options);
+    } else {
+      // Modo Criação (Gestor)
+      createCliente(data, options);
+    }
+  };
   // Definição das Colunas
   const colunas: GridColDef[] = [
     { 
@@ -258,11 +273,17 @@ export const PaginaClientes: React.FC = () => {
       </Paper>
       
       {/* Modal de Adicionar/Editar */}
-      <ModalFormCliente
-        open={modalFormAberto}
-        onClose={handleCloseModal}
-        cliente={clienteSelecionado}
-      />
+      {modalFormAberto && (
+        <ModalFormCliente
+          open={modalFormAberto}
+          onClose={handleCloseModal}
+          cliente={clienteSelecionado}
+          // Passa os hooks corretos do GESTOR
+          onSave={handleSaveCliente}
+          isSaving={isCreating || isUpdating}
+          mutationError={createError || updateError}
+        />
+      )}
       
       {/* Modal de Confirmação de Exclusão */}
       <ModalConfirmarExclusao
@@ -273,12 +294,17 @@ export const PaginaClientes: React.FC = () => {
         mensagem="Tem certeza que deseja desativar este cliente? Esta ação pode ser revertida posteriormente."
         isLoading={isDeleting}
       />
-      {/* Renderiza apenas se um cliente estiver selecionado */}
       {clienteSelecionado && (
         <ModalGerenciarEnderecos
           open={modalEnderecosAberto}
           onClose={() => setModalEnderecosAberto(false)}
           cliente={clienteSelecionado}
+          
+          // Passa os hooks específicos do GESTOR
+          getEnderecosHook={getEnderecosHook}
+          addEnderecoHook={addEnderecoHook}
+          updateEnderecoHook={updateEnderecoHook}
+          deleteEnderecoHook={deleteEnderecoHook}
         />
       )}
       {clienteSelecionado && (

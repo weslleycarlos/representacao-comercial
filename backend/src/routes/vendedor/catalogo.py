@@ -2,7 +2,7 @@
 # (VERSÃO REATORADA PARA CATÁLOGOS)
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 
 from src.database import get_db
@@ -41,14 +41,17 @@ def get_catalogo_vendedor(
 
     # 2. Busca os Itens de Catálogo (Preços) e faz JOIN com Produtos
     query = db.query(models.ItemCatalogo).options(
-        joinedload(models.ItemCatalogo.produto).joinedload(models.Produto.variacoes),
-        joinedload(models.ItemCatalogo.produto).joinedload(models.Produto.categoria)
-    ).filter(
-        models.ItemCatalogo.id_catalogo == catalogo_ativo.id_catalogo,
-        models.ItemCatalogo.fl_ativo_no_catalogo == True
+        # Carrega 'produto' e, dentro dele, 'variacoes' e 'categoria'
+        joinedload(models.ItemCatalogo.produto).options(
+            selectinload(models.Produto.variacoes),
+            joinedload(models.Produto.categoria)
+        )
     ).join(
+        # Garante que o Produto também esteja ativo
         models.Produto, models.ItemCatalogo.id_produto == models.Produto.id_produto
     ).filter(
+        models.ItemCatalogo.id_catalogo == catalogo_ativo.id_catalogo,
+        models.ItemCatalogo.fl_ativo_no_catalogo == True,
         models.Produto.fl_ativo == True
     )
     
@@ -66,12 +69,10 @@ def get_categorias_organizacao(
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db)
 ):
-    """ Lista as categorias de produto ativas da organização """
+    # (Esta rota já estava correta)
     _, id_organizacao, _ = contexto
-    
     categorias = db.query(models.CategoriaProduto).filter(
         models.CategoriaProduto.id_organizacao == id_organizacao,
         models.CategoriaProduto.fl_ativa == True
     ).order_by(models.CategoriaProduto.no_categoria).all()
-    
     return categorias

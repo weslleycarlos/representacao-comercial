@@ -14,17 +14,32 @@ import { Search as SearchIcon } from '@mui/icons-material';
 
 import { type ClienteFormData, clienteSchema } from '../../tipos/validacao';
 import type { IClienteCompleto } from '../../tipos/schemas';
-import { useCreateCliente, useUpdateCliente } from '../../api/servicos/clienteService';
+//import { useCreateCliente, useUpdateCliente } from '../../api/servicos/clienteService';
 import { useConsultaCNPJ } from '../../api/servicos/utilsService';
 import { MaskedInput } from '../utils/MaskedInput';
+
+type MutateClienteFn = (
+  data: ClienteFormData, 
+  options: { onSuccess: () => void }
+) => void;
 
 interface ModalFormClienteProps {
   open: boolean;
   onClose: () => void;
   cliente?: IClienteCompleto;
+  onSave: MutateClienteFn; // <-- 1. Recebe a função de salvar
+  isSaving: boolean; // <-- 2. Recebe o estado de "salvando"
+  mutationError: Error | null; // <-- 3. Recebe o erro
 }
 
-export const ModalFormCliente: React.FC<ModalFormClienteProps> = ({ open, onClose, cliente }) => {
+export const ModalFormCliente: React.FC<ModalFormClienteProps> = ({ 
+  open, 
+  onClose, 
+  cliente,
+  onSave, // <-- 1. Recebe das props
+  isSaving, // <-- 2. Recebe das props
+  mutationError // <-- 3. Recebe das props
+}) => {
   const isEditMode = !!cliente;
 
   const { 
@@ -36,11 +51,11 @@ export const ModalFormCliente: React.FC<ModalFormClienteProps> = ({ open, onClos
   });
 
   const { mutate: buscarCNPJ, isPending: isBuscandoCNPJ, error: erroCNPJ } = useConsultaCNPJ();
-  const { mutate: createCliente, isPending: isCreating, error: createError } = useCreateCliente();
-  const { mutate: updateCliente, isPending: isUpdating, error: updateError } = useUpdateCliente();
+  //const { mutate: createCliente, isPending: isCreating, error: createError } = useCreateCliente();
+  //const { mutate: updateCliente, isPending: isUpdating, error: updateError } = useUpdateCliente();
 
-  const isSaving = isCreating || isUpdating;
-  const mutationError = createError || updateError || erroCNPJ;
+  //const isSaving = isCreating || isUpdating;
+  //const mutationError = createError || updateError || erroCNPJ;
   
   const cnpjValue = watch('nr_cnpj');
   const telefoneValue = watch('nr_telefone');
@@ -65,12 +80,13 @@ export const ModalFormCliente: React.FC<ModalFormClienteProps> = ({ open, onClos
   }, [cliente, isEditMode, reset, open]);
 
   const onSubmit = (data: ClienteFormData) => {
-    if (isEditMode && cliente) {
-      updateCliente({ id: cliente.id_cliente, data }, { onSuccess: () => onClose() });
-    } else {
-      createCliente(data, { onSuccess: () => onClose() });
-    }
+    // (A lógica de 'editar' vs 'criar' agora é gerenciada pelo 'onSave')
+    onSave(data, {
+      onSuccess: () => onClose(),
+    });
   };
+
+  const apiError = mutationError || erroCNPJ; // Combina erros
   
   const handleBuscaCNPJ = () => {
     const cnpj = watch('nr_cnpj');

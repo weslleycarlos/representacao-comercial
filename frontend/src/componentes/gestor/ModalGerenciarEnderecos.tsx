@@ -17,37 +17,44 @@ import {
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
-
+import type { UseQueryResult, UseMutationResult } from '@tanstack/react-query';
 import type { IClienteCompleto, IEndereco } from '../../tipos/schemas';
 import { useGetEnderecosPorCliente, useDeleteEndereco } from '../../api/servicos/clienteService';
 import { ModalFormEndereco } from './ModalFormEndereco';
 import { ModalConfirmarExclusao } from '../layout/ModalConfirmarExclusao';
+import { formatCurrency } from '../../utils/format';
+
+// Tipos para os hooks que serão passados via Props
+type GetEnderecosHook = UseQueryResult<IEndereco[], Error>;
+type AddEnderecoHook = UseMutationResult<IEndereco, Error, { idCliente: number; data: EnderecoFormData; }, unknown>;
+type UpdateEnderecoHook = UseMutationResult<IEndereco, Error, { idEndereco: number; idCliente: number; data: Partial<EnderecoFormData>; }, unknown>;
+type DeleteEnderecoHook = UseMutationResult<void, Error, { idEndereco: number; idCliente: number; }, unknown>;
+
 
 interface ModalGerenciarEnderecosProps {
   open: boolean;
   onClose: () => void;
   cliente: IClienteCompleto;
+  
+  // Hooks passados como props
+  getEnderecosHook: GetEnderecosHook;
+  addEnderecoHook: AddEnderecoHook;
+  updateEnderecoHook: UpdateEnderecoHook;
+  deleteEnderecoHook: DeleteEnderecoHook;
 }
 
-export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = ({ open, onClose, cliente }) => {
-  // Estado para o modal filho (formulário)
+export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = ({ 
+  open, onClose, cliente,
+  getEnderecosHook, addEnderecoHook, updateEnderecoHook, deleteEnderecoHook
+}) => {
   const [formOpen, setFormOpen] = useState(false);
   const [enderecoSelecionado, setEnderecoSelecionado] = useState<IEndereco | undefined>(undefined);
-
-  // Estado para o modal de exclusão
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
 
-  // 1. Hook de Busca (TanStack Query)
-  const {
-    data: enderecos,
-    isLoading,
-    isError,
-    error,
-  } = useGetEnderecosPorCliente(cliente.id_cliente);
-
-  // 2. Hook de Mutação (Delete)
-  const { mutate: deleteEndereco, isPending: isDeleting } = useDeleteEndereco();
+  // 1. Hooks de API (agora vêm das props)
+  const { data: enderecos, isLoading, isError, error } = getEnderecosHook;
+  const { mutate: deleteEndereco, isPending: isDeleting } = deleteEnderecoHook;
 
   // 3. Colunas da Tabela
   const colunas: GridColDef[] = [
@@ -234,21 +241,26 @@ export const ModalGerenciarEnderecos: React.FC<ModalGerenciarEnderecosProps> = (
         </DialogActions>
       </Dialog>
 
-      {/* Modal Filho (Formulário) */}
-      <ModalFormEndereco
-        open={formOpen}
-        onClose={handleCloseForm}
-        idCliente={cliente.id_cliente}
-        endereco={enderecoSelecionado}
-      />
-
+      {formOpen && (
+        <ModalFormEndereco
+          open={formOpen}
+          onClose={() => setFormOpen(false)}
+          idCliente={cliente.id_cliente}
+          endereco={enderecoSelecionado}
+          
+          // Passando os hooks corretos (seja do Gestor ou Vendedor)
+          addHook={addEnderecoHook}
+          updateHook={updateEnderecoHook}
+        />
+      )}
+      
       {/* Modal Filho (Exclusão) */}
       <ModalConfirmarExclusao
         open={deleteOpen}
-        onClose={handleCloseDelete}
+        onClose={() => setDeleteOpen(false)}
         onConfirm={handleConfirmDelete}
-        titulo="Excluir Endereço"
-        mensagem="Tem certeza que deseja excluir este endereço? Esta ação não pode ser desfeita."
+        titulo="Confirmar Exclusão"
+        mensagem="Tem certeza que deseja excluir este endereço?"
         isLoading={isDeleting}
       />
     </>

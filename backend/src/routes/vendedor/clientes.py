@@ -1,15 +1,19 @@
 # /src/routes/vendedor/clientes.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from datetime import datetime
 from typing import List
 
 from src.database import get_db
 from src.models import models
-from src.schemas import ClienteCompletoSchema, ClienteCreate
+from src.schemas import (
+    ClienteCompletoSchema, ClienteCreate, 
+    EnderecoSchema, EnderecoCreate, EnderecoUpdate # <-- Adicione os schemas de Endereço
+)
 # Reutilizamos a dependência, pois ela nos dá o id_organizacao
 from src.core.security import get_current_vendedor_contexto
 # Reutilizamos a rota de criação do gestor (lógica é idêntica)
-from src.routes.gestor.clientes import create_cliente as gestor_create_cliente
+from src.routes.gestor.clientes import create_cliente as gestor_create_cliente, get_cliente_by_id, get_endereco_by_id
 
 # Cria o router
 vendedor_clientes_router = APIRouter(
@@ -60,3 +64,76 @@ def create_cliente_rapido_vendedor(
         raise e
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    
+    # ============================================
+# CRUD de Endereços (Vendedor)
+# ============================================
+
+@vendedor_clientes_router.get("/{id_cliente}/enderecos", response_model=List[EnderecoSchema])
+def get_enderecos_do_cliente_vendedor(
+    id_cliente: int,
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    """
+    (Vendedor) Lista todos os endereços de um cliente específico.
+    """
+    _, id_organizacao, _ = contexto
+    # Reutiliza o helper do Gestor, pois a lógica de validação é a mesma
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    return db_cliente.enderecos
+
+@vendedor_clientes_router.post("/{id_cliente}/enderecos", response_model=EnderecoSchema, status_code=status.HTTP_201_CREATED)
+def add_endereco_ao_cliente_vendedor(
+    id_cliente: int,
+    endereco_in: EnderecoCreate,
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    """
+    (Vendedor) Adiciona um novo endereço a um cliente.
+    """
+    _, id_organizacao, _ = contexto
+    db_cliente = get_cliente_by_id(db, id_cliente, id_organizacao)
+    
+    db_endereco = models.Endereco(
+        **endereco_in.model_dump(),
+        id_cliente=db_cliente.id_cliente
+    )
+    db.add(db_endereco)
+    db.commit()
+    db.refresh(db_endereco)
+    return db_endereco
+
+@vendedor_clientes_router.put("/enderecos/{id_endereco}", response_model=EnderecoSchema)
+def update_endereco_vendedor(
+    id_endereco: int,
+    endereco_in: EnderecoUpdate,
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    """ (Vendedor) Atualiza um endereço """
+    _, id_organizacao, _ = contexto
+    db_endereco = get_endereco_by_id(db, id_endereco, id_organizacao) # Valida
+    
+    update_data = endereco_in.model_dump(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_endereco, key, value)
+        
+    db.commit()
+    db.refresh(db_endereco)
+    return db_endereco
+
+@vendedor_clientes_router.delete("/enderecos/{id_endereco}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_endereco_vendedor(
+    id_endereco: int,
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    """ (Vendedor) Exclui um endereço """
+    _, id_organizacao, _ = contexto
+    db_endereco = get_endereco_by_id(db, id_endereco, id_organizacao) # Valida
+        
+    db.delete(db_endereco)
+    db.commit()
+    return

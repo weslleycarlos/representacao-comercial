@@ -11,6 +11,7 @@ import {
   MenuItem, Divider
 } from '@mui/material';
 import { Search as SearchIcon } from '@mui/icons-material';
+import type { UseMutationResult } from '@tanstack/react-query';
 
 import { type EnderecoFormData, enderecoSchema } from '../../tipos/validacao';
 import type { IEndereco } from '../../tipos/schemas';
@@ -18,20 +19,26 @@ import { useAddEndereco, useUpdateEndereco } from '../../api/servicos/clienteSer
 import { useConsultaCEP } from '../../api/servicos/utilsService';
 import { MaskedInput } from '../utils/MaskedInput';
 
+// Tipos para as mutações que serão passadas via Props
+type AddMutateFn = UseMutationResult<IEndereco, Error, { idCliente: number; data: EnderecoFormData; }, unknown>;
+type UpdateMutateFn = UseMutationResult<IEndereco, Error, { idEndereco: number; idCliente: number; data: Partial<EnderecoFormData>; }, unknown>;
+
 interface ModalFormEnderecoProps {
   open: boolean;
   onClose: () => void;
   idCliente: number;
   endereco?: IEndereco;
+  
+  // Hooks são passados como props
+  addHook: AddMutateFn;
+  updateHook: UpdateMutateFn;
 }
 
 export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onClose, idCliente, endereco }) => {
   const isEditMode = !!endereco;
 
   const { 
-    register, handleSubmit, formState: { errors }, reset, control,
-    setValue, watch
-  } = useForm<EnderecoFormData>({
+    register, handleSubmit, formState: { errors }, reset, control, setValue, watch } = useForm<EnderecoFormData>({
     resolver: zodResolver(enderecoSchema),
     defaultValues: {
       tp_endereco: 'entrega',

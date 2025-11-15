@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 from typing import List, Optional
 
 from src.database import get_db
-from src.models import models # Importa todos os modelos
+from src.models import models  # Importa todos os modelos
 from src.schemas import (
     # Schemas de Categoria
     CategoriaProdutoCreate, CategoriaProdutoSchema, CategoriaProdutoUpdate,
@@ -21,8 +21,8 @@ from src.core.security import get_current_gestor_org_id
 
 # Cria o router
 gestor_produtos_router = APIRouter(
-    prefix="/api/gestor/catalogo", # Mudei o prefixo para /catalogo (mais genérico)
-    tags=["5. Gestor - Catálogo (Produtos e Preços)"], # Tag atualizada
+    prefix="/api/gestor/catalogo",  # Mudei o prefixo para /catalogo (mais genérico)
+    tags=["5. Gestor - Catálogo (Produtos e Preços)"],  # Tag atualizada
     dependencies=[Depends(get_current_gestor_org_id)]
 )
 
@@ -34,7 +34,7 @@ def get_categoria_by_id(db: Session, id_categoria: int, id_organizacao: int) -> 
         models.CategoriaProduto.id_categoria == id_categoria,
         models.CategoriaProduto.id_organizacao == id_organizacao
     ).first()
-    
+
     if not categoria:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -49,13 +49,14 @@ def get_produto_by_id(db: Session, id_produto: int, id_organizacao: int) -> mode
         models.Produto.id_produto == id_produto,
         models.Empresa.id_organizacao == id_organizacao
     ).first()
-    
+
     if not produto:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Produto não encontrado ou não pertence a esta organização."
         )
     return produto
+
 
 def get_catalogo_by_id(db: Session, id_catalogo: int, id_organizacao: int) -> models.Catalogo:
     catalogo = db.query(models.Catalogo).join(models.Empresa).filter(
@@ -89,7 +90,8 @@ def create_categoria(
     db.add(db_categoria)
     db.commit()
     db.refresh(db_categoria)
-    return db_categoria
+    return CategoriaProdutoSchema.model_validate(db_categoria, from_attributes=True)
+
 
 @gestor_produtos_router.get("/categorias", response_model=List[CategoriaProdutoSchema])
 def get_categorias(
@@ -100,7 +102,8 @@ def get_categorias(
     categorias = db.query(models.CategoriaProduto).filter(
         models.CategoriaProduto.id_organizacao == id_organizacao
     ).order_by(models.CategoriaProduto.no_categoria).all()
-    return categorias
+    return [CategoriaProdutoSchema.model_validate(cat, from_attributes=True) for cat in categorias]
+
 
 @gestor_produtos_router.put("/categorias/{id_categoria}", response_model=CategoriaProdutoSchema)
 def update_categoria(
@@ -111,19 +114,20 @@ def update_categoria(
 ):
     """ Atualiza uma categoria """
     db_categoria = get_categoria_by_id(db, id_categoria, id_organizacao)
-    
+
     update_data = categoria_in.model_dump(exclude_unset=True)
-    
+
     # Valida a categoria pai (se for alterada)
     if 'id_categoria_pai' in update_data and update_data['id_categoria_pai']:
         get_categoria_by_id(db, update_data['id_categoria_pai'], id_organizacao)
-        
+
     for key, value in update_data.items():
         setattr(db_categoria, key, value)
-        
+
     db.commit()
     db.refresh(db_categoria)
-    return db_categoria
+    return CategoriaProdutoSchema.model_validate(db_categoria, from_attributes=True)
+
 
 # ============================================
 # CRUD de Produtos (TB_PRODUTOS)
@@ -147,7 +151,7 @@ def create_produto(
     # 2. Valida a Categoria (se informada)
     if produto_in.id_categoria:
         get_categoria_by_id(db, produto_in.id_categoria, id_organizacao)
-        
+
     # 3. Valida a constraint UK (Código + Empresa)
     existing_prod = db.query(models.Produto).filter(
         models.Produto.id_empresa == produto_in.id_empresa,
@@ -155,14 +159,15 @@ def create_produto(
     ).first()
     if existing_prod:
         raise HTTPException(status_code=409, detail="Este código de produto já existe para esta empresa.")
-        
+
     # O vl_base não existe mais no schema, então o model_dump() não o inclui
     db_produto = models.Produto(**produto_in.model_dump())
-    
+
     db.add(db_produto)
     db.commit()
     db.refresh(db_produto)
-    return db_produto
+    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
+
 
 @gestor_produtos_router.get("/produtos", response_model=List[ProdutoCompletoSchema])
 def get_produtos_da_organizacao(
@@ -175,14 +180,15 @@ def get_produtos_da_organizacao(
         models.Empresa.id_organizacao == id_organizacao
     ).options(
         joinedload(models.Produto.variacoes),
-        joinedload(models.Produto.listas_de_preco) # Carrega as listas de preço
+        joinedload(models.Produto.listas_de_preco)  # Carrega as listas de preço
     )
-    
+
     if id_empresa:
         query = query.filter(models.Produto.id_empresa == id_empresa)
-        
+
     produtos = query.order_by(models.Produto.ds_produto).all()
-    return produtos
+    return [ProdutoCompletoSchema.model_validate(p, from_attributes=True) for p in produtos]
+
 
 @gestor_produtos_router.get("/produtos/{id_produto}", response_model=ProdutoCompletoSchema)
 def get_produto(
@@ -194,15 +200,16 @@ def get_produto(
     db_produto = db.query(models.Produto).options(
         joinedload(models.Produto.variacoes),
         joinedload(models.Produto.categoria),
-        joinedload(models.Produto.listas_de_preco) # Carrega as listas
+        joinedload(models.Produto.listas_de_preco)  # Carrega as listas
     ).join(models.Empresa).filter(
         models.Produto.id_produto == id_produto,
         models.Empresa.id_organizacao == id_organizacao
     ).first()
-    
+
     if not db_produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado.")
-    return db_produto
+    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
+
 
 @gestor_produtos_router.put("/produtos/{id_produto}", response_model=ProdutoCompletoSchema)
 def update_produto(
@@ -214,13 +221,14 @@ def update_produto(
     """ Atualiza um PRODUTO (definição) """
     db_produto = get_produto_by_id(db, id_produto, id_organizacao)
     update_data = produto_in.model_dump(exclude_unset=True)
-    
+
     for key, value in update_data.items():
         setattr(db_produto, key, value)
-        
+
     db.commit()
     db.refresh(db_produto)
-    return db_produto
+    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
+
 
 # ============================================
 # CRUD de Variações (TB_VARIACOES_PRODUTOS)
@@ -236,7 +244,7 @@ def create_variacao(
     """ Adiciona uma nova variação (tamanho, cor, etc.) a um produto """
     # Valida se o produto pai pertence à organização
     db_produto = get_produto_by_id(db, id_produto, id_organizacao)
-    
+
     # Valida SKU (se informado)
     if variacao_in.cd_sku:
         existing_sku = db.query(models.VariacaoProduto).filter(
@@ -244,7 +252,7 @@ def create_variacao(
         ).first()
         if existing_sku:
             raise HTTPException(status_code=409, detail="Este SKU já está em uso.")
-            
+
     db_variacao = models.VariacaoProduto(
         **variacao_in.model_dump(),
         id_produto=db_produto.id_produto
@@ -252,7 +260,8 @@ def create_variacao(
     db.add(db_variacao)
     db.commit()
     db.refresh(db_variacao)
-    return db_variacao
+    return VariacaoProdutoSchema.model_validate(db_variacao, from_attributes=True)
+
 
 @gestor_produtos_router.put("/variacoes/{id_variacao}", response_model=VariacaoProdutoSchema)
 def update_variacao(
@@ -267,18 +276,19 @@ def update_variacao(
         models.VariacaoProduto.id_variacao == id_variacao,
         models.Empresa.id_organizacao == id_organizacao
     ).first()
-    
+
     if not db_variacao:
         raise HTTPException(status_code=404, detail="Variação não encontrada.")
-        
+
     update_data = variacao_in.model_dump(exclude_unset=True)
-    
+
     for key, value in update_data.items():
         setattr(db_variacao, key, value)
-        
+
     db.commit()
     db.refresh(db_variacao)
-    return db_variacao
+    return VariacaoProdutoSchema.model_validate(db_variacao, from_attributes=True)
+
 
 # ============================================
 # (NOVO) CRUD de Catálogos (TB_CATALOGOS)
@@ -303,13 +313,14 @@ def create_catalogo(
     db.add(db_catalogo)
     db.commit()
     db.refresh(db_catalogo)
-    return db_catalogo
+    return CatalogoSchema.model_validate(db_catalogo, from_attributes=True)
+
 
 @gestor_produtos_router.get("/catalogos", response_model=List[CatalogoSchema])
 def get_catalogos_da_organizacao(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db),
-    id_empresa: Optional[int] = None # Filtro obrigatório
+    id_empresa: Optional[int] = None  # Filtro obrigatório
 ):
     """ (NOVO) Lista os catálogos (listas de preço) da organização, filtrados por empresa """
     if not id_empresa:
@@ -319,23 +330,24 @@ def get_catalogos_da_organizacao(
         models.Empresa.id_organizacao == id_organizacao,
         models.Catalogo.id_empresa == id_empresa
     )
-    
+
     catalogos = query.order_by(models.Catalogo.no_catalogo).all()
-    return catalogos
+    return [CatalogoSchema.model_validate(cat, from_attributes=True) for cat in catalogos]
+
 
 @gestor_produtos_router.put("/catalogos/{id_catalogo}", response_model=CatalogoSchema)
 def update_catalogo(
     id_catalogo: int,
-    catalogo_in: CatalogoUpdate, # O schema de atualização (campos opcionais)
+    catalogo_in: CatalogoUpdate,  # O schema de atualização (campos opcionais)
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
     """ (NOVO) Atualiza uma "capa" de catálogo """
     # O helper valida se o catálogo pertence à organização
     db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
-    
+
     update_data = catalogo_in.model_dump(exclude_unset=True)
-    
+
     # Validação (se o nome estiver sendo alterado)
     if 'no_catalogo' in update_data:
         existing = db.query(models.Catalogo).filter(
@@ -348,10 +360,11 @@ def update_catalogo(
 
     for key, value in update_data.items():
         setattr(db_catalogo, key, value)
-        
+
     db.commit()
     db.refresh(db_catalogo)
-    return db_catalogo
+    return CatalogoSchema.model_validate(db_catalogo, from_attributes=True)
+
 
 # ============================================
 # (NOVO) CRUD de Itens de Catálogo (TB_ITENS_CATALOGO)
@@ -367,12 +380,12 @@ def add_item_ao_catalogo(
     """ (NOVO) Adiciona um produto e seu preço a um catálogo """
     # 1. Valida o Catálogo
     db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
-    
+
     # 2. Valida o Produto (e se pertence à mesma empresa do catálogo)
     db_produto = get_produto_by_id(db, item_in.id_produto, id_organizacao)
     if db_produto.id_empresa != db_catalogo.id_empresa:
         raise HTTPException(status_code=400, detail="Produto não pertence à mesma empresa do catálogo.")
-        
+
     # 3. (UK_CATALOGO_PRODUTO será validada pelo DB, mas podemos checar)
     existing = db.query(models.ItemCatalogo).filter(
         models.ItemCatalogo.id_catalogo == id_catalogo,
@@ -388,7 +401,8 @@ def add_item_ao_catalogo(
     db.add(db_item)
     db.commit()
     db.refresh(db_item)
-    return db_item
+    return ItemCatalogoSchema.model_validate(db_item, from_attributes=True)
+
 
 @gestor_produtos_router.get("/catalogos/{id_catalogo}/itens", response_model=List[ItemCatalogoSchema])
 def get_itens_do_catalogo(
@@ -397,7 +411,7 @@ def get_itens_do_catalogo(
     db: Session = Depends(get_db)
 ):
     """ Lista todos os produtos (e seus preços) de um catálogo """
-    
+
     # Valida o catálogo
     db_catalogo = get_catalogo_by_id(db, id_catalogo, id_organizacao)
 
@@ -409,7 +423,7 @@ def get_itens_do_catalogo(
         joinedload(models.ItemCatalogo.produto).selectinload(models.Produto.variacoes),
         joinedload(models.ItemCatalogo.produto).selectinload(models.Produto.categoria)
     ).all()
-    
+
     # ✅ DEBUG: Imprime os dados carregados
     print(f"\n=== DEBUG: Itens carregados ===")
     for item in itens:
@@ -421,8 +435,9 @@ def get_itens_do_catalogo(
             print(f"    Variações: {len(item.produto.variacoes)}")
             print(f"    Categoria: {item.produto.categoria}")
     print("=" * 40 + "\n")
-    
-    return itens
+
+    return [ItemCatalogoSchema.model_validate(item, from_attributes=True) for item in itens]
+
 
 def get_item_catalogo_by_id(db: Session, id_item_catalogo: int, id_organizacao: int) -> models.ItemCatalogo:
     """ Helper que valida se o item pertence à organização """
@@ -434,10 +449,11 @@ def get_item_catalogo_by_id(db: Session, id_item_catalogo: int, id_organizacao: 
         models.ItemCatalogo.id_item_catalogo == id_item_catalogo,
         models.Empresa.id_organizacao == id_organizacao
     ).first()
-    
+
     if not item:
         raise HTTPException(status_code=404, detail="Item de catálogo não encontrado.")
     return item
+
 
 @gestor_produtos_router.put("/itens/{id_item_catalogo}", response_model=ItemCatalogoSchema)
 def update_item_catalogo(
@@ -447,16 +463,17 @@ def update_item_catalogo(
     db: Session = Depends(get_db)
 ):
     """ (NOVO) Atualiza um item (preço) em um catálogo """
-    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao) # Valida
-    
+    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao)  # Valida
+
     update_data = item_in.model_dump(exclude_unset=True)
-    
+
     for key, value in update_data.items():
         setattr(db_item, key, value)
-        
+
     db.commit()
     db.refresh(db_item)
-    return db_item
+    return ItemCatalogoSchema.model_validate(db_item, from_attributes=True)
+
 
 @gestor_produtos_router.delete("/itens/{id_item_catalogo}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_item_catalogo(
@@ -465,8 +482,8 @@ def delete_item_catalogo(
     db: Session = Depends(get_db)
 ):
     """ (NOVO) Remove um item (produto) de um catálogo """
-    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao) # Valida
-        
+    db_item = get_item_catalogo_by_id(db, id_item_catalogo, id_organizacao)  # Valida
+
     db.delete(db_item)
     db.commit()
     return

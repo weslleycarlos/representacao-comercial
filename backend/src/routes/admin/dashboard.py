@@ -7,14 +7,15 @@ from decimal import Decimal
 from src.database import get_db
 from src.models import models
 from src.schemas import AdminDashboardKpiSchema
-from src.core.security import get_current_super_admin # Proteção da rota
+from src.core.security import get_current_super_admin  # Proteção da rota
 
 # Cria o router
 admin_dashboard_router = APIRouter(
     prefix="/api/admin/dashboard",
-    tags=["12. Super Admin - Auditoria"], # Mesmo grupo dos Logs
-    dependencies=[Depends(get_current_super_admin)] # Protege a rota
+    tags=["16. Super Admin - Dashboard"],  # Mesmo grupo dos Logs
+    dependencies=[Depends(get_current_super_admin)]  # Protege a rota
 )
+
 
 @admin_dashboard_router.get("/kpis", response_model=AdminDashboardKpiSchema)
 def get_admin_dashboard_kpis(
@@ -28,7 +29,7 @@ def get_admin_dashboard_kpis(
         total_ativas = db.query(models.Organizacao).filter(
             models.Organizacao.st_assinatura == 'ativo'
         ).count()
-        
+
         total_suspensas = db.query(models.Organizacao).filter(
             models.Organizacao.st_assinatura == 'suspenso'
         ).count()
@@ -36,12 +37,12 @@ def get_admin_dashboard_kpis(
         # 2. KPIs de Usuários (apenas ativos)
         total_gestores = db.query(models.Usuario).filter(
             models.Usuario.tp_usuario == 'gestor',
-            models.Usuario.fl_ativo == True
+            models.Usuario.fl_ativo is True
         ).count()
-        
+
         total_vendedores = db.query(models.Usuario).filter(
             models.Usuario.tp_usuario == 'vendedor',
-            models.Usuario.fl_ativo == True
+            models.Usuario.fl_ativo is True
         ).count()
 
         # 3. KPIs de Pedidos (Globais)
@@ -61,7 +62,7 @@ def get_admin_dashboard_kpis(
             total_pedidos_sistema=kpis_pedidos.total_pedidos or 0,
             valor_total_pedidos_sistema=kpis_pedidos.valor_total or Decimal(0.0)
         )
-        
+
     except Exception as e:
         # Se as queries falharem
         raise HTTPException(

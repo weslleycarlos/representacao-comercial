@@ -1,9 +1,8 @@
 # /src/routes/auth.py
 # VERSÃO CORRIGIDA E LIMPA (usando Pydantic v2 .model_validate())
-from fastapi import APIRouter, Depends, HTTPException, status, Form
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from datetime import datetime
-from typing import Annotated
 from src.database import get_db
 from src.models.models import Usuario, Empresa, UsuarioEmpresa, Organizacao
 from src.schemas import (
@@ -12,16 +11,18 @@ from src.schemas import (
 )
 from src.core.security import create_access_token, get_current_user_data
 
+
 # Substitui o Blueprint do Flask
 auth_router = APIRouter(
     prefix="/api/auth",
-    tags=["1. Autenticação"] # Agrupa no /docs
+    tags=["1. Autenticação"]  # Agrupa no /docs
 )
+
 
 @auth_router.post("/login", response_model=LoginResponse)
 def login_for_access_token(
-    login_data: LoginRequest, # Validação automática de entrada
-    db: Session = Depends(get_db) # Injeção de dependência do DB
+    login_data: LoginRequest,  # Validação automática de entrada
+    db: Session = Depends(get_db)  # Injeção de dependência do DB
 ):
     """
     Autentica um usuário, retorna dados da sessão e um token JWT inicial.
@@ -50,14 +51,14 @@ def login_for_access_token(
             "sub": str(user.id_usuario),
             "org": user.id_organizacao,
             "role": user.tp_usuario,
-            "emp_ativa": None # Nenhum empresa selecionada ainda
+            "emp_ativa": None  # Nenhum empresa selecionada ainda
         }
         access_token = create_access_token(data=token_payload)
 
         # Busca empresas vinculadas
         empresas_vinculadas = [
-            vinculo.empresa 
-            for vinculo in user.empresas_vinculadas 
+            vinculo.empresa
+            for vinculo in user.empresas_vinculadas
             if vinculo.empresa and vinculo.empresa.fl_ativa
         ]
 
@@ -70,69 +71,7 @@ def login_for_access_token(
         )
 
     except HTTPException as e:
-        raise e 
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f'Erro interno no servidor: {str(e)}'
-        )
-
-# /src/routes/auth.py
-
-@auth_router.post("/login", response_model=LoginResponse)
-def login_for_access_token(
-    login_data: LoginRequest, # Validação automática de entrada
-    db: Session = Depends(get_db) # Injeção de dependência do DB
-):
-    """
-    Autentica um usuário, retorna dados da sessão e um token JWT inicial.
-    """
-    try:
-        user = db.query(Usuario).filter(Usuario.ds_email == login_data.email).first()
-
-        if not user or not user.check_password(login_data.password):
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Email ou senha inválidos",
-            )
-
-        if not user.fl_ativo:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Esta conta de usuário está desativada",
-            )
-
-        # Atualiza a data de último acesso
-        user.dt_ultimo_acesso = datetime.utcnow()
-        db.commit()
-
-        # Cria o token JWT (payload inicial)
-        token_payload = {
-            "sub": str(user.id_usuario),
-            "org": user.id_organizacao,
-            "role": user.tp_usuario,
-            "emp_ativa": None # Nenhum empresa selecionada ainda
-        }
-        access_token = create_access_token(data=token_payload)
-
-        # Busca empresas vinculadas
-        empresas_vinculadas = [
-            vinculo.empresa 
-            for vinculo in user.empresas_vinculadas 
-            if vinculo.empresa and vinculo.empresa.fl_ativa
-        ]
-
-        # --- CORREÇÃO AQUI: Usando .model_validate() ---
-        return LoginResponse(
-            token=Token(access_token=access_token, token_type="bearer"),
-            usuario=UsuarioSchema.model_validate(user),
-            organizacao=OrganizacaoSchema.model_validate(user.organizacao) if user.organizacao else None,
-            empresas_vinculadas=[EmpresaSchema.model_validate(emp) for emp in empresas_vinculadas]
-        )
-
-    except HTTPException as e:
-        raise e 
+        raise e
     except Exception as e:
         db.rollback()
         raise HTTPException(
@@ -170,10 +109,10 @@ def select_company(
         "sub": str(current_user.id_usuario),
         "org": current_user.id_organizacao,
         "role": current_user.tp_usuario,
-        "emp_ativa": id_empresa_selecionada # <-- A GRANDE MUDANÇA
+        "emp_ativa": id_empresa_selecionada  # <-- A GRANDE MUDANÇA
     }
     access_token = create_access_token(data=new_token_payload)
-    
+
     # --- CORREÇÃO AQUI: Usando .model_validate() ---
     return SelectCompanyResponse(
         token=Token(access_token=access_token, token_type="bearer"),
@@ -187,11 +126,11 @@ def get_current_user_session(
     db: Session = Depends(get_db)
 ):
     """
-    Retorna informações da sessão atual (usuário, organização, 
+    Retorna informações da sessão atual (usuário, organização,
     empresa ativa e lista de empresas vinculadas).
     """
     current_user, token_data = user_data
-    
+
     empresa_ativa = None
     if token_data.id_empresa_ativa:
         empresa_ativa = db.get(Empresa, token_data.id_empresa_ativa)
@@ -199,8 +138,8 @@ def get_current_user_session(
             empresa_ativa = None
 
     empresas_vinculadas = [
-        vinculo.empresa 
-        for vinculo in current_user.empresas_vinculadas 
+        vinculo.empresa
+        for vinculo in current_user.empresas_vinculadas
         if vinculo.empresa and vinculo.empresa.fl_ativa
     ]
 

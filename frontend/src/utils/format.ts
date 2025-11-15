@@ -29,3 +29,25 @@ export const formatInteger = (value: number | undefined | null): string => {
    }
    return value.toString();
 };
+
+/**
+ * Função auxiliar para operações de ponto flutuante (inspirada no Decimal.js)
+ * @param value O número a ser manipulado
+ */
+export const Decimal = (value: number | string): {
+  toNumber: () => number;
+  mul: (n: number | string) => ReturnType<typeof Decimal>;
+  div: (n: number | string) => ReturnType<typeof Decimal>;
+  add: (n: number | string) => ReturnType<typeof Decimal>;
+  sub: (n: number | string) => ReturnType<typeof Decimal>;
+} => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+
+  return {
+    toNumber: () => num,
+    mul: (n: number | string) => Decimal(num * (typeof n === 'string' ? parseFloat(n) : n)),
+    div: (n: number | string) => Decimal(num / (typeof n === 'string' ? parseFloat(n) : n)),
+    add: (n: number | string) => Decimal(num + (typeof n === 'string' ? parseFloat(n) : n)),
+    sub: (n: number | string) => Decimal(num - (typeof n === 'string' ? parseFloat(n) : n)),
+  };
+};

@@ -12,13 +12,14 @@ from src.core.security import get_current_gestor_org_id, get_current_user
 # Cria o router
 gestor_pedidos_router = APIRouter(
     prefix="/api/gestor/pedidos",
-    tags=["10. Gestor - Gestão de Pedidos"], # Novo grupo no /docs
+    tags=["8. Gestor - Pedidos"],  # Novo grupo no /docs
     dependencies=[Depends(get_current_gestor_org_id)]
 )
 
+
 async def get_pedido_by_id_gestor(
-    db: Session, 
-    id_pedido: int, 
+    db: Session,
+    id_pedido: int,
     id_organizacao: int
 ) -> models.Pedido:
     """
@@ -37,7 +38,7 @@ async def get_pedido_by_id_gestor(
         models.Empresa, models.Pedido.id_empresa == models.Empresa.id_empresa
     ).filter(
         models.Pedido.id_pedido == id_pedido,
-        models.Empresa.id_organizacao == id_organizacao # Valida a organização
+        models.Empresa.id_organizacao == id_organizacao  # Valida a organização
     ).first()
 
     if not pedido:
@@ -46,6 +47,7 @@ async def get_pedido_by_id_gestor(
             detail="Pedido não encontrado ou não pertence a esta organização."
         )
     return pedido
+
 
 @gestor_pedidos_router.get("/", response_model=List[PedidoCompletoSchema])
 async def get_pedidos_da_organizacao(
@@ -71,7 +73,7 @@ async def get_pedidos_da_organizacao(
     ).filter(
         models.Empresa.id_organizacao == id_organizacao
     )
-    
+
     # Aplica filtros
     if id_vendedor:
         query = query.filter(models.Pedido.id_usuario == id_vendedor)
@@ -81,10 +83,11 @@ async def get_pedidos_da_organizacao(
         query = query.filter(models.Pedido.id_cliente == id_cliente)
     if st_pedido:
         query = query.filter(models.Pedido.st_pedido == st_pedido)
-        
+
     pedidos = query.order_by(models.Pedido.dt_pedido.desc()).offset(skip).limit(limit).all()
-    
-    return pedidos
+
+    return [PedidoCompletoSchema.model_validate(p, from_attributes=True) for p in pedidos]
+
 
 @gestor_pedidos_router.get("/{id_pedido}", response_model=PedidoCompletoSchema)
 async def get_pedido_especifico_gestor(
@@ -97,15 +100,16 @@ async def get_pedido_especifico_gestor(
     """
     # A função helper já faz a busca, validação e eager loading
     db_pedido = await get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
-    
-    return db_pedido
+
+    return PedidoCompletoSchema.model_validate(db_pedido, from_attributes=True)
+
 
 @gestor_pedidos_router.put("/{id_pedido}/status", response_model=PedidoCompletoSchema)
 async def update_status_pedido(
     id_pedido: int,
     status_in: PedidoStatusUpdate,
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    current_user: models.Usuario = Depends(get_current_user), # Pega o usuário (Gestor)
+    current_user: models.Usuario = Depends(get_current_user),  # Pega o usuário (Gestor)
     db: Session = Depends(get_db)
 ):
     """
@@ -113,7 +117,7 @@ async def update_status_pedido(
     (Esta é a principal rota de gerenciamento do gestor)
     """
     db_pedido = await get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
-    
+
     status_antigo = db_pedido.st_pedido
     novo_status = status_in.novo_status
 
@@ -123,11 +127,11 @@ async def update_status_pedido(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Não é possível alterar o status de um pedido '{status_antigo}'."
         )
-        
+
     # (O PRD menciona status sequencial, mas por enquanto vamos permitir a troca)
-    
+
     db_pedido.st_pedido = novo_status
-    
+
     # Adiciona uma observação de auditoria
     observacao = (db_pedido.ds_observacoes or "") + \
         f"\n[Status alterado: {status_antigo} -> {novo_status} por {current_user.ds_email} em {datetime.utcnow().isoformat()}]"
@@ -136,10 +140,10 @@ async def update_status_pedido(
     try:
         db.commit()
         db.refresh(db_pedido)
-        
+
         # (Aqui dispararia a lógica de Notificações em tempo real - Fase 2)
-        
-        return db_pedido
+
+        return PedidoCompletoSchema.model_validate(db_pedido, from_attributes=True)
     except Exception as e:
         db.rollback()
         raise HTTPException(

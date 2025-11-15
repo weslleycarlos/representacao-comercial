@@ -1,7 +1,7 @@
 # /src/routes/gestor/config.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_ # Para buscar formas de pagamento globais
+from sqlalchemy import or_  # Para buscar formas de pagamento globais
 from typing import List
 
 from src.database import get_db
@@ -15,7 +15,7 @@ from src.core.security import get_current_gestor_org_id
 # Cria o router
 gestor_config_router = APIRouter(
     prefix="/api/gestor/config",
-    tags=["8. Gestor - Configurações"], # Novo grupo no /docs
+    tags=["6. Gestor - Configurações"],  # Novo grupo no /docs
     dependencies=[Depends(get_current_gestor_org_id)]
 )
 
@@ -36,12 +36,13 @@ def get_formas_pagamento(
     formas_pgto = db.query(models.FormaPagamento).filter(
         or_(
             models.FormaPagamento.id_organizacao == id_organizacao,
-            models.FormaPagamento.id_organizacao == None
+            models.FormaPagamento.id_organizacao is None
         ),
-        models.FormaPagamento.fl_ativa == True
+        models.FormaPagamento.fl_ativa is True
     ).order_by(models.FormaPagamento.no_forma_pagamento).all()
-    
-    return formas_pgto
+
+    return [FormaPagamentoSchema.model_validate(fp, from_attributes=True) for fp in formas_pgto]
+
 
 @gestor_config_router.post("/formas-pagamento", response_model=FormaPagamentoSchema, status_code=status.HTTP_201_CREATED)
 def create_forma_pagamento_organizacao(
@@ -50,7 +51,7 @@ def create_forma_pagamento_organizacao(
     db: Session = Depends(get_db)
 ):
     """ Cria uma nova forma de pagamento específica para esta organização. """
-    
+
     # Validação (UK_FORMAS_PAGAMENTO_NOME)
     existing = db.query(models.FormaPagamento).filter(
         models.FormaPagamento.id_organizacao == id_organizacao,
@@ -61,12 +62,13 @@ def create_forma_pagamento_organizacao(
 
     db_forma = models.FormaPagamento(
         **forma_in.model_dump(),
-        id_organizacao=id_organizacao # Vincula à organização do gestor
+        id_organizacao=id_organizacao  # Vincula à organização do gestor
     )
     db.add(db_forma)
     db.commit()
     db.refresh(db_forma)
-    return db_forma
+    return FormaPagamentoSchema.model_validate(db_forma, from_attributes=True)
+
 
 # (Rotas PUT e DELETE para FormaPagamento seriam adicionadas aqui)
 
@@ -86,8 +88,9 @@ def get_regras_comissao(
     ).filter(
         models.RegraComissao.id_organizacao == id_organizacao
     ).order_by(models.RegraComissao.nr_prioridade.desc()).all()
-    
-    return regras
+
+    return [RegraComissaoSchema.model_validate(r, from_attributes=True) for r in regras]
+
 
 @gestor_config_router.post("/regras-comissao", response_model=RegraComissaoSchema, status_code=status.HTTP_201_CREATED)
 def create_regra_comissao(
@@ -96,7 +99,7 @@ def create_regra_comissao(
     db: Session = Depends(get_db)
 ):
     """ Cria uma nova regra de comissão para a organização """
-    
+
     # Validação: Garante que a Empresa (se houver) pertence à organização
     if regra_in.id_empresa:
         empresa = db.query(models.Empresa).filter(
@@ -105,7 +108,7 @@ def create_regra_comissao(
         ).first()
         if not empresa:
             raise HTTPException(status_code=404, detail="Empresa não encontrada nesta organização.")
-            
+
     # Validação: Garante que o Vendedor (se houver) pertence à organização
     if regra_in.id_usuario:
         vendedor = db.query(models.Usuario).filter(
@@ -123,6 +126,6 @@ def create_regra_comissao(
     db.add(db_regra)
     db.commit()
     db.refresh(db_regra)
-    return db_regra
+    return RegraComissaoSchema.model_validate(db_regra, from_attributes=True)
 
 # (Rotas PUT e DELETE para RegraComissao seriam adicionadas aqui)

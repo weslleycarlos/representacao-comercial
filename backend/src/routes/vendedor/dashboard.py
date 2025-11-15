@@ -9,14 +9,15 @@ from decimal import Decimal
 from src.database import get_db
 from src.models import models
 from src.schemas import DashboardVendedorKpiSchema
-from src.core.security import get_current_vendedor_contexto # Reutiliza a dependência
+from src.core.security import get_current_vendedor_contexto  # Reutiliza a dependência
 
 # Cria o router
 vendedor_dashboard_router = APIRouter(
     prefix="/api/vendedor/dashboard",
-    tags=["7. Vendedor - Catálogo e Clientes"], # Mesmo grupo
+    tags=["13. Vendedor - Dashboard"],  # Mesmo grupo
     dependencies=[Depends(get_current_vendedor_contexto)]
 )
+
 
 @vendedor_dashboard_router.get("/kpis", response_model=DashboardVendedorKpiSchema)
 def get_dashboard_vendedor(
@@ -45,7 +46,7 @@ def get_dashboard_vendedor(
         models.VwComissoesCalculadas.id_usuario == id_usuario_logado,
         extract('year', models.VwComissoesCalculadas.dt_pedido) == ano_atual,
         extract('month', models.VwComissoesCalculadas.dt_pedido) == mes_atual
-    ).scalar() # .scalar() retorna o valor da primeira coluna da primeira linha
+    ).scalar()  # .scalar() retorna o valor da primeira coluna da primeira linha
 
     # 3. Monta a resposta
     if vendas_mes:

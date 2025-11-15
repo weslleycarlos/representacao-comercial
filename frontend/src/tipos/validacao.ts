@@ -140,23 +140,61 @@ export const itemCatalogoSchema = z.object({
 });
 export type ItemCatalogoFormData = z.infer<typeof itemCatalogoSchema>;
 
-const itemPedidoSchema = z.object({
-  id_produto: z.number(),
+// Este é o schema para UM item DENTRO do carrinho
+export const itemPedidoSchema = z.object({
+  id_produto: z.number().min(1, "Produto é obrigatório."),
   id_variacao: z.number().optional().nullable(),
-  qt_quantidade: z.coerce.number().min(1, "Quantidade deve ser pelo menos 1"),
-  pc_desconto_item: z.coerce.number().min(0).optional().default(0),
+  
+  // (Dados que pegamos do catálogo, mas salvamos no formulário)
+  cd_produto: z.string(), // Para exibição
+  ds_produto: z.string(), // Para exibição
+  vl_unitario_base: z.coerce.number(), // O preço (do catálogo + variação)
+  
+  // Dados que o usuário edita
+  qt_quantidade: z.coerce.number().min(1, "Qtd. deve ser > 0"),
+  pc_desconto_item: z.coerce.number().min(0).max(100).optional().default(0),
+  
+  // (vl_total_item será calculado)
 });
 
+export type ItemPedidoFormData = z.infer<typeof itemPedidoSchema>;
+
+// Este é o schema para o formulário INTEIRO
 export const pedidoCreateSchema = z.object({
-  id_cliente: z.number().min(1, "Cliente é obrigatório."),
-  id_endereco_entrega: z.number().min(1, "Endereço de entrega é obrigatório."),
-  id_endereco_cobranca: z.number().min(1, "Endereço de cobrança é obrigatório."),
-  id_forma_pagamento: z.number().min(1, "Forma de pagamento é obrigatória."),
+  // 1. Cliente (Pode ser um ID ou um Novo Cliente)
+  id_cliente: z.number().optional().nullable(),
+  
+  // (Campos para cadastro rápido se id_cliente for nulo)
+  nr_cnpj: z.string().optional().or(z.literal('')),
+  no_razao_social: z.string().optional().or(z.literal('')),
+  
+  // 2. Detalhes
+  id_endereco_entrega: z.number().min(1, { message: "Endereço de entrega é obrigatório." }),
+  id_endereco_cobranca: z.number().min(1, { message: "Endereço de cobrança é obrigatório." }),
+  id_forma_pagamento: z.number().min(1, { message: "Forma de pagamento é obrigatória." }),
   
   pc_desconto: z.coerce.number().min(0).optional().default(0),
   ds_observacoes: z.string().optional().or(z.literal('')),
   
+  // 3. Itens (O Carrinho)
   itens: z.array(itemPedidoSchema).min(1, "O pedido deve ter pelo menos um item."),
 });
 
 export type PedidoCreateFormData = z.infer<typeof pedidoCreateSchema>;
+
+// Validação para ATUALIZAR um Pedido (Vendedor)
+// (Conforme o PRD, só podemos atualizar observações ou desconto)
+export const pedidoUpdateSchema = z.object({
+  ds_observacoes: z.string().optional().or(z.literal('')),
+  pc_desconto: z.coerce.number().min(0).optional(),
+});
+
+export type PedidoUpdateFormData = z.infer<typeof pedidoUpdateSchema>;
+
+
+// Validação para CANCELAR um Pedido (Vendedor)
+export const pedidoCancelSchema = z.object({
+  motivo: z.string().min(5, { message: "O motivo do cancelamento é obrigatório (mín. 5 caracteres)." }),
+});
+
+export type PedidoCancelRequestData = z.infer<typeof pedidoCancelSchema>;

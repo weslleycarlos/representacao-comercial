@@ -1,29 +1,70 @@
 // /frontend/src/api/servicos/vendedorService.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../axios';
-import type { 
-  ICategoriaProduto, 
+import type {
+  ICategoriaProduto,
   IItemCatalogoVenda,
   IEndereco,
   IPedidoCompleto,
-  IClienteCompleto
+  IClienteCompleto,
+  IFormaPagamento,
+  IVendedor,
 } from '../../tipos/schemas';
-import type { 
+import type {
   PedidoCreateFormData,
+  PedidoUpdate, 
+  PedidoCancelRequest,
   ClienteFormData,
-  EnderecoFormData
+  EnderecoFormData,
+  VendedorFormData,
 } from '../../tipos/validacao';
-import type { IVendedor } from '../../tipos/schemas';
-import type { VendedorFormData } from '../../tipos/validacao';
 
-// Define uma "chave" de cache para este recurso
+// --- CACHE KEYS ---
 const VENDEDOR_CACHE_KEY = 'vendedores';
 const VENDEDOR_CATALOGO_KEY = 'catalogoVendedor';
 const VENDEDOR_CATEGORIAS_KEY = 'categoriasVendedor';
 const VENDEDOR_PEDIDOS_KEY = 'pedidosVendedor';
+const VENDEDOR_PEDIDO_DETALHE_KEY = (id: number) => ['pedidosVendedor', id];
 const CLIENTE_CACHE_KEY = 'clientes';
+const VENDEDOR_FORMAS_PGTO_KEY = 'formasPagamentoVendedor';
+const VENDEDOR_ENDERECO_CACHE_KEY = (idCliente: number) => ['vendedor', 'enderecos', idCliente];
 
-// --- QUERY (Hook para GET) ---
+// --- INTERFACES ---
+interface UpdatePayload {
+  id: number;
+  data: Omit<VendedorFormData, 'password'>; // Omitimos a senha da atualização padrão
+}
+
+interface VincularPayload {
+  id_usuario: number;
+  id_empresa: number;
+}
+
+interface AddPayload {
+  idCliente: number;
+  data: EnderecoFormData;
+}
+
+interface UpdateEnderecoPayload {
+  idEndereco: number;
+  idCliente: number;
+  data: Partial<EnderecoFormData>;
+}
+
+interface DeletePayload {
+  idEndereco: number;
+  idCliente: number;
+}
+
+interface CancelPayload {
+  idPedido: number;
+  data: PedidoCancelRequest; // (data = { motivo: "..." })
+}
+
+// --- HOOKS ---
+
+// --- VENDEDORES (CRUD) ---
+
 export const useGetVendedores = () => {
   const fetchVendedores = async (): Promise<IVendedor[]> => {
     const { data } = await apiClient.get('/gestor/vendedores/');
@@ -36,7 +77,22 @@ export const useGetVendedores = () => {
   });
 };
 
-// --- MUTATIONS (Hooks para POST, PUT, DELETE) ---
+/**
+ * Hook (useQuery) para buscar as Formas de Pagamento (Globais + da Org)
+ * (Reutiliza a rota do Gestor, pois a permissão de Vendedor é suficiente)
+ */
+export const useGetFormasPagamento = () => {
+  const fetchFormasPgto = async (): Promise<IFormaPagamento[]> => {
+    // (O backend (gestor/config.py) já retorna as globais + da org)
+    const { data } = await apiClient.get('/gestor/config/formas-pagamento');
+    return data;
+  };
+
+  return useQuery({
+    queryKey: [VENDEDOR_FORMAS_PGTO_KEY],
+    queryFn: fetchFormasPgto,
+  });
+};
 
 export const useCreateVendedor = () => {
   const queryClient = useQueryClient();
@@ -56,10 +112,6 @@ export const useCreateVendedor = () => {
 
 export const useUpdateVendedor = () => {
   const queryClient = useQueryClient();
-  interface UpdatePayload {
-    id: number;
-    data: Omit<VendedorFormData, 'password'>; // Omitimos a senha da atualização padrão
-  }
 
   const updateVendedor = async (payload: UpdatePayload): Promise<IVendedor> => {
     const { data } = await apiClient.put(`/gestor/vendedores/${payload.id}`, payload.data);
@@ -73,11 +125,6 @@ export const useUpdateVendedor = () => {
     },
   });
 };
-
-interface VincularPayload {
-  id_usuario: number;
-  id_empresa: number;
-}
 
 export const useVincularEmpresa = () => {
   const queryClient = useQueryClient();
@@ -117,6 +164,8 @@ export const useDesvincularEmpresa = () => {
   });
 };
 
+// --- CATÁLOGO (Vendedor) ---
+
 export const useGetCatalogoVenda = (idCategoria?: number) => {
   const fetchCatalogo = async (): Promise<IItemCatalogoVenda[]> => {
     const { data } = await apiClient.get('/vendedor/catalogo/', {
@@ -126,7 +175,7 @@ export const useGetCatalogoVenda = (idCategoria?: number) => {
   };
 
   return useQuery({
-    queryKey: [VENDEDOR_CATALOGO_KEY, { idCategoria }], 
+    queryKey: [VENDEDOR_CATALOGO_KEY, { idCategoria }],
     queryFn: fetchCatalogo,
   });
 };
@@ -146,31 +195,7 @@ export const useGetCategoriasVenda = () => {
   });
 };
 
-
-// ============================================
-// PEDIDOS DO VENDEDOR (CRUD)
-// ============================================
-
-/**
- * Hook (useMutation) para CRIAR um novo Pedido.
- * (O 'PedidoCreateFormData' não deve conter 'vl_unitario')
- */
-export const useCreatePedido = () => {
-  const queryClient = useQueryClient();
-
-  const createPedido = async (pedidoData: PedidoCreateFormData): Promise<IPedidoCompleto> => {
-    const { data } = await apiClient.post('/vendedor/pedidos/', pedidoData);
-    return data;
-  };
-
-  return useMutation({
-    mutationFn: createPedido,
-    onSuccess: () => {
-      // Invalida a lista de pedidos do vendedor
-      queryClient.invalidateQueries({ queryKey: [VENDEDOR_PEDIDOS_KEY] });
-    },
-  });
-};
+// --- PEDIDOS (Vendedor) ---
 
 /**
  * Hook (useQuery) para buscar os pedidos do Vendedor logado
@@ -187,6 +212,72 @@ export const useGetMeusPedidos = () => {
   });
 };
 
+/**
+ * Hook (useQuery) para buscar UM pedido específico
+ */
+export const useGetMeuPedidoDetalhe = (idPedido: number) => {
+  const fetchPedido = async (): Promise<IPedidoCompleto> => {
+    const { data } = await apiClient.get(`/vendedor/pedidos/${idPedido}`);
+    return data;
+  };
+
+  return useQuery({
+    queryKey: VENDEDOR_PEDIDO_DETALHE_KEY(idPedido),
+    queryFn: fetchPedido,
+    enabled: !!idPedido, // Só executa se o ID for fornecido
+  });
+};
+
+/**
+ * Hook (useMutation) para CRIAR um novo Pedido.
+ * (O 'PedidoCreateFormData' não deve conter 'vl_unitario')
+ */
+export const useCreatePedido = () => {
+  const queryClient = useQueryClient();
+
+  const createPedido = async (pedidoData: PedidoCreateFormData): Promise<IPedidoCompleto> => {
+    // A API (backend) espera o formato PedidoCreate (sem dados extras de UI)
+    // Nós já limpamos o vl_unitario do schema da API (backend)
+    
+    // (Podemos precisar limpar dados extras do formulário aqui, se o Zod não o fizer)
+    
+    const { data } = await apiClient.post('/vendedor/pedidos/', pedidoData);
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: createPedido,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [VENDEDOR_PEDIDOS_KEY] });
+    },
+  });
+};
+
+/**
+ * Hook (useMutation) para CANCELAR um pedido
+ */
+export const useCancelarPedido = () => {
+  const queryClient = useQueryClient();
+
+  const cancelarPedido = async (payload: CancelPayload): Promise<IPedidoCompleto> => {
+    const { data } = await apiClient.post(
+      `/vendedor/pedidos/${payload.idPedido}/cancelar`, 
+      payload.data
+    );
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: cancelarPedido,
+    onSuccess: (data) => {
+      // Atualiza o cache da lista E o cache do detalhe
+      queryClient.invalidateQueries({ queryKey: [VENDEDOR_PEDIDOS_KEY] });
+      queryClient.setQueryData(VENDEDOR_PEDIDO_DETALHE_KEY(data.id_pedido), data);
+    },
+  });
+};
+
+// --- CLIENTES (Vendedor) ---
 
 /**
  * Hook (useQuery) para o VENDEDOR buscar clientes da organização
@@ -224,11 +315,7 @@ export const useCreateVendedorCliente = () => {
   });
 };
 
-// ============================================
-// ENDEREÇOS (Vendedor)
-// ============================================
-
-const VENDEDOR_ENDERECO_CACHE_KEY = (idCliente: number) => ['vendedor', 'enderecos', idCliente];
+// --- ENDEREÇOS (Vendedor) ---
 
 export const useGetVendedorEnderecos = (idCliente: number) => {
   const fetchEnderecos = async (): Promise<IEndereco[]> => {
@@ -240,17 +327,16 @@ export const useGetVendedorEnderecos = (idCliente: number) => {
   return useQuery({
     queryKey: VENDEDOR_ENDERECO_CACHE_KEY(idCliente),
     queryFn: fetchEnderecos,
-    enabled: !!idCliente, 
+    enabled: !!idCliente,
   });
 };
 
 export const useAddVendedorEndereco = () => {
   const queryClient = useQueryClient();
-  interface AddPayload { idCliente: number; data: EnderecoFormData; }
 
   const addEndereco = async (payload: AddPayload): Promise<IEndereco> => {
     const { data } = await apiClient.post(
-      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
+      `/vendedor/clientes/${payload.idCliente}/enderecos`,
       payload.data
     );
     return data;
@@ -259,8 +345,8 @@ export const useAddVendedorEndereco = () => {
   return useMutation({
     mutationFn: addEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
     },
   });
@@ -268,9 +354,8 @@ export const useAddVendedorEndereco = () => {
 
 export const useUpdateVendedorEndereco = () => {
   const queryClient = useQueryClient();
-  interface UpdatePayload { idEndereco: number; idCliente: number; data: Partial<EnderecoFormData>; }
 
-  const updateEndereco = async (payload: UpdatePayload): Promise<IEndereco> => {
+  const updateEndereco = async (payload: UpdateEnderecoPayload): Promise<IEndereco> => {
     const { data } = await apiClient.put(
       `/vendedor/enderecos/${payload.idEndereco}`, // Rota do Vendedor
       payload.data
@@ -281,8 +366,8 @@ export const useUpdateVendedorEndereco = () => {
   return useMutation({
     mutationFn: updateEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
     },
   });
@@ -290,7 +375,6 @@ export const useUpdateVendedorEndereco = () => {
 
 export const useDeleteVendedorEndereco = () => {
   const queryClient = useQueryClient();
-  interface DeletePayload { idEndereco: number; idCliente: number; }
 
   const deleteEndereco = async (payload: DeletePayload): Promise<void> => {
     await apiClient.delete(`/vendedor/enderecos/${payload.idEndereco}`); // Rota do Vendedor
@@ -299,8 +383,8 @@ export const useDeleteVendedorEndereco = () => {
   return useMutation({
     mutationFn: deleteEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
     },
   });

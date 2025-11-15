@@ -23,7 +23,7 @@ import { loginSchema, type LoginFormData } from '../tipos/validacao';
 import { useLogin } from '../api/servicos/authService';
 
 const imagemFundoUrl =
-  "https://lh3.googleusercontent.com/aida-public/AB6AXuCm87jb9E_CnCr8niIekc3Lj__5LrNJKRpEouCmTiiOjvnT5rhiNOwkd9V3U1hvwjYJ_gUtLO6H6_J-gUN-xx0ulUTEdEWFMlb_ZlqsrecWD5n34AKNLOv8rhc6y8q5w_a5A9yUzdngGTCsH4mBHqrk3kccM0igBK2kofaNnEPNL246sfYkEJ-3V9VwAszzuoq_WXZy40AsRepCh2oSWPhUrZdv1sIEQ2VGXAPNmNt-4Wt2PMFFH8vYdjZIjj9Ohuv7tqxb-8OQt9M5";
+  "https://images.pexels.com/photos/443383/pexels-photo-443383.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=2";
 
 export const PaginaLogin: React.FC = () => {
   const navigate = useNavigate();

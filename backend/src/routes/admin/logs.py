@@ -8,14 +8,15 @@ from src.database import get_db
 from src.models import models
 from src.schemas import LogAuditoriaSchema
 from src.core.security import get_current_super_admin
-from src.routes.gestor.relatorios import get_date_filters # Reutiliza o helper de data
+from src.routes.gestor.relatorios import get_date_filters  # Reutiliza o helper de data
 
 # Cria o router
 admin_logs_router = APIRouter(
     prefix="/api/admin/logs",
-    tags=["12. Super Admin - Auditoria"],
-    dependencies=[Depends(get_current_super_admin)] # Protege TODAS as rotas
+    tags=["15. Super Admin - Logs"],  # Corrigido: removido "description"
+    dependencies=[Depends(get_current_super_admin)]  # Protege TODAS as rotas
 )
+
 
 @admin_logs_router.get("/", response_model=List[LogAuditoriaSchema])
 def get_all_logs(
@@ -33,9 +34,9 @@ def get_all_logs(
     (Super Admin) Lista todos os logs de auditoria do sistema, com filtros.
     """
     query = db.query(models.LogAuditoria).options(
-        joinedload(models.LogAuditoria.usuario) # Carrega dados do usuário
+        joinedload(models.LogAuditoria.usuario)  # Carrega dados do usuário
     )
-    
+
     # Aplica filtros
     if id_organizacao:
         query = query.filter(models.LogAuditoria.id_organizacao == id_organizacao)
@@ -43,12 +44,12 @@ def get_all_logs(
         query = query.filter(models.LogAuditoria.id_usuario == id_usuario)
     if tp_entidade:
         query = query.filter(models.LogAuditoria.tp_entidade == tp_entidade)
-    
+
     # Filtro de data
     if start_date and end_date:
         start, end = get_date_filters(start_date, end_date)
         query = query.filter(models.LogAuditoria.dt_acao.between(start, end))
 
     logs = query.order_by(models.LogAuditoria.dt_acao.desc()).offset(skip).limit(limit).all()
-    
-    return logs
+
+    return [LogAuditoriaSchema.model_validate(log, from_attributes=True) for log in logs]

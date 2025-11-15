@@ -1,5 +1,7 @@
 // /frontend/src/componentes/layout/LayoutVendedor.tsx
-import React, { useState } from 'react';
+// (VERSÃO REVISADA com menu colapsável e correção de borda)
+
+import React, { useState } from 'react'; // <-- MUDANÇA (1): Importa useState
 import { Outlet, useNavigate, Link as RouterLink, useLocation } from 'react-router-dom';
 import {
   Box,
@@ -14,6 +16,8 @@ import {
   Avatar,
   Divider,
   Drawer,
+  IconButton, // <-- MUDANÇA (2): Importa IconButton
+  Tooltip,    // <-- MUDANÇA (3): Importa Tooltip
 } from '@mui/material';
 import {
   Dashboard as DashboardIcon,
@@ -22,6 +26,7 @@ import {
   Category as CatalogoIcon,
   Logout as LogoutIcon,
   SwapHoriz as TrocarEmpresaIcon,
+  Menu as MenuIcon, // <-- MUDANÇA (4): Importa MenuIcon
 } from '@mui/icons-material';
 
 import { useAuth } from '../../contextos/AuthContext';
@@ -29,14 +34,22 @@ import { PaginaSelecionarEmpresa } from '../../paginas/vendedor/PaginaSelecionar
 import { ModalSelecionarEmpresa } from '../auth/ModalSelecionarEmpresa';
 
 const DRAWER_WIDTH = 260;
+const MINI_DRAWER_WIDTH = 80; // <-- MUDANÇA (5): Define largura mini
 
 export const LayoutVendedor: React.FC = () => {
   const { usuario, logout, empresaAtiva } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); // ✅ Adicionado
+  const location = useLocation(); 
 
-  // --- ADICIONE ESTE STATE ---
   const [modalTrocarEmpresaAberto, setModalTrocarEmpresaAberto] = useState(false);
+  
+  // --- MUDANÇA (6): Adiciona estado para o menu ---
+  const [open, setOpen] = useState(true); // Começa aberto
+  
+  const handleDrawerToggle = () => {
+    setOpen(!open); // Inverte o estado
+  };
+  // --- FIM DA MUDANÇA ---
 
   if (!empresaAtiva) {
     return <PaginaSelecionarEmpresa />;
@@ -48,7 +61,6 @@ export const LayoutVendedor: React.FC = () => {
   };
 
   const handleTrocarEmpresa = () => {
-    // Em vez de deslogar, abre o modal
     setModalTrocarEmpresaAberto(true);
   };
 
@@ -59,6 +71,9 @@ export const LayoutVendedor: React.FC = () => {
     { text: 'Clientes', icon: <GroupIcon />, path: '/vendedor/clientes' },
   ];
 
+  // --- MUDANÇA (7): Calcula a largura atual ---
+  const currentDrawerWidth = open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH;
+
   const drawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Perfil do Usuário */}
@@ -66,28 +81,27 @@ export const LayoutVendedor: React.FC = () => {
         <Avatar
           sx={{
             bgcolor: 'primary.main',
-            width: 44,
-            height: 44,
-            fontSize: '1.25rem',
-            fontWeight: 600,
+            width: 44, height: 44,
+            fontSize: '1.25rem', fontWeight: 600,
+            transition: 'all 0.2s', // Animação
           }}
         >
           {usuario?.no_completo ? usuario.no_completo[0].toUpperCase() : usuario?.ds_email[0].toUpperCase()}
         </Avatar>
-        <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography
-            variant="subtitle1"
-            fontWeight={600}
-            noWrap
-            sx={{ lineHeight: 1.3 }}
-          >
+        
+        {/* --- MUDANÇA (8): Anima o texto do perfil --- */}
+        <Box sx={{ 
+          flex: 1, 
+          minWidth: 0,
+          opacity: open ? 1 : 0, // Fade out
+          transition: (theme) => theme.transitions.create('opacity', {
+            duration: theme.transitions.duration.shortest,
+          }),
+        }}>
+          <Typography variant="subtitle1" fontWeight={600} noWrap sx={{ lineHeight: 1.3 }}>
             {usuario?.no_completo || 'Vendedor'}
           </Typography>
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            noWrap
-          >
+          <Typography variant="caption" color="text.secondary" noWrap>
             {empresaAtiva.no_empresa}
           </Typography>
         </Box>
@@ -95,7 +109,7 @@ export const LayoutVendedor: React.FC = () => {
 
       <Divider />
 
-      {/* Menu Principal */}
+      {/* --- MUDANÇA (9): Anima o Menu Principal --- */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', py: 1 }}>
         <List disablePadding>
           {menuItems.map((item) => {
@@ -103,40 +117,43 @@ export const LayoutVendedor: React.FC = () => {
 
             return (
               <ListItem key={item.text} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
-                <ListItemButton
-                  component={RouterLink}
-                  to={item.path}
-                  selected={isActive}
-                  sx={{
-                    borderRadius: 1.5,
-                    '&.Mui-selected': {
-                      bgcolor: 'primary.main',
-                      color: 'primary.contrastText',
-                      '&:hover': {
-                        bgcolor: 'primary.dark',
-                      },
-                      '& .MuiListItemIcon-root': {
-                        color: 'primary.contrastText',
-                      },
-                    },
-                  }}
-                >
-                  <ListItemIcon
+                <Tooltip title={item.text} placement="right" disableHoverListener={open}>
+                  <ListItemButton
+                    component={RouterLink}
+                    to={item.path}
+                    selected={isActive}
                     sx={{
-                      color: isActive ? 'inherit' : 'text.secondary',
-                      minWidth: 40,
+                      borderRadius: 1.5,
+                      justifyContent: 'center', // Centraliza ícone
+                      '&.Mui-selected': {
+                        bgcolor: 'primary.main',
+                        color: 'primary.contrastText',
+                        '&:hover': { bgcolor: 'primary.dark' },
+                        '& .MuiListItemIcon-root': { color: 'primary.contrastText' },
+                      },
                     }}
                   >
-                    {item.icon}
-                  </ListItemIcon>
-                  <ListItemText
-                    primary={item.text}
-                    primaryTypographyProps={{
-                      fontSize: '0.9375rem',
-                      fontWeight: isActive ? 600 : 500,
-                    }}
-                  />
-                </ListItemButton>
+                    <ListItemIcon
+                      sx={{
+                        color: isActive ? 'inherit' : 'text.secondary',
+                        minWidth: 0, // Permite centralizar
+                        mr: open ? 2 : 'auto', // Margem automática
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {item.icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.text}
+                      sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                      primaryTypographyProps={{
+                        fontSize: '0.9375rem',
+                        fontWeight: isActive ? 600 : 500,
+                        noWrap: true,
+                      }}
+                    />
+                  </ListItemButton>
+                </Tooltip>
               </ListItem>
             );
           })}
@@ -145,45 +162,46 @@ export const LayoutVendedor: React.FC = () => {
 
       <Divider />
 
-      {/* Menu Inferior */}
+      {/* --- MUDANÇA (10): Anima o Menu Inferior --- */}
       <List disablePadding sx={{ py: 1 }}>
         <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
-          <ListItemButton
-            onClick={handleTrocarEmpresa}
-            sx={{ borderRadius: 1.5 }}
-          >
-            <ListItemIcon sx={{ color: 'text.secondary', minWidth: 40 }}>
-              <TrocarEmpresaIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Trocar Empresa"
-              primaryTypographyProps={{ fontSize: '0.9375rem' }}
-            />
-          </ListItemButton>
+          <Tooltip title="Trocar Empresa" placement="right" disableHoverListener={open}>
+            <ListItemButton
+              onClick={handleTrocarEmpresa}
+              sx={{ borderRadius: 1.5, justifyContent: 'center' }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+                <TrocarEmpresaIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Trocar Empresa"
+                sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
+              />
+            </ListItemButton>
+          </Tooltip>
         </ListItem>
 
         <ListItem disablePadding sx={{ px: 1.5 }}>
-          <ListItemButton
-            onClick={handleLogout}
-            sx={{
-              borderRadius: 1.5,
-              '&:hover': {
-                bgcolor: 'error.dark',
-                color: 'error.contrastText',
-                '& .MuiListItemIcon-root': {
-                  color: 'error.contrastText',
-                },
-              },
-            }}
-          >
-            <ListItemIcon sx={{ color: 'text.secondary', minWidth: 40 }}>
-              <LogoutIcon />
-            </ListItemIcon>
-            <ListItemText
-              primary="Sair"
-              primaryTypographyProps={{ fontSize: '0.9375rem' }}
-            />
-          </ListItemButton>
+          <Tooltip title="Sair" placement="right" disableHoverListener={open}>
+            <ListItemButton
+              onClick={handleLogout}
+              sx={{
+                borderRadius: 1.5,
+                justifyContent: 'center',
+                '&:hover': { /* ... (estilos de hover) ... */ },
+              }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+                <LogoutIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Sair"
+                sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
+              />
+            </ListItemButton>
+          </Tooltip>
         </ListItem>
       </List>
     </Box>
@@ -191,40 +209,75 @@ export const LayoutVendedor: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      {/* AppBar */}
+      {/* --- MUDANÇA (11): AppBar Animada e Corrigida --- */}
       <AppBar
         position="fixed"
-        elevation={0}
+        elevation={0} // Mantém flat
         sx={{
-          width: `calc(100% - ${DRAWER_WIDTH}px)`,
-          ml: `${DRAWER_WIDTH}px`,
+          // Anima a largura e margem
+          width: `calc(100% - ${currentDrawerWidth}px)`,
+          ml: `${currentDrawerWidth}px`,
           backgroundColor: 'background.paper',
-          borderBottom: '1px solid',
-          borderColor: 'divider',
+          
+          // Remove a borda de baixo (Correção do "TOC")
+          // borderBottom: '1px solid', (Removido)
+          // borderColor: 'divider', (Removido)
+
+          // Animação
+          transition: (theme) => theme.transitions.create(['width', 'margin'], {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
         }}
       >
         <Toolbar sx={{ justifyContent: 'space-between' }}>
-          <Typography variant="h6" noWrap component="div" color="text.primary" fontWeight={600}>
-            Empresa Ativa: {empresaAtiva.no_empresa}
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            {/* --- MUDANÇA (12): Botão de Toggle --- */}
+            <IconButton
+              color="inherit"
+              aria-label="toggle drawer"
+              onClick={handleDrawerToggle}
+              edge="start"
+              sx={{ 
+                mr: 2, 
+                color: 'text.primary',
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+
+            <Typography variant="h6" noWrap component="div" color="text.primary" fontWeight={600}>
+              Empresa Ativa: {empresaAtiva.no_empresa}
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            {/* Espaço para ações do header (notificações, etc) */}
+            {/* Espaço para ações */}
           </Box>
         </Toolbar>
       </AppBar>
 
-      {/* Sidebar */}
+      {/* --- MUDANÇA (13): Sidebar Animada --- */}
       <Drawer
         variant="permanent"
         sx={{
-          width: DRAWER_WIDTH,
+          width: currentDrawerWidth, // Largura animada
           flexShrink: 0,
+          whiteSpace: 'nowrap',
+          transition: (theme) => theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
           '& .MuiDrawer-paper': {
-            width: DRAWER_WIDTH,
+            width: currentDrawerWidth, // Largura animada
             boxSizing: 'border-box',
             backgroundColor: 'background.paper',
             borderRight: '1px solid',
             borderColor: 'divider',
+            overflowX: 'hidden', // Esconde texto ao fechar
+            transition: (theme) => theme.transitions.create('width', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
           },
         }}
         anchor="left"
@@ -232,7 +285,7 @@ export const LayoutVendedor: React.FC = () => {
         {drawerContent}
       </Drawer>
 
-      {/* Conteúdo Principal */}
+      {/* Conteúdo Principal (sem alteração) */}
       <Box
         component="main"
         sx={{
@@ -246,7 +299,7 @@ export const LayoutVendedor: React.FC = () => {
         <Outlet />
       </Box>
 
-      {/* --- MODAL DE TROCA DE EMPRESA --- */}
+      {/* Modal de Troca (sem alteração) */}
       <ModalSelecionarEmpresa
         open={modalTrocarEmpresaAberto}
         onClose={() => setModalTrocarEmpresaAberto(false)}

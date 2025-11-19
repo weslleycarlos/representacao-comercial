@@ -126,7 +126,6 @@ O Frontend roda na porta `5173`.
 
 ## 4. Configuração de Produção (Deploy no Railway/Supabase)
 
-(Esta seção foi mantida do seu arquivo original)
 
 O deploy em produção é mais simples, pois depende apenas das variáveis de ambiente e do comando de start.
 

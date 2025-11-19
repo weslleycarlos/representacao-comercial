@@ -124,6 +124,17 @@ def seed_initial_data():
             db.add(org)
             db.flush()  # Pega o ID da Org
 
+            # 2.X. Cria Categorias Padrão
+            categorias = [
+                models.CategoriaProduto(no_categoria="Roupas Masculinas", id_organizacao=org.id_organizacao),
+                models.CategoriaProduto(no_categoria="Roupas Femininas", id_organizacao=org.id_organizacao),
+                models.CategoriaProduto(no_categoria="Roupas Infantis", id_organizacao=org.id_organizacao),
+                models.CategoriaProduto(no_categoria="Calçados", id_organizacao=org.id_organizacao),
+                models.CategoriaProduto(no_categoria="Acessórios", id_organizacao=org.id_organizacao),
+            ]
+            db.bulk_save_objects(categorias)
+            db.flush()
+            
             # 2.2. Cria o Usuário Gestor
             gestor = models.Usuario(
                 id_organizacao=org.id_organizacao,

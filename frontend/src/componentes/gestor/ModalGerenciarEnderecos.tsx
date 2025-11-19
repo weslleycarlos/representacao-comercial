@@ -23,6 +23,7 @@ import { useGetEnderecosPorCliente, useDeleteEndereco } from '../../api/servicos
 import { ModalFormEndereco } from './ModalFormEndereco';
 import { ModalConfirmarExclusao } from '../layout/ModalConfirmarExclusao';
 import { formatCurrency } from '../../utils/format';
+import type { EnderecoFormData } from '../../tipos/validacao';
 
 // Tipos para os hooks que serão passados via Props
 type GetEnderecosHook = UseQueryResult<IEndereco[], Error>;

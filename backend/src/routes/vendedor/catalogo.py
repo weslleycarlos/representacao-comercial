@@ -8,7 +8,7 @@ from typing import List, Optional
 from src.database import get_db
 from src.models import models
 # --- IMPORTAÇÃO CORRIGIDA ---
-from src.schemas import CategoriaProdutoSchema, ItemCatalogoVendaSchema
+from src.schemas import CategoriaProdutoSchema, ItemCatalogoVendaSchema, CatalogoSchema
 from src.core.security import get_current_vendedor_contexto
 
 vendedor_catalogo_router = APIRouter(
@@ -18,20 +18,36 @@ vendedor_catalogo_router = APIRouter(
 )
 
 
+@vendedor_catalogo_router.get("/catalogos", response_model=List[CatalogoSchema])
+def get_catalogos_disponiveis(
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    """ Lista todos os catálogos ATIVOS da empresa selecionada """
+    _, _, id_empresa_ativa = contexto
+    
+    catalogos = db.query(models.Catalogo).filter(
+        models.Catalogo.id_empresa == id_empresa_ativa,
+        models.Catalogo.fl_ativo == True
+    ).order_by(models.Catalogo.no_catalogo).all()
+    
+    return catalogos
+
 @vendedor_catalogo_router.get("/", response_model=List[ItemCatalogoVendaSchema])
 def get_catalogo_vendedor(
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db),
-    id_categoria: Optional[int] = Query(None)  # Renomeado de Query
+    id_catalogo: int = Query(..., description="ID do Catálogo é obrigatório"), # <-- Agora obrigatório
+    id_categoria: Optional[int] = Query(None)
 ):
     """
-    Lista todos os itens de venda (Produto + Preço) do ÚNICO
-    catálogo ativo da empresa selecionada.
+    Lista os itens de venda de um catálogo específico.
     """
     _, id_organizacao, id_empresa_ativa = contexto
 
     # 1. Encontra o catálogo ATIVO da empresa
     catalogo_ativo = db.query(models.Catalogo).filter(
+        models.Catalogo.id_catalogo == id_catalogo,
         models.Catalogo.id_empresa == id_empresa_ativa,
         models.Catalogo.fl_ativo == True
     ).first()

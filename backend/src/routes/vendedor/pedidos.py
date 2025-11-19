@@ -68,6 +68,7 @@ def create_pedido(
         raise HTTPException(status_code=422, detail="O pedido deve conter pelo menos um item.")
 
     catalogo_ativo = db.query(models.Catalogo).filter(
+        models.Catalogo.id_catalogo == pedido_in.id_catalogo,
         models.Catalogo.id_empresa == id_empresa_ativa,
         models.Catalogo.fl_ativo == True
     ).first()
@@ -157,14 +158,15 @@ def get_meus_pedidos(
     skip: int = 0,
     limit: int = 25
 ):
-    id_usuario, _, _ = contexto
+    id_usuario, _, id_empresa_ativa = contexto
 
     pedidos = db.query(models.Pedido).options(
         joinedload(models.Pedido.cliente),
         joinedload(models.Pedido.empresa),
         joinedload(models.Pedido.forma_pagamento)
     ).filter(
-        models.Pedido.id_usuario == id_usuario
+        models.Pedido.id_usuario == id_usuario,
+        models.Pedido.id_empresa == id_empresa_ativa
     ).order_by(models.Pedido.dt_pedido.desc()).offset(skip).limit(limit).all()
 
     return [PedidoCompletoSchema.model_validate(p, from_attributes=True) for p in pedidos]

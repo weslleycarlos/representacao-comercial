@@ -21,6 +21,7 @@ import {
 } from '@mui/icons-material';
 
 import { useGetMeusPedidos } from '../../api/servicos/vendedorService';
+import { useAuth } from '../../contextos/AuthContext';
 import type { IPedidoCompleto } from '../../tipos/schemas';
 import { formatCurrency } from '../../utils/format';
 
@@ -67,6 +68,7 @@ const getStatusIcon = (status: string) => {
 
 export const PaginaVendedorPedidos: React.FC = () => {
   const navigate = useNavigate();
+  const { empresaAtiva } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [modalNovoPedidoOpen, setModalNovoPedidoOpen] = useState(false);
@@ -78,7 +80,7 @@ export const PaginaVendedorPedidos: React.FC = () => {
     isError, 
     error,
     refetch
-  } = useGetMeusPedidos();
+  } = useGetMeusPedidos(empresaAtiva?.id_empresa);
 
   // Filtros e busca
   const pedidosFiltrados = React.useMemo(() => {

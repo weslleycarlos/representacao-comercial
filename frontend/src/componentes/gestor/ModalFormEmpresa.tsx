@@ -17,12 +17,16 @@ import {
   FormControlLabel,
   Box,
   Grid,
-  Divider
+  Divider,
+  InputAdornment,
+  IconButton
 } from '@mui/material';
+import { Search as SearchIcon } from '@mui/icons-material';
 
 import { type EmpresaFormData, empresaSchema } from '../../tipos/validacao';
 import type { IEmpresaCompleta } from '../../tipos/schemas';
 import { useCreateEmpresa, useUpdateEmpresa } from '../../api/servicos/empresaService';
+import { useConsultaCNPJ } from '../../api/servicos/utilsService';
 import { MaskedInput } from '../utils/MaskedInput';
 
 interface ModalFormEmpresaProps {
@@ -31,6 +35,7 @@ interface ModalFormEmpresaProps {
   empresa?: IEmpresaCompleta;
 }
 
+// ✅ CORREÇÃO: A função handleBuscaCNPJ foi movida para DENTRO do componente
 export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClose, empresa }) => {
   const isEditMode = !!empresa;
 
@@ -56,14 +61,27 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
     }
   });
 
+  const { mutate: buscarCNPJ, isPending: isBuscandoCNPJ, error: erroCNPJ } = useConsultaCNPJ();
   const { mutate: createEmpresa, isPending: isCreating, error: createError } = useCreateEmpresa();
   const { mutate: updateEmpresa, isPending: isUpdating, error: updateError } = useUpdateEmpresa();
 
-  const isSaving = isCreating || isUpdating;
-  const mutationError = (createError || updateError) as any;
-  
   const cnpjValue = watch('nr_cnpj');
   const telefoneValue = watch('nr_telefone_contato');
+
+  const isSaving = isCreating || isUpdating;
+  const mutationError = (createError || updateError || erroCNPJ) as any;
+
+  // ✅ Agora a função pode acessar 'buscarCNPJ', 'cnpjValue' e 'setValue'
+  const handleBuscaCNPJ = () => {
+    buscarCNPJ(cnpjValue, {
+      onSuccess: (data) => {
+        setValue('no_empresa', data.razao_social || '', { shouldValidate: true });
+        setValue('ds_email_contato', data.email || '', { shouldValidate: true });
+        setValue('nr_telefone_contato', data.ddd_telefone_1 || '', { shouldValidate: true });
+        // (Outros campos se houver)
+      }
+    });
+  };
 
   useEffect(() => {
     if (open) {
@@ -92,18 +110,14 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
     }
   };
 
- let apiErrorMessage: string | null = null;
+  let apiErrorMessage: string | null = null;
   if (mutationError) {
     const errorDetail = (mutationError as any)?.response?.data?.detail;
     if (typeof errorDetail === 'string') {
-      // Erro simples (ex: "CNPJ já existe")
       apiErrorMessage = errorDetail;
     } else if (Array.isArray(errorDetail)) {
-      // Erro de validação 422 (Pydantic)
-      // Pega a primeira mensagem de erro do array
       apiErrorMessage = errorDetail[0]?.msg || "Erro de validação.";
     } else if ((mutationError as any).message) {
-      // Erro de rede ou outro (ex: "Network Error")
       apiErrorMessage = (mutationError as any).message;
     } else {
       apiErrorMessage = "Ocorreu um erro desconhecido.";
@@ -136,7 +150,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
 
           <Grid container spacing={2.5}>
             {/* Linha 1: Nome da Empresa */}
-            <Grid size={12}>
+            <Grid item xs={12}>
               <TextField
                 {...register('no_empresa')}
                 label="Nome da Empresa"
@@ -149,7 +163,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
             </Grid>
 
             {/* Linha 2: CNPJ e IE */}
-            <Grid size={{ xs: 12, sm: 7 }}>
+            <Grid item xs={12} sm={7}>
               <MaskedInput
                 mask="cnpj"
                 label="CNPJ"
@@ -159,10 +173,26 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
                 onChange={(value) => setValue('nr_cnpj', value)}
                 error={!!errors.nr_cnpj}
                 helperText={errors.nr_cnpj?.message}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton
+                        aria-label="buscar dados do cnpj"
+                        onClick={handleBuscaCNPJ}
+                        disabled={isBuscandoCNPJ || (cnpjValue || "").replace(/\D/g, '').length !== 14}
+                        edge="end"
+                        size="small"
+                        color="primary"
+                      >
+                        {isBuscandoCNPJ ? <CircularProgress size={20} /> : <SearchIcon />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }}
               />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 5 }}>
+            <Grid item xs={12} sm={5}>
               <TextField
                 {...register('nr_inscricao_estadual')}
                 label="Inscrição Estadual"
@@ -173,7 +203,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
             </Grid>
 
             {/* Linha 3: Email e Telefone */}
-            <Grid size={{ xs: 12, sm: 7 }}>
+            <Grid item xs={12} sm={7}>
               <TextField
                 {...register('ds_email_contato')}
                 label="E-mail"
@@ -184,7 +214,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
               />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 5 }}>
+            <Grid item xs={12} sm={5}>
               <MaskedInput
                 mask="telefone"
                 label="Telefone"
@@ -197,7 +227,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
             </Grid>
 
             {/* Linha 4: Website */}
-            <Grid size={12}>
+            <Grid item xs={12}>
               <TextField
                 {...register('ds_site')}
                 label="Website"
@@ -209,7 +239,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
             </Grid>
 
             {/* Linha 5: Comissão e Status */}
-            <Grid size={{ xs: 12, sm: 6 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 {...register('pc_comissao_padrao', { valueAsNumber: true })}
                 label="Comissão Padrão (%)"
@@ -227,7 +257,7 @@ export const ModalFormEmpresa: React.FC<ModalFormEmpresaProps> = ({ open, onClos
               />
             </Grid>
 
-            <Grid size={{ xs: 12, sm: 6 }} sx={{ display: 'flex', alignItems: 'center' }}>
+            <Grid item xs={12} sm={6} sx={{ display: 'flex', alignItems: 'center' }}>
               <FormControlLabel
                 control={
                   <Controller

@@ -15,7 +15,6 @@ import type { UseMutationResult } from '@tanstack/react-query';
 
 import { type EnderecoFormData, enderecoSchema } from '../../tipos/validacao';
 import type { IEndereco } from '../../tipos/schemas';
-import { useAddEndereco, useUpdateEndereco } from '../../api/servicos/clienteService';
 import { useConsultaCEP } from '../../api/servicos/utilsService';
 import { MaskedInput } from '../utils/MaskedInput';
 
@@ -34,11 +33,16 @@ interface ModalFormEnderecoProps {
   updateHook: UpdateMutateFn;
 }
 
-export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onClose, idCliente, endereco }) => {
+export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ 
+  open, onClose, idCliente, endereco, 
+  addHook, updateHook // <-- Recebe aqui
+}) => {
   const isEditMode = !!endereco;
 
   const { 
-    register, handleSubmit, formState: { errors }, reset, control, setValue, watch } = useForm<EnderecoFormData>({
+    register, handleSubmit, formState: { errors }, reset, control,
+    setValue, watch
+  } = useForm<EnderecoFormData>({
     resolver: zodResolver(enderecoSchema),
     defaultValues: {
       tp_endereco: 'entrega',
@@ -47,8 +51,8 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
   });
 
   const { mutate: buscarCEP, isPending: isBuscandoCEP, error: erroCEP } = useConsultaCEP();
-  const { mutate: addEndereco, isPending: isAdding, error: addError } = useAddEndereco();
-  const { mutate: updateEndereco, isPending: isUpdating, error: updateError } = useUpdateEndereco();
+  const { mutate: addEndereco, isPending: isAdding, error: addError } = addHook;
+  const { mutate: updateEndereco, isPending: isUpdating, error: updateError } = updateHook;
 
   const isSaving = isAdding || isUpdating;
   const mutationError = addError || updateError || erroCEP;
@@ -99,7 +103,20 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
     }
   };
   
-  const apiErrorMessage = (mutationError as any)?.response?.data?.detail;
+  // Processa mensagem de erro
+  let apiErrorMessage: string | null = null;
+  if (mutationError) {
+     const errorData = (mutationError as any)?.response?.data;
+     const errorDetail = errorData?.detail;
+     
+     if (typeof errorDetail === 'string') {
+       apiErrorMessage = errorDetail;
+     } else if (Array.isArray(errorDetail)) {
+       apiErrorMessage = errorDetail[0]?.msg || "Erro de validação.";
+     } else {
+       apiErrorMessage = (mutationError as any).message || "Ocorreu um erro.";
+     }
+  }
 
   return (
     <Dialog 
@@ -120,9 +137,7 @@ export const ModalFormEndereco: React.FC<ModalFormEnderecoProps> = ({ open, onCl
       <Box component="form" onSubmit={handleSubmit(onSubmit)} noValidate>
         <DialogContent sx={{ pt: 3 }}>
           {apiErrorMessage && (
-            <Alert severity="error" sx={{ mb: 3 }}>
-              {apiErrorMessage}
-            </Alert>
+            <Alert severity="error" sx={{ mb: 2 }}>{apiErrorMessage}</Alert>
           )}
 
           <Grid container spacing={2.5}>

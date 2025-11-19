@@ -9,11 +9,12 @@ import type {
   IClienteCompleto,
   IFormaPagamento,
   IVendedor,
+  ICatalogo,
 } from '../../tipos/schemas';
 import type {
   PedidoCreateFormData,
-  PedidoUpdate, 
-  PedidoCancelRequest,
+  PedidoUpdateFormData,
+  PedidoCancelRequestData,
   ClienteFormData,
   EnderecoFormData,
   VendedorFormData,
@@ -21,11 +22,12 @@ import type {
 
 // --- CACHE KEYS ---
 const VENDEDOR_CACHE_KEY = 'vendedores';
-const VENDEDOR_CATALOGO_KEY = 'catalogoVendedor';
-const VENDEDOR_CATEGORIAS_KEY = 'categoriasVendedor';
-const VENDEDOR_PEDIDOS_KEY = 'pedidosVendedor';
+const VENDEDOR_LISTA_CATALOGOS_KEY = (idEmpresa?: number) => ['listaCatalogosVendedor', idEmpresa];
+const VENDEDOR_CATALOGO_KEY = (idEmpresa?: number) => ['catalogoVendedor', idEmpresa];
+const VENDEDOR_CATEGORIAS_KEY = (idEmpresa?: number) => ['categoriasVendedor', idEmpresa];
+const CLIENTE_CACHE_KEY = (idEmpresa?: number) => ['clientesVendedor', idEmpresa];
+const VENDEDOR_PEDIDOS_KEY = (idEmpresa?: number) => ['pedidosVendedor', idEmpresa];
 const VENDEDOR_PEDIDO_DETALHE_KEY = (id: number) => ['pedidosVendedor', id];
-const CLIENTE_CACHE_KEY = 'clientes';
 const VENDEDOR_FORMAS_PGTO_KEY = 'formasPagamentoVendedor';
 const VENDEDOR_ENDERECO_CACHE_KEY = (idCliente: number) => ['vendedor', 'enderecos', idCliente];
 
@@ -58,7 +60,7 @@ interface DeletePayload {
 
 interface CancelPayload {
   idPedido: number;
-  data: PedidoCancelRequest; // (data = { motivo: "..." })
+  data: PedidoCancelRequestData; // (data = { motivo: "..." })
 }
 
 // --- HOOKS ---
@@ -146,6 +148,21 @@ export const useVincularEmpresa = () => {
 };
 
 /**
+ * Hook para buscar a lista de catálogos disponíveis para a empresa ativa
+ */
+export const useGetCatalogosDisponiveis = (idEmpresaAtiva?: number) => {
+  const fetch = async (): Promise<ICatalogo[]> => {
+    const { data } = await apiClient.get('/vendedor/catalogo/catalogos');
+    return data;
+  };
+  return useQuery({
+    queryKey: VENDEDOR_LISTA_CATALOGOS_KEY(idEmpresaAtiva),
+    queryFn: fetch,
+    enabled: !!idEmpresaAtiva,
+  });
+};
+
+/**
  * Hook para DESVINCULAR um Vendedor de uma Empresa
  */
 export const useDesvincularEmpresa = () => {
@@ -164,34 +181,41 @@ export const useDesvincularEmpresa = () => {
   });
 };
 
-// --- CATÁLOGO (Vendedor) ---
-
-export const useGetCatalogoVenda = (idCategoria?: number) => {
+/**
+ * Hook atualizado para buscar itens de UM catálogo específico
+ */
+export const useGetCatalogoVenda = (idEmpresaAtiva?: number, idCatalogo?: number, idCategoria?: number) => {
   const fetchCatalogo = async (): Promise<IItemCatalogoVenda[]> => {
     const { data } = await apiClient.get('/vendedor/catalogo/', {
-      params: { id_categoria: idCategoria }
+      params: { 
+        id_catalogo: idCatalogo, // <-- Agora envia o ID
+        id_categoria: idCategoria 
+      }
     });
     return data;
   };
 
   return useQuery({
-    queryKey: [VENDEDOR_CATALOGO_KEY, { idCategoria }],
+    // A chave depende do Catálogo selecionado
+    queryKey: [...VENDEDOR_CATALOGO_KEY(idEmpresaAtiva), { idCatalogo, idCategoria }], 
     queryFn: fetchCatalogo,
+    enabled: !!idEmpresaAtiva && !!idCatalogo, // Só busca se tiver catálogo selecionado
   });
 };
 
 /**
  * Hook (useQuery) para buscar as Categorias (para o Vendedor filtrar)
  */
-export const useGetCategoriasVenda = () => {
+export const useGetCategoriasVenda = (idEmpresaAtiva?: number) => {
   const fetchCategorias = async (): Promise<ICategoriaProduto[]> => {
     const { data } = await apiClient.get('/vendedor/catalogo/categorias');
     return data;
   };
 
   return useQuery({
-    queryKey: [VENDEDOR_CATEGORIAS_KEY],
+    queryKey: VENDEDOR_CATEGORIAS_KEY(idEmpresaAtiva),
     queryFn: fetchCategorias,
+    enabled: !!idEmpresaAtiva,
   });
 };
 
@@ -200,15 +224,18 @@ export const useGetCategoriasVenda = () => {
 /**
  * Hook (useQuery) para buscar os pedidos do Vendedor logado
  */
-export const useGetMeusPedidos = () => {
+export const useGetMeusPedidos = (idEmpresaAtiva?: number) => {
   const fetchPedidos = async (): Promise<IPedidoCompleto[]> => {
+    // O backend já filtra pelo token, mas o frontend precisa do ID para o cache
     const { data } = await apiClient.get('/vendedor/pedidos/');
     return data;
   };
 
   return useQuery({
-    queryKey: [VENDEDOR_PEDIDOS_KEY],
+    // A chave agora muda quando a empresa muda!
+    queryKey: VENDEDOR_PEDIDOS_KEY(idEmpresaAtiva), 
     queryFn: fetchPedidos,
+    enabled: !!idEmpresaAtiva, // Só busca se tiver empresa selecionada
   });
 };
 
@@ -282,16 +309,16 @@ export const useCancelarPedido = () => {
 /**
  * Hook (useQuery) para o VENDEDOR buscar clientes da organização
  */
-export const useGetVendedorClientes = () => {
+export const useGetVendedorClientes = (idEmpresaAtiva?: number) => {
   const fetchClientes = async (): Promise<IClienteCompleto[]> => {
-    // --- ESTA É A ROTA CORRETA ---
     const { data } = await apiClient.get('/vendedor/clientes/');
     return data;
   };
 
   return useQuery({
-    queryKey: [CLIENTE_CACHE_KEY, { ativo: true }],
+    queryKey: CLIENTE_CACHE_KEY(idEmpresaAtiva),
     queryFn: fetchClientes,
+    enabled: !!idEmpresaAtiva,
   });
 };
 
@@ -333,10 +360,11 @@ export const useGetVendedorEnderecos = (idCliente: number) => {
 
 export const useAddVendedorEndereco = () => {
   const queryClient = useQueryClient();
+  interface AddPayload { idCliente: number; data: EnderecoFormData; }
 
   const addEndereco = async (payload: AddPayload): Promise<IEndereco> => {
     const { data } = await apiClient.post(
-      `/vendedor/clientes/${payload.idCliente}/enderecos`,
+      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
       payload.data
     );
     return data;
@@ -345,8 +373,14 @@ export const useAddVendedorEndereco = () => {
   return useMutation({
     mutationFn: addEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+
+      // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
+      // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
+      queryClient.invalidateQueries({ 
+        queryKey: ['clientesVendedor'] 
       });
     },
   });
@@ -357,7 +391,7 @@ export const useUpdateVendedorEndereco = () => {
 
   const updateEndereco = async (payload: UpdateEnderecoPayload): Promise<IEndereco> => {
     const { data } = await apiClient.put(
-      `/vendedor/enderecos/${payload.idEndereco}`, // Rota do Vendedor
+      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
       payload.data
     );
     return data;
@@ -366,8 +400,14 @@ export const useUpdateVendedorEndereco = () => {
   return useMutation({
     mutationFn: updateEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+
+      // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
+      // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
+      queryClient.invalidateQueries({ 
+        queryKey: ['clientesVendedor'] 
       });
     },
   });
@@ -377,14 +417,20 @@ export const useDeleteVendedorEndereco = () => {
   const queryClient = useQueryClient();
 
   const deleteEndereco = async (payload: DeletePayload): Promise<void> => {
-    await apiClient.delete(`/vendedor/enderecos/${payload.idEndereco}`); // Rota do Vendedor
+    await apiClient.delete(`/vendedor/clientes/${payload.idCliente}/enderecos`); // Rota do Vendedor
   };
 
   return useMutation({
     mutationFn: deleteEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
+      queryClient.invalidateQueries({ 
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      });
+
+      // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
+      // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
+      queryClient.invalidateQueries({ 
+        queryKey: ['clientesVendedor'] 
       });
     },
   });

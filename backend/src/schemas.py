@@ -516,7 +516,7 @@ class PedidoCreate(BaseModel):
     id_endereco_entrega: int
     id_endereco_cobranca: int
     id_forma_pagamento: int
-    
+    id_catalogo: int
     pc_desconto: Optional[Decimal] = 0.00 # type: ignore
     ds_observacoes: Optional[str] = None
     

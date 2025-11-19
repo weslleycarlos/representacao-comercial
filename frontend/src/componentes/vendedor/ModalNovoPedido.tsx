@@ -26,9 +26,11 @@ import { useAuth } from '../../contextos/AuthContext';
 import { useGetVendedorClientes, useCreateVendedorCliente } from '../../api/servicos/vendedorService';
 import { useGetCatalogoVenda, useGetFormasPagamento } from '../../api/servicos/vendedorService';
 import { useCreatePedido } from '../../api/servicos/vendedorService';
+import { useAddVendedorEndereco, useUpdateVendedorEndereco, useGetCatalogosDisponiveis } from '../../api/servicos/vendedorService';
 import type { IClienteCompleto, IItemCatalogoVenda, IEndereco } from '../../tipos/schemas';
 import { formatCurrency, Decimal } from '../../utils/format';
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
+import { ModalFormEndereco } from '../../componentes/gestor/ModalFormEndereco';
 
 interface ModalNovoPedidoProps {
   open: boolean;
@@ -44,13 +46,20 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   onClose,
   onPedidoCriado
 }) => {
-  const { usuario } = useAuth();
+
+  const { usuario, empresaAtiva } = useAuth();
   const [activeStep, setActiveStep] = useState(0);
   const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | null>(null);
   //const [modoCadastroRapido, setModoCadastroRapido] = useState(false);
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
+  const [modalEnderecoAberto, setModalEnderecoAberto] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState<IItemCatalogoVenda | null>(null);
+  const addEnderecoHook = useAddVendedorEndereco();
+  const updateEnderecoHook = useUpdateVendedorEndereco();
   const [qtdItem, setQtdItem] = useState(1);
+    // Busque os catálogos
+  const { data: listaCatalogos } = useGetCatalogosDisponiveis(empresaAtiva?.id_empresa);
+
 
   // Configuração do Formulário
   const {
@@ -71,20 +80,51 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
     },
   });
 
+    // Assista o campo id_catalogo do formulário
+  const idCatalogoSelecionado = useWatch({ control, name: 'id_catalogo' });
+
   // Field Array para os itens do carrinho
   const { fields, append, remove } = useFieldArray({
     control,
     name: "itens",
   });
 
+  const handleOpenNovoEndereco = () => {
+    setModalEnderecoAberto(true);
+  };
+
   // Observadores para cálculos
   const itensDoFormulario = useWatch({ control, name: 'itens' });
   const descontoGeral = useWatch({ control, name: 'pc_desconto' });
 
   // Hooks de API
-  const { data: clientes, isLoading: isLoadingClientes, refetch: refetchClientes } = useGetVendedorClientes();
-  const { data: catalogo, isLoading: isLoadingCatalogo } = useGetCatalogoVenda();
+  const { data: clientes, isLoading: isLoadingClientes, refetch: refetchClientes } = useGetVendedorClientes(empresaAtiva?.id_empresa);
+  const { data: catalogo, isLoading: isLoadingCatalogo } = useGetCatalogoVenda(empresaAtiva?.id_empresa,idCatalogoSelecionado);
   const { data: formasPgto, isLoading: isLoadingFormasPgto } = useGetFormasPagamento();
+
+// Adicione logo após os hooks de API
+  useEffect(() => {
+    if (clienteSelecionado && clientes) {
+      const clienteAtualizado = clientes.find(c => c.id_cliente === clienteSelecionado.id_cliente);
+      if (clienteAtualizado) {
+        // Atualiza o state local com os novos dados (incluindo o novo endereço)
+        setClienteSelecionado(clienteAtualizado);
+        
+        // Opcional: Se for o único endereço, já seleciona ele nos campos
+        if (clienteAtualizado.enderecos.length === 1) {
+             const endId = clienteAtualizado.enderecos[0].id_endereco;
+             setValue('id_endereco_entrega', endId);
+             setValue('id_endereco_cobranca', endId);
+        }
+      }
+    }
+  }, [clientes]); // Roda sempre que a lista global de clientes atualizar
+ // Auto-selecionar o primeiro catálogo se houver apenas um (UX)
+   useEffect(() => {
+    if (listaCatalogos && listaCatalogos.length > 0 && !idCatalogoSelecionado) {
+       setValue('id_catalogo', listaCatalogos[0].id_catalogo);
+    }
+  }, [listaCatalogos, idCatalogoSelecionado, setValue]); 
 
   // (Removemos useConsultaCNPJ)
   const { mutate: criarCliente, isPending: isCriandoCliente, error: erroCriarCliente } = useCreateVendedorCliente();
@@ -308,9 +348,24 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                 </Grid>
               </Grid>
             </Paper>
+            {/* Se selecionou cliente mas ele não tem endereços */}
+            {clienteSelecionado && clienteSelecionado.enderecos.length === 0 && (
+              <Grid xs={12}>
+                <Alert 
+                  severity="warning" 
+                  action={
+                    <Button color="inherit" size="small" onClick={handleOpenNovoEndereco}>
+                      Cadastrar Endereço
+                    </Button>
+                  }
+                >
+                  Este cliente não possui endereços cadastrados.
+                </Alert>
+              </Grid>
+            )}
 
-            {/* Endereços e Pagamento (só aparecem se um cliente ESTIVER selecionado) */}
-            {clienteSelecionado && (
+            {/* Renderiza os selects de endereço APENAS se houver endereços */}
+            {clienteSelecionado && clienteSelecionado.enderecos.length > 0 && (
               <Paper variant="outlined" sx={{ p: 2.5 }}>
                 <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
                   Informações do Pedido
@@ -414,7 +469,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
       case 1:
         return (
           <Box>
-            {/* Header da Etapa */}
+                      {/* Header da Etapa */}
             <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
               <Box
                 sx={{
@@ -437,81 +492,184 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               </Box>
             </Stack>
 
-            {/* Formulário de Adição */}
-            <Paper variant="outlined" sx={{ p: 2.5, mb: 3, bgcolor: 'grey.50' }}>
-              <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
-                Adicionar Item ao Pedido
-              </Typography>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={6}>
-                  <Autocomplete
-                    options={catalogo || []}
-                    getOptionLabel={(option) => `${option.produto.ds_produto} (${option.produto.cd_produto})`}
-                    value={produtoSelecionado}
-                    onChange={(_, newValue) => setProdutoSelecionado(newValue)}
-                    loading={isLoadingCatalogo}
-                    // --- CORREÇÃO AQUI (Bug da Key) ---
-                    renderOption={(props, option) => {
-                      // 1. Desestrutura as props para isolar a 'key'
-                      const { key, ...restProps } = props as any; 
-                      return (
-                        <Box component="li" key={key} {...restProps}> 
-                          <Box sx={{ flex: 1 }}>
-                            <Typography variant="body2" fontWeight="medium">
-                              {option.produto.ds_produto}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Código: {option.produto.cd_produto} • Preço: {formatCurrency(option.vl_preco_catalogo)}
-                            </Typography>
-                          </Box>
-                        </Box>
-                      );
+            {/* Seletor de Tabela de Preço (Catálogo) */}
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 2.5, 
+                mb: 3,
+                borderRadius: 2,
+                borderColor: 'divider'
+              }}
+            >
+              <Stack spacing={2}>
+                <Typography variant="subtitle1" fontWeight="medium">
+                  Catálogo de Preços
+                </Typography>
+                <TextField
+                  select
+                  label="Selecionar Tabela de Preços"
+                  fullWidth
+                  value={idCatalogoSelecionado || ''}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setValue('id_catalogo', val);
+                    setProdutoSelecionado(null); // Limpa seleção anterior
+                  }}
+                  slotProps={{
+                    select: {
+                      displayEmpty: true,
+                    },
+                    input: {
+                      sx: { height: '48px' }
+                    }
+                  }}
+                >
+                  <MenuItem value="" disabled>
+                    Selecione uma tabela de preços
+                  </MenuItem>
+                  {(listaCatalogos || []).map((cat) => (
+                    <MenuItem key={cat.id_catalogo} value={cat.id_catalogo}>
+                      <Box>
+                        <Typography variant="body1" fontWeight="medium">
+                          {cat.no_catalogo}
+                        </Typography>
+                        {cat.ds_descricao && (
+                          <Typography variant="caption" color="text.secondary">
+                            {cat.ds_descricao}
+                          </Typography>
+                        )}
+                      </Box>
+                    </MenuItem>
+                  ))}
+                </TextField>
+                
+                {/* Indicador de status do catálogo */}
+                {idCatalogoSelecionado && (
+                  <Alert 
+                    severity="info" 
+                    variant="filled"
+                    sx={{ 
+                      borderRadius: 1.5,
+                      '& .MuiAlert-message': {
+                        width: '100%'
+                      }
                     }}
-                    // --- FIM DA CORREÇÃO ---
-                    renderInput={(params) => (
-                      <TextField
-                        {...params}
-                        label="Buscar Produto"
-                        placeholder="Digite o nome ou código..."
-                        helperText="Selecione o produto desejado"
-                      />
-                    )}
-                  />
-                </Grid>
-                <Grid item xs={6} md={2}>
-                  <TextField
-                    label="Quantidade"
-                    type="number"
-                    value={qtdItem}
-                    onChange={(e) => setQtdItem(Math.max(1, Number(e.target.value)))}
-                    fullWidth
-                    InputProps={{ inputProps: { min: 1 } }}
-                    helperText="Qtd."
-                  />
-                </Grid>
-                <Grid item xs={6} md={2}>
-                  <TextField
-                    label="Preço Unit."
-                    value={formatCurrency(produtoSelecionado?.vl_preco_catalogo || 0)}
-                    fullWidth
-                    disabled
-                    helperText="Preço"
-                  />
-                </Grid>
-                <Grid item xs={12} md={2}>
-                  <Button
-                    variant="contained"
-                    startIcon={<AddCartIcon />}
-                    onClick={handleAddItemAoCarrinho}
-                    disabled={!produtoSelecionado || qtdItem <= 0}
-                    fullWidth
-                    size="large"
                   >
-                    Adicionar
-                  </Button>
-                </Grid>
-              </Grid>
+                    <Stack direction="row" justifyContent="space-between" alignItems="center" width="100%">
+                      <Typography variant="body2">
+                        Catálogo selecionado: <strong>{listaCatalogos?.find(c => c.id_catalogo === idCatalogoSelecionado)?.no_catalogo}</strong>
+                      </Typography>
+                      <Chip 
+                        label="Ativo" 
+                        size="small" 
+                        color="success" 
+                        variant="outlined"
+                      />
+                    </Stack>
+                  </Alert>
+                )}
+              </Stack>
             </Paper>
+
+            {/* Formulário de Adicionar Item (Só mostra se tiver catálogo) */}
+            {idCatalogoSelecionado ? (
+              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, bgcolor: 'grey.50' }}>
+                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
+                  Adicionar Item ao Pedido
+                </Typography>
+                <Grid container spacing={2} alignItems="center">
+                  <Grid item xs={12} md={6}>
+                    <Autocomplete
+                      options={catalogo || []}
+                      getOptionLabel={(option) => `${option.produto.ds_produto} (${option.produto.cd_produto})`}
+                      value={produtoSelecionado}
+                      onChange={(_, newValue) => setProdutoSelecionado(newValue)}
+                      loading={isLoadingCatalogo}
+                      renderOption={(props, option) => {
+                        const { key, ...restProps } = props as any; 
+                        return (
+                          <Box component="li" key={key} {...restProps}> 
+                            <Box sx={{ flex: 1 }}>
+                              <Typography variant="body2" fontWeight="medium">
+                                {option.produto.ds_produto}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Código: {option.produto.cd_produto} • Preço: {formatCurrency(option.vl_preco_catalogo)}
+                              </Typography>
+                            </Box>
+                          </Box>
+                        );
+                      }}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Buscar Produto"
+                          placeholder="Digite o nome ou código..."
+                          helperText="Selecione o produto desejado"
+                        />
+                      )}
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <TextField
+                      label="Quantidade"
+                      type="number"
+                      value={qtdItem}
+                      onChange={(e) => setQtdItem(Math.max(1, Number(e.target.value)))}
+                      fullWidth
+                      InputProps={{ inputProps: { min: 1 } }}
+                      helperText="Qtd."
+                    />
+                  </Grid>
+                  <Grid item xs={6} md={2}>
+                    <TextField
+                      label="Preço Unit."
+                      value={formatCurrency(produtoSelecionado?.vl_preco_catalogo || 0)}
+                      fullWidth
+                      disabled
+                      helperText="Preço"
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={2}>
+                    <Button
+                      variant="filled"
+                      startIcon={<AddCartIcon />}
+                      onClick={handleAddItemAoCarrinho}
+                      disabled={!produtoSelecionado || qtdItem <= 0}
+                      fullWidth
+                      size="large"
+                      sx={{ height: '56px' }}
+                    >
+                      Adicionar
+                    </Button>
+                  </Grid>
+                </Grid>
+              </Paper>
+            ) : (
+              <Alert 
+                severity="info" 
+                sx={{ 
+                  mb: 3,
+                  borderRadius: 2,
+                  '& .MuiAlert-message': {
+                    width: '100%'
+                  }
+                }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1.5}>
+                  <InfoIcon color="info" />
+                  <Box>
+                    <Typography variant="body2" fontWeight="medium">
+                      Selecione uma tabela de preços
+                    </Typography>
+                    <Typography variant="caption">
+                      Escolha um catálogo acima para visualizar e adicionar produtos ao pedido
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Alert>
+            )}
 
             {/* Lista de Itens */}
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
@@ -976,6 +1134,18 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         // (cliente={undefined} -> Força o modo "Criar")
       />
     )}
+    {/* --- RENDERIZA O MODAL DE ENDEREÇO --- */}
+      {modalEnderecoAberto && clienteSelecionado && (
+        <ModalFormEndereco
+          open={modalEnderecoAberto}
+          onClose={() => setModalEnderecoAberto(false)}
+          idCliente={clienteSelecionado.id_cliente}
+          // Passa os hooks do Vendedor
+          addHook={addEnderecoHook}
+          updateHook={updateEnderecoHook}
+        />
+      )}
+
   </Dialog>
 );
 };

@@ -1,5 +1,6 @@
 // /frontend/src/paginas/vendedor/Catalogo.tsx
 import React, { useState } from 'react';
+import { useAuth } from '../../contextos/AuthContext';
 import {
   Box,
   Typography,
@@ -147,6 +148,7 @@ const CardProdutoCatalogo: React.FC<{ item: IItemCatalogoVenda }> = ({ item }) =
 
 // --- Componente da Página Principal ---
 export const PaginaVendedorCatalogo: React.FC = () => {
+  const { empresaAtiva } = useAuth();
   const [idCategoriaFiltro, setIdCategoriaFiltro] = useState<number | undefined>(undefined);
   const [buscaTexto, setBuscaTexto] = useState('');
   const [viewMode, setViewMode] = useState<'cards' | 'table'>('cards');
@@ -156,12 +158,12 @@ export const PaginaVendedorCatalogo: React.FC = () => {
     isLoading: isLoadingCatalogo,
     isError,
     error,
-  } = useGetCatalogoVenda(idCategoriaFiltro);
+  } = useGetCatalogoVenda(empresaAtiva?.id_empresa, idCategoriaFiltro);
 
   const {
     data: categorias,
     isLoading: isLoadingCategorias,
-  } = useGetCategoriasVenda();
+  } = useGetCategoriasVenda(empresaAtiva?.id_empresa);
 
   // Filtro de busca
   const itensFiltrados = React.useMemo(() => {

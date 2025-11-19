@@ -20,8 +20,10 @@ import type { ClienteFormData } from '../../tipos/validacao'; // (Tipo do Zod)
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalGerenciarEnderecos } from '../../componentes/gestor/ModalGerenciarEnderecos';
 import { ModalConfirmarExclusao } from '../../componentes/layout/ModalConfirmarExclusao';
+import { useAuth } from '../../contextos/AuthContext';
 
 export const PaginaVendedorClientes: React.FC = () => {
+  const { empresaAtiva } = useAuth();
   const [modalFormAberto, setModalFormAberto] = useState(false);
   const [modalEnderecosAberto, setModalEnderecosAberto] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | undefined>(undefined);
@@ -32,7 +34,7 @@ export const PaginaVendedorClientes: React.FC = () => {
     isLoading: isLoadingClientes, 
     isError, 
     error 
-  } = useGetVendedorClientes(); // <-- USA O HOOK DO VENDEDOR
+  } = useGetVendedorClientes(empresaAtiva?.id_empresa); // <-- USA O HOOK DO VENDEDOR
 
   // --- 3. HOOK DE CRIAÇÃO DO VENDEDOR ---
   const { 

@@ -27,7 +27,7 @@ import { formatCurrency } from '../../utils/format';
 // Modal de Novo Pedido (será implementado posteriormente)
 import { ModalNovoPedido } from '../../componentes/vendedor/ModalNovoPedido';
 
-// Função para dar cor aos status (melhorada com mais variações)nn
+// Função para dar cor aos status (melhorada com mais variações)
 const getStatusChipColor = (status: string) => {
   const statusLower = status.toLowerCase();
   switch (statusLower) {
@@ -99,104 +99,107 @@ export const PaginaVendedorPedidos: React.FC = () => {
 
   // Estatísticas rápidas
   const stats = React.useMemo(() => {
-    if (!pedidos) return { total: 0, pendentes: 0, valorTotal: 0 };
-    
-    const total = pedidos.length;
-    const pendentes = pedidos.filter(p => p.st_pedido.toLowerCase() === 'pendente').length;
-    const valorTotal = pedidos.reduce((sum, pedido) => sum + (pedido.vl_total || 0), 0);
-    
-    return { total, pendentes, valorTotal };
+  if (!pedidos) return { total: 0, pendentes: 0, valorTotal: 0 };
+  
+  const total = pedidos.length;
+  const pendentes = pedidos.filter(p => p.st_pedido.toLowerCase() === 'pendente').length;
+  const valorTotal = pedidos.reduce((sum, pedido) => sum + (Number(pedido.vl_total) || 0), 0); // 🔥 CORREÇÃO
+  
+  return { total, pendentes, valorTotal };
   }, [pedidos]);
 
   // Colunas da tabela (melhoradas visualmente)
   const colunas: GridColDef<IPedidoCompleto>[] = [
-    { 
-      field: 'nr_pedido', 
-      headerName: 'Nº PEDIDO', 
-      width: 130,
-      headerAlign: 'center',
-      align: 'center',
-      valueGetter: (value, row) => row.nr_pedido || `#${row.id_pedido}`,
-      renderCell: (params) => (
-        <Typography variant="body2" fontWeight="bold" color="primary">
-          {params.value}
-        </Typography>
-      )
-    },
-    { 
-      field: 'cliente', 
-      headerName: 'CLIENTE', 
-      flex: 2,
-      minWidth: 200,
-      valueGetter: (value, row) => row.cliente?.no_razao_social || 'Cliente não informado',
-      renderCell: (params) => (
+  { 
+    field: 'nr_pedido', 
+    headerName: 'Nº PEDIDO', 
+    width: 130,
+    headerAlign: 'center',
+    align: 'center',
+    valueGetter: (value, row) => row.nr_pedido || `#${row.id_pedido}`,
+    renderCell: (params) => (
+      <Typography variant="body2" fontWeight="bold" color="primary">
+        {params.value}
+      </Typography>
+    ),
+    cellClassName: 'centerAlignCell', // 🔥 CORREÇÃO: Classe para alinhamento vertical
+  },
+  { 
+    field: 'cliente', 
+    headerName: 'CLIENTE', 
+    flex: 2,
+    minWidth: 200,
+    valueGetter: (value, row) => row.cliente?.no_razao_social || 'Cliente não informado',
+    renderCell: (params) => (
+      <Box sx={{ display: 'flex', alignItems: 'center', height: '100%' }}> {/* 🔥 CORREÇÃO: Alinhamento vertical */}
         <Box>
           <Typography variant="body2" fontWeight="medium">
             {params.value}
           </Typography>
-          {params.row.empresa?.no_empresa && (
-            <Typography variant="caption" color="text.secondary">
-              {params.row.empresa.no_empresa}
-            </Typography>
-          )}
+          {/* 🔥 REMOVIDO: Empresa representada para evitar confusão */}
         </Box>
-      )
-    },
-    { 
-      field: 'dt_pedido', 
-      headerName: 'DATA', 
-      width: 120,
-      headerAlign: 'center',
-      align: 'center',
-      valueGetter: (value) => new Date(value).toLocaleDateString('pt-BR'),
-      renderCell: (params) => (
-        <Typography variant="body2">
-          {params.value}
-        </Typography>
-      )
-    },
-    { 
-      field: 'vl_total', 
-      headerName: 'VALOR', 
-      width: 130,
-      headerAlign: 'center',
-      align: 'right',
-      valueGetter: (value) => formatCurrency(value),
-      renderCell: (params) => (
-        <Typography variant="body2" fontWeight="bold">
-          {params.value}
-        </Typography>
-      )
-    },
-    { 
-      field: 'st_pedido', 
-      headerName: 'STATUS', 
-      width: 150,
-      headerAlign: 'center',
-      align: 'center',
-      renderCell: (params) => (
-        <Chip 
-          icon={<span>{getStatusIcon(params.value)}</span>}
-          label={params.value.replace(/_/g, ' ').toLowerCase()}
-          color={getStatusChipColor(params.value) as any}
-          size="small"
-          variant="filled"
-          sx={{ 
-            textTransform: 'capitalize',
-            fontWeight: 'medium',
-            minWidth: 120
-          }}
-        />
-      )
-    },
-    {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'AÇÕES',
-      width: 120,
-      headerAlign: 'center',
-      align: 'center',
-      getActions: (params) => [
+      </Box>
+    ),
+    cellClassName: 'centerAlignCell',
+  },
+  { 
+    field: 'dt_pedido', 
+    headerName: 'DATA', 
+    width: 120,
+    headerAlign: 'center',
+    align: 'center',
+    valueGetter: (value) => new Date(value).toLocaleDateString('pt-BR'),
+    renderCell: (params) => (
+      <Typography variant="body2">
+        {params.value}
+      </Typography>
+    ),
+    cellClassName: 'centerAlignCell',
+  },
+  { 
+    field: 'vl_total', 
+    headerName: 'VALOR', 
+    width: 130,
+    headerAlign: 'center',
+    align: 'right',
+    valueGetter: (value) => formatCurrency(Number(value) || 0), // 🔥 CORREÇÃO: Garantir número
+    renderCell: (params) => (
+      <Typography variant="body2" fontWeight="bold">
+        {params.value}
+      </Typography>
+    ),
+    cellClassName: 'centerAlignCell',
+  },
+  { 
+    field: 'st_pedido', 
+    headerName: 'STATUS', 
+    width: 150,
+    headerAlign: 'center',
+    align: 'center',
+    renderCell: (params) => (
+      <Chip 
+        icon={<span>{getStatusIcon(params.value)}</span>}
+        label={params.value.replace(/_/g, ' ').toLowerCase()}
+        color={getStatusChipColor(params.value) as any}
+        size="small"
+        variant="filled"
+        sx={{ 
+          textTransform: 'capitalize',
+          fontWeight: 'medium',
+          minWidth: 120
+        }}
+      />
+    ),
+    cellClassName: 'centerAlignCell',
+  },
+  {
+    field: 'actions',
+    type: 'actions',
+    headerName: 'AÇÕES',
+    width: 120,
+    headerAlign: 'center',
+    align: 'center',
+    getActions: (params) => [
         <GridActionsCellItem
           icon={
             <Tooltip title="Ver detalhes">
@@ -228,6 +231,7 @@ export const PaginaVendedorPedidos: React.FC = () => {
           }}
         />,
       ],
+      cellClassName: 'centerAlignCell',
     },
   ];
 
@@ -244,84 +248,112 @@ export const PaginaVendedorPedidos: React.FC = () => {
 
   return (
     <Box sx={{ p: 3 }}>
-      {/* --- HEADER PRINCIPAL --- */}
+      {/* --- HEADER PRINCIPAL (MELHORADO) --- */}
       <Paper 
-        sx={{ 
-          p: 3, 
-          mb: 3, 
-          background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: 'white',
-          borderRadius: 3
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Stack direction="row" alignItems="center" spacing={2}>
-            <CartIcon sx={{ fontSize: 32 }} />
-            <Box>
-              <Typography variant="h4" fontWeight="bold">
-                Meus Pedidos
-              </Typography>
-              <Typography variant="body1" sx={{ opacity: 0.9 }}>
-                Gerencie todos os seus pedidos em um só lugar
-              </Typography>
-            </Box>
-          </Stack>
-          
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => setModalNovoPedidoOpen(true)}
-            sx={{ 
-              bgcolor: 'white', 
-              color: 'primary.main',
-              fontWeight: 'bold',
-              px: 3,
-              '&:hover': { 
-                bgcolor: 'grey.100',
-                transform: 'translateY(-2px)',
-                boxShadow: 3
-              },
-              transition: 'all 0.2s'
-            }}
-            size="large"
-          >
-            Novo Pedido
-          </Button>
-        </Stack>
+  sx={{ 
+    p: 2.5, 
+    mb: 3, 
+    background: `linear-gradient(135deg, #4A90E2 0%, #2D5FA4 100%)`,
+    color: 'white',
+    borderRadius: 3
+  }}
+>
+  <Stack 
+    direction={{ xs: 'column', sm: 'row' }} 
+    justifyContent="space-between" 
+    alignItems={{ xs: 'flex-start', sm: 'center' }}
+    spacing={2}
+    sx={{ mb: 2 }}
+  >
+    {/* Título e Botão lado a lado */}
+    <Stack direction="row" alignItems="center" spacing={2} sx={{ flex: 1 }}>
+      <CartIcon sx={{ fontSize: 28 }} />
+      <Box>
+        <Typography variant="h5" fontWeight="bold">
+          Meus Pedidos
+        </Typography>
+        <Typography variant="body2" sx={{ opacity: 0.9, fontSize: '0.875rem' }}>
+          Acompanhe seus pedidos
+        </Typography>
+      </Box>
+    </Stack>
+    
+    {/* Botão Novo Pedido mais destacado */}
+    <Button
+      variant="contained"
+      startIcon={<AddIcon />}
+      onClick={() => setModalNovoPedidoOpen(true)}
+      sx={{ 
+        bgcolor: 'white', 
+        color: 'primary.main',
+        fontWeight: 'bold',
+        px: 3,
+        py: 1,
+        '&:hover': { 
+          bgcolor: 'grey.100',
+          transform: 'translateY(-2px)',
+          boxShadow: 3
+        },
+        transition: 'all 0.2s',
+        minWidth: '140px'
+      }}
+      size="medium"
+    >
+      Novo Pedido
+    </Button>
+  </Stack>
 
-        {/* --- CARDS DE ESTATÍSTICAS --- */}
-        <Grid container spacing={2} sx={{ mt: 2 }}>
-          <Grid item xs={12} md={4}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-              <CardContent>
-                <Typography variant="h3" fontWeight="bold" textAlign="center">
+        {/* --- CARDS DE ESTATÍSTICAS (REDIMENSIONADOS) --- */}
+        <Grid container spacing={1.5}>
+          <Grid item xs={12} sm={4}>
+            <Card 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}
+            >
+              <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="h5" fontWeight="bold" textAlign="center">
                   {stats.total}
                 </Typography>
-                <Typography variant="body2" textAlign="center" sx={{ opacity: 0.9 }}>
+                <Typography variant="caption" textAlign="center" display="block" sx={{ opacity: 0.9 }}>
                   Total de Pedidos
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-              <CardContent>
-                <Typography variant="h3" fontWeight="bold" textAlign="center" color="warning.light">
+          <Grid item xs={12} sm={4}>
+            <Card 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}
+            >
+              <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="h5" fontWeight="bold" textAlign="center" color="warning.light">
                   {stats.pendentes}
                 </Typography>
-                <Typography variant="body2" textAlign="center" sx={{ opacity: 0.9 }}>
-                  Pendentes
+                <Typography variant="caption" textAlign="center" display="block" sx={{ opacity: 0.9 }}>
+                  Aguardando
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Card sx={{ bgcolor: 'rgba(255,255,255,0.1)', backdropFilter: 'blur(10px)' }}>
-              <CardContent>
-                <Typography variant="h3" fontWeight="bold" textAlign="center" color="success.light">
+          <Grid item xs={12} sm={4}>
+            <Card 
+              sx={{ 
+                bgcolor: 'rgba(255,255,255,0.15)', 
+                backdropFilter: 'blur(10px)',
+                border: '1px solid rgba(255,255,255,0.2)'
+              }}
+            >
+              <CardContent sx={{ py: 1.5, px: 2, '&:last-child': { pb: 1.5 } }}>
+                <Typography variant="h5" fontWeight="bold" textAlign="center" color="success.light">
                   {formatCurrency(stats.valorTotal)}
                 </Typography>
-                <Typography variant="body2" textAlign="center" sx={{ opacity: 0.9 }}>
+                <Typography variant="caption" textAlign="center" display="block" sx={{ opacity: 0.9 }}>
                   Valor Total
                 </Typography>
               </CardContent>
@@ -330,13 +362,17 @@ export const PaginaVendedorPedidos: React.FC = () => {
         </Grid>
       </Paper>
 
-      {/* --- BARRA DE FERRAMENTAS --- */}
+      {/* --- BARRA DE FERRAMENTAS (ALINHAMENTO CORRIGIDO) --- */}
       <Paper sx={{ p: 2, mb: 2, borderRadius: 2 }}>
-        <Stack direction="row" spacing={2} alignItems="center">
+        <Stack 
+          direction={{ xs: 'column', md: 'row' }} 
+          spacing={2} 
+          alignItems={{ xs: 'stretch', md: 'center' }}
+        >
           {/* Busca */}
           <TextField
             size="small"
-            placeholder="Buscar por cliente, pedido ou empresa..."
+            placeholder="Buscar pedido, cliente ou empresa..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             InputProps={{
@@ -346,16 +382,24 @@ export const PaginaVendedorPedidos: React.FC = () => {
                 </InputAdornment>
               ),
             }}
-            sx={{ flex: 1, maxWidth: 400 }}
+            sx={{ flex: { xs: 1, md: 0 }, minWidth: { md: 350 } }}
           />
 
           {/* Filtro de Status */}
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FilterIcon color="action" />
-            <Typography variant="body2" color="text.secondary" sx={{ minWidth: 60 }}>
-              Status:
-            </Typography>
-            <Stack direction="row" spacing={0.5} flexWrap="wrap">
+          <Stack 
+            direction="row" 
+            spacing={1} 
+            alignItems="center"
+            flexWrap="wrap"
+            sx={{ flex: 1 }}
+          >
+            <Stack direction="row" alignItems="center" spacing={0.5}>
+              <FilterIcon color="action" fontSize="small" />
+              <Typography variant="body2" color="text.secondary" sx={{ whiteSpace: 'nowrap' }}>
+                Filtrar:
+              </Typography>
+            </Stack>
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ gap: 0.5 }}>
               {statusOptions.map((status) => (
                 <Chip
                   key={status.value}
@@ -365,27 +409,34 @@ export const PaginaVendedorPedidos: React.FC = () => {
                   size="small"
                   onClick={() => setStatusFilter(status.value)}
                   clickable
+                  sx={{ 
+                    height: 28,
+                    '& .MuiChip-label': { 
+                      px: 1.5,
+                      fontSize: '0.8125rem'
+                    }
+                  }}
                 />
               ))}
             </Stack>
           </Stack>
 
           {/* Ações */}
-          <Box sx={{ flexGrow: 1 }} />
-          
-          <Tooltip title="Recarregar">
-            <IconButton onClick={() => refetch()} color="primary">
-              <RefreshIcon />
-            </IconButton>
-          </Tooltip>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <Tooltip title="Atualizar lista">
+              <IconButton onClick={() => refetch()} color="primary" size="small">
+                <RefreshIcon />
+              </IconButton>
+            </Tooltip>
 
-          <Button 
-            startIcon={<DownloadIcon />} 
-            variant="outlined"
-            size="small"
-          >
-            Exportar
-          </Button>
+            <Button 
+              startIcon={<DownloadIcon />} 
+              variant="outlined"
+              size="small"
+            >
+              Exportar
+            </Button>
+          </Stack>
         </Stack>
       </Paper>
 
@@ -424,12 +475,18 @@ export const PaginaVendedorPedidos: React.FC = () => {
           slots={{
             loadingOverlay: LinearProgress,
             noRowsOverlay: () => (
-              <Stack height="100%" alignItems="center" justifyContent="center" spacing={2}>
-                <CartIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.5 }} />
-                <Typography color="text.secondary">
+              <Stack height="100%" alignItems="center" justifyContent="center" spacing={2} sx={{ p: 3 }}>
+                <CartIcon sx={{ fontSize: 64, color: 'text.secondary', opacity: 0.3 }} />
+                <Typography variant="h6" color="text.secondary" textAlign="center">
                   {searchTerm || statusFilter !== 'todos' 
-                    ? 'Nenhum pedido encontrado com os filtros aplicados' 
-                    : 'Nenhum pedido encontrado'
+                    ? 'Nenhum pedido encontrado' 
+                    : 'Você ainda não tem pedidos'
+                  }
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  {searchTerm || statusFilter !== 'todos' 
+                    ? 'Tente ajustar os filtros de busca' 
+                    : 'Clique em "Novo Pedido" para começar'
                   }
                 </Typography>
                 {(searchTerm || statusFilter !== 'todos') && (
@@ -439,6 +496,7 @@ export const PaginaVendedorPedidos: React.FC = () => {
                       setSearchTerm('');
                       setStatusFilter('todos');
                     }}
+                    size="small"
                   >
                     Limpar Filtros
                   </Button>

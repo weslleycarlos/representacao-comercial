@@ -84,7 +84,7 @@ export const useGetVendedores = () => {
 export const useGetFormasPagamento = () => {
   const fetchFormasPgto = async (): Promise<IFormaPagamento[]> => {
     // (O backend (gestor/config.py) já retorna as globais + da org)
-    const { data } = await apiClient.get('/gestor/config/formas-pagamento');
+    const { data } = await apiClient.get('/vendedor/config/formas-pagamento');
     return data;
   };
 
@@ -290,7 +290,7 @@ export const useGetVendedorClientes = () => {
   };
 
   return useQuery({
-    queryKey: [CLIENTE_CACHE_KEY, { ativo: true }], // (Mesma chave do gestor)
+    queryKey: [CLIENTE_CACHE_KEY, { ativo: true }],
     queryFn: fetchClientes,
   });
 };

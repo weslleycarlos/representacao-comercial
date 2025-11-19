@@ -31,6 +31,7 @@ from src.routes.vendedor.pedidos import vendedor_pedidos_router
 from src.routes.vendedor.catalogo import vendedor_catalogo_router
 from src.routes.vendedor.clientes import vendedor_clientes_router
 from src.routes.vendedor.dashboard import vendedor_dashboard_router
+from src.routes.vendedor.config import vendedor_config_router
 
 
 # --- 1. CRIAÇÃO DAS TABELAS ---
@@ -220,6 +221,7 @@ app.include_router(vendedor_pedidos_router)
 app.include_router(vendedor_catalogo_router)
 app.include_router(vendedor_clientes_router)
 app.include_router(vendedor_dashboard_router)
+app.include_router(vendedor_config_router)
 
 
 # --- 7. ROTA RAIZ (Redireciona para /docs) ---

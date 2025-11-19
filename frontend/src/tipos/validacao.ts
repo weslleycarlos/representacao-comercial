@@ -161,22 +161,18 @@ export type ItemPedidoFormData = z.infer<typeof itemPedidoSchema>;
 
 // Este é o schema para o formulário INTEIRO
 export const pedidoCreateSchema = z.object({
-  // 1. Cliente (Pode ser um ID ou um Novo Cliente)
-  id_cliente: z.number().optional().nullable(),
+  // Agora é obrigatório (não pode ser nulo ou opcional)
+  id_cliente: z.number().min(1, "Selecione um cliente."),
   
-  // (Campos para cadastro rápido se id_cliente for nulo)
-  nr_cnpj: z.string().optional().or(z.literal('')),
-  no_razao_social: z.string().optional().or(z.literal('')),
+  // (Campos de cadastro rápido removidos)
   
-  // 2. Detalhes
-  id_endereco_entrega: z.number().min(1, { message: "Endereço de entrega é obrigatório." }),
-  id_endereco_cobranca: z.number().min(1, { message: "Endereço de cobrança é obrigatório." }),
-  id_forma_pagamento: z.number().min(1, { message: "Forma de pagamento é obrigatória." }),
+  id_endereco_entrega: z.number().min(1, "Endereço de entrega é obrigatório." ),
+  id_endereco_cobranca: z.number().min(1, "Endereço de cobrança é obrigatório." ),
+  id_forma_pagamento: z.number().min(1,"Forma de pagamento é obrigatória." ),
   
   pc_desconto: z.coerce.number().min(0).optional().default(0),
   ds_observacoes: z.string().optional().or(z.literal('')),
   
-  // 3. Itens (O Carrinho)
   itens: z.array(itemPedidoSchema).min(1, "O pedido deve ter pelo menos um item."),
 });
 

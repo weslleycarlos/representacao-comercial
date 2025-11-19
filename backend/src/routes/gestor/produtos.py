@@ -1,6 +1,7 @@
 # /src/routes/gestor/produtos.py
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload, selectinload
+from sqlalchemy.exc import IntegrityError
 from typing import List, Optional
 
 from src.database import get_db
@@ -140,7 +141,8 @@ def create_produto(
     db: Session = Depends(get_db)
 ):
     """ Cria um novo PRODUTO (definição, sem preço) """
-    # 1. Valida a Empresa
+    
+    # 1. Valida a Empresa (garante que ela pertence à org)
     db_empresa = db.query(models.Empresa).filter(
         models.Empresa.id_empresa == produto_in.id_empresa,
         models.Empresa.id_organizacao == id_organizacao,
@@ -151,7 +153,7 @@ def create_produto(
     # 2. Valida a Categoria (se informada)
     if produto_in.id_categoria:
         get_categoria_by_id(db, produto_in.id_categoria, id_organizacao)
-
+        
     # 3. Valida a constraint UK (Código + Empresa)
     existing_prod = db.query(models.Produto).filter(
         models.Produto.id_empresa == produto_in.id_empresa,
@@ -159,14 +161,32 @@ def create_produto(
     ).first()
     if existing_prod:
         raise HTTPException(status_code=409, detail="Este código de produto já existe para esta empresa.")
-
-    # O vl_base não existe mais no schema, então o model_dump() não o inclui
+        
     db_produto = models.Produto(**produto_in.model_dump())
+    
+    try:
+        db.add(db_produto)
+        db.commit()
+        db.refresh(db_produto)
+        
+        # --- CORREÇÃO AQUI ---
+        # Re-busca o produto usando o helper, que já faz os joins/loads
+        # necessários ('variacoes', 'categoria') para o response_model
+        return get_produto_by_id(db, db_produto.id_produto, id_organizacao)
+        # --- FIM DA CORREÇÃO ---
 
-    db.add(db_produto)
-    db.commit()
-    db.refresh(db_produto)
-    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
+    except IntegrityError as e: # Captura UK (Unique Constraint)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Falha de integridade: {e.orig}"
+        )
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e)
+        )
 
 
 @gestor_produtos_router.get("/produtos", response_model=List[ProdutoCompletoSchema])

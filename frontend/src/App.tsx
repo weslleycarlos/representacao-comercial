@@ -11,7 +11,6 @@ import { PaginaClientes } from './paginas/gestor/Clientes';
 import { PaginaCatalogo } from './paginas/gestor/Catalogo';
 import { PaginaVendedorCatalogo } from './paginas/vendedor/Catalogo';
 import { PaginaVendedorClientes } from './paginas/vendedor/Clientes';
-import { PaginaNovoPedido } from './paginas/vendedor/NovoPedido';
 import { PaginaVendedorPedidos } from './paginas/vendedor/Pedidos';
 
 // Layouts e Rotas
@@ -83,7 +82,6 @@ function App() {
           <Route path="/vendedor/dashboard" element={<h1>Dashboard do Vendedor</h1>} />
           <Route path="/vendedor/catalogo" element={<PaginaVendedorCatalogo />} />
           <Route path="/vendedor/pedidos" element={<PaginaVendedorPedidos />} />
-          <Route path="/vendedor/pedidos/novo" element={<PaginaNovoPedido />} />
           <Route path="/vendedor/clientes" element={<PaginaVendedorClientes />} />
         </Route>
       </Route>

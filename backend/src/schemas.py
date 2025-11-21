@@ -536,7 +536,7 @@ class ItemPedidoSchema(BaseModel):
     vl_total_item: Decimal
     
     # Opcional: incluir dados do produto (se precisarmos no futuro)
-    # produto: ProdutoSchema
+    produto: Optional['ProdutoSchemaSimples'] = None
     
     class ConfigDict:
         from_attributes = True

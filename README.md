@@ -18,7 +18,7 @@ Este é um projeto monorepo para um sistema SaaS multi-tenant de representação
 
 ### Frontend (React)
 * **Base:** Vite + React + TypeScript
-* **UI:** Material-UI (MUI)
+* **UI:** Material-UI (MUI) v7
 * **Roteamento:** `react-router-dom`
 * **Gerenciamento de API/Cache:** `TanStack Query` (React Query)
 * **Cliente HTTP:** `axios`
@@ -61,10 +61,10 @@ O Backend roda na porta `5000`.
     # /backend/.env
     
     # Use o caminho absoluto para o seu arquivo .db (use barras /)
-    # Ex: DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/repcom/backend/local_api.db
-    DATABASE_URL=sqlite:///C:/COLOQUE/SEU/CAMINHO/ABSOLUTO/AQUI/backend/local_api.db
+    # Ex: DATABASE_URL=sqlite:///C:/Users/SeuUsuario/Projetos/representacao-comercial/backend/local_api.db
+    DATABASE_URL=sqlite:///C:/CAMINHO/ABSOLUTO/PARA/backend/local_api.db
 
-    # Gere uma chave forte ([https://1password.com/pt-br/password-generator/](https://1password.com/pt-br/password-generator/))
+    # Gere uma chave forte
     SECRET_KEY=SUA_CHAVE_SECRETA_ALEATORIA_DE_64_CARACTERES_AQUI
     
     # Flag para rodar o seed de dados (criação de tabelas e usuários admin)
@@ -94,10 +94,7 @@ O Frontend roda na porta `5173`.
     ```bash
     npm install
     ```
-    * *Nota: Se você encontrar erros `ERESOLVE` (conflitos de dependência), use o comando alternativo:*
-        ```bash
-        npm install --legacy-peer-deps
-        ```
+    * *Nota: Se encontrar erros de dependência, use:* `npm install --legacy-peer-deps`
 
 4.  **Configurar `.env` Local:**
     Crie um arquivo chamado `.env` dentro da pasta `/frontend`.
@@ -116,47 +113,37 @@ O Frontend roda na porta `5173`.
 
 ---
 
-## 3. Rodando o Projeto (Resumo)
+## 3. Acesso e Credenciais (Ambiente Dev)
 
-1.  **Terminal 1 (Backend):** `cd backend` -> `.\venv\Scripts\activate` -> `uvicorn src.main:app --reload --port 5000`
-2.  **Terminal 2 (Frontend):** `cd frontend` -> `npm run dev`
-3.  **Acessar a Aplicação:** `http://localhost:5173`
+Ao rodar pela primeira vez com `AMBIENTE=dev`, o sistema cria automaticamente os dados iniciais.
+
+* **Super Admin:**
+    * Email: `admin@repcom.com`
+    * Senha: `admin123`
+
+* **Gestor Padrão:**
+    * Email: `gestor@repcom.com`
+    * Senha: `123456`
+
+* **Vendedor Padrão:**
+    * Email: `vendedor@repcom.com`
+    * Senha: `123456`
 
 ---
 
-## 4. Configuração de Produção (Deploy no Railway/Supabase)
+## 4. Configuração de Produção (Deploy)
 
+Para deploy (ex: Railway, Supabase, Render), siga estas configurações nas variáveis de ambiente do serviço:
 
-O deploy em produção é mais simples, pois depende apenas das variáveis de ambiente e do comando de start.
+### Variáveis de Ambiente (Environment Variables)
 
-### A. Preparação do `src/main.py` (IMPORTANTE!)
+* **`DATABASE_URL`**: String de conexão do PostgreSQL (ex: `postgresql://user:pass@host:port/db`).
+* **`SECRET_KEY`**: Uma chave secreta forte e única para produção.
+* **`AMBIENTE`**: Defina como `prod` (ou deixe vazio). **NÃO** use `dev`, para evitar recriar o banco de dados a cada deploy.
 
-O nosso `main.py` atualmente executa `Base.metadata.create_all()` e `seed_initial_data()` toda vez que inicia. Isso é ótimo para desenvolvimento, mas **terrível** para produção (você não quer recriar tabelas ou o usuário admin a cada deploy).
+### Comando de Inicialização (Start Command)
 
-Precisamos condicionar isso à variável `AMBIENTE=dev` que definimos no `.env` local.
+O comando para iniciar o backend em produção deve usar o Gunicorn:
 
-**Substitua** as seções 4 e 5 do seu `src/main.py`:
-
-```python
-# /src/main.py
-# ... (importações) ...
-import os # <-- Adicione esta importação
-
-# ... (código do app = FastAPI()) ...
-# ... (código do CORS) ...
-
-# --- 4. CRIAÇÃO DE TABELAS E SEED (APENAS EM DEV) ---
-# Verifica se estamos em ambiente de desenvolvimento (definido no .env local)
-if os.getenv("AMBIENTE") == "dev":
-    print("MODO DE DESENVOLVIMENTO: Criando tabelas (se não existirem)...")
-    Base.metadata.create_all(bind=engine)
-    print("Tabelas verificadas.")
-    
-    # Executa a função de seed
-    seed_initial_data()
-else:
-    print("MODO DE PRODUÇÃO: Conectando ao banco de dados existente.")
-
-
-# --- 5. INCLUSÃO DAS ROTAS ---
-# ... (todo o seu app.include_router(...)) ...
+```bash
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker src.main:app

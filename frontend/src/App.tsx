@@ -12,6 +12,7 @@ import { PaginaCatalogo } from './paginas/gestor/Catalogo';
 import { PaginaVendedorCatalogo } from './paginas/vendedor/Catalogo';
 import { PaginaVendedorClientes } from './paginas/vendedor/Clientes';
 import { PaginaVendedorPedidos } from './paginas/vendedor/Pedidos';
+import { PaginaVendedorDashboard } from './paginas/vendedor/DashboardVendedor';
 
 // Layouts e Rotas
 import { RotaProtegida } from './rotas/RotaProtegida';
@@ -79,7 +80,7 @@ function App() {
       {/* --- Rotas do VENDEDOR --- */}
       <Route element={<RotaProtegida permissoes={['vendedor']} />}>
         <Route element={<LayoutVendedor />}>
-          <Route path="/vendedor/dashboard" element={<h1>Dashboard do Vendedor</h1>} />
+          <Route path="/vendedor/dashboard" element={<PaginaVendedorDashboard />} />
           <Route path="/vendedor/catalogo" element={<PaginaVendedorCatalogo />} />
           <Route path="/vendedor/pedidos" element={<PaginaVendedorPedidos />} />
           <Route path="/vendedor/clientes" element={<PaginaVendedorClientes />} />

@@ -1,12 +1,14 @@
 // /frontend/src/paginas/vendedor/Clientes.tsx
 import React, { useState } from 'react';
 import {
-  Box, Button, Typography, Paper, Alert, LinearProgress, Chip
+  Box, Button, Typography, Paper, Alert, LinearProgress, Chip,
+  Stack,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon, LocationOn as LocationOnIcon } from '@mui/icons-material';
 
-// --- 1. IMPORTAÇÕES CORRIGIDAS ---
 import { 
   useGetVendedorClientes, 
   useCreateVendedorCliente,
@@ -14,29 +16,29 @@ import {
   useAddVendedorEndereco,
   useUpdateVendedorEndereco,
   useDeleteVendedorEndereco
-} from '../../api/servicos/vendedorService'; // (Hooks do Vendedor)
+} from '../../api/servicos/vendedorService';
 import type { IClienteCompleto } from '../../tipos/schemas';
-import type { ClienteFormData } from '../../tipos/validacao'; // (Tipo do Zod)
+import type { ClienteFormData } from '../../tipos/validacao';
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalGerenciarEnderecos } from '../../componentes/gestor/ModalGerenciarEnderecos';
-import { ModalConfirmarExclusao } from '../../componentes/layout/ModalConfirmarExclusao';
 import { useAuth } from '../../contextos/AuthContext';
 
 export const PaginaVendedorClientes: React.FC = () => {
   const { empresaAtiva } = useAuth();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  
   const [modalFormAberto, setModalFormAberto] = useState(false);
   const [modalEnderecosAberto, setModalEnderecosAberto] = useState(false);
   const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | undefined>(undefined);
 
-  // --- 2. HOOK CORRIGIDO ---
   const { 
     data: clientes, 
     isLoading: isLoadingClientes, 
     isError, 
     error 
-  } = useGetVendedorClientes(empresaAtiva?.id_empresa); // <-- USA O HOOK DO VENDEDOR
+  } = useGetVendedorClientes(empresaAtiva?.id_empresa);
 
-  // --- 3. HOOK DE CRIAÇÃO DO VENDEDOR ---
   const { 
     mutate: createCliente, 
     isPending: isCreating, 
@@ -48,28 +50,48 @@ export const PaginaVendedorClientes: React.FC = () => {
   const updateEnderecoHook = useUpdateVendedorEndereco();
   const deleteEnderecoHook = useDeleteVendedorEndereco();
 
+  // --- COLUNAS CORRIGIDAS (SEM FORMATAÇÃO DUPLICADA DO CNPJ) ---
   const colunas: GridColDef[] = [
-    // ... (Definições de colunas) ...
-    { field: 'no_razao_social', headerName: 'Razão Social', flex: 2 },
-    { field: 'no_fantasia', headerName: 'Nome Fantasia', flex: 1 },
-    { field: 'nr_cnpj', headerName: 'CNPJ', flex: 1 },
+    { 
+      field: 'no_razao_social', 
+      headerName: 'Razão Social', 
+      flex: 2,
+      minWidth: 200
+    },
+    { 
+      field: 'no_fantasia', 
+      headerName: 'Nome Fantasia', 
+      flex: 1,
+      minWidth: 150
+    },
+    { 
+      field: 'nr_cnpj', 
+      headerName: 'CNPJ', 
+      flex: 1,
+      minWidth: 150,
+      // REMOVI o valueFormatter - o backend já deve enviar formatado
+      // Se precisar formatar, verifique como estava antes
+    },
     {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      flex: 1,
+      width: 120,
+      cellClassName: 'actions',
       getActions: (params) => [
         <GridActionsCellItem
           icon={<LocationOnIcon />}
-          label="Ver Endereços"
-          onClick={() => handleOpenEnderecos(params.row as IClienteCompleto)} // <-- ATUALIZE AQUI
+          label="Gerenciar Endereços"
+          onClick={() => handleOpenEnderecos(params.row as IClienteCompleto)}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
       ],
     },
   ];
 
   const handleOpenCreate = () => {
-    // setClienteSelecionado(undefined);
     setModalFormAberto(true);
   };
   
@@ -77,10 +99,13 @@ export const PaginaVendedorClientes: React.FC = () => {
     setModalFormAberto(false);
   };
   
-  // 4. Handler 'onSave' para o VENDEDOR
   const handleSaveCliente = (data: ClienteFormData, options: { onSuccess: () => void }) => {
-    // Vendedor SÓ PODE CRIAR
-    createCliente(data, options);
+    createCliente(data, {
+      onSuccess: () => {
+        options.onSuccess();
+        handleCloseModal();
+      }
+    });
   };
 
   const handleOpenEnderecos = (cliente: IClienteCompleto) => {
@@ -88,24 +113,68 @@ export const PaginaVendedorClientes: React.FC = () => {
     setModalEnderecosAberto(true);
   };
 
+  const handleCloseEnderecos = () => {
+    setModalEnderecosAberto(false);
+    setClienteSelecionado(undefined);
+  };
+
   return (
-    <Box>
-      {/* ... (Título e Botão) ... */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Clientes
-        </Typography>
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* HEADER RESPONSIVO */}
+      <Box sx={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 2
+      }}>
+        <Box>
+          <Typography variant="h4" fontWeight="bold" gutterBottom={isMobile}>
+            Meus Clientes
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Gerencie os clientes da sua carteira
+          </Typography>
+        </Box>
+        
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleOpenCreate}
+          size={isMobile ? "medium" : "large"}
+          fullWidth={isMobile}
+          sx={{ 
+            minWidth: { xs: '100%', sm: 'auto' },
+            whiteSpace: 'nowrap'
+          }}
         >
-          Novo Cliente (Cadastro Rápido)
+          Novo Cliente
         </Button>
       </Box>
 
-      {/* ... (Erro e Tabela) ... */}
-      <Paper elevation={0} sx={{ height: '75vh', width: '100%', border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+      {/* ALERTAS DE ERRO */}
+      {isError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Erro ao carregar clientes: {(error as any)?.message || 'Erro desconhecido'}
+        </Alert>
+      )}
+
+      {createError && (
+        <Alert severity="error" sx={{ mb: 2 }}>
+          Erro ao criar cliente: {(createError as any)?.message || 'Erro desconhecido'}
+        </Alert>
+      )}
+
+      {/* DATA GRID */}
+      <Paper elevation={0} sx={{ 
+        height: { xs: '60vh', md: '70vh' }, 
+        width: '100%', 
+        border: '1px solid', 
+        borderColor: 'divider', 
+        borderRadius: 2,
+        overflow: 'hidden'
+      }}>
         <DataGrid
           rows={clientes || []}
           columns={colunas}
@@ -113,30 +182,40 @@ export const PaginaVendedorClientes: React.FC = () => {
           loading={isLoadingClientes}
           slots={{ loadingOverlay: LinearProgress }}
           pageSizeOptions={[10, 25, 50]}
-          initialState={{ pagination: { paginationModel: { pageSize: 10 } } }}
-          sx={{ border: 0 }}
+          initialState={{ 
+            pagination: { paginationModel: { pageSize: 10 } } 
+          }}
+          sx={{ 
+            border: 0,
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid',
+              borderColor: 'divider',
+            },
+            '& .MuiDataGrid-columnHeaders': {
+              backgroundColor: 'action.hover',
+              borderBottom: '2px solid',
+              borderColor: 'divider',
+            }
+          }}
+          disableRowSelectionOnClick
         />
       </Paper>
       
-      {/* --- 5. MODAL CORRIGIDO --- */}
-      {modalFormAberto && (
-        <ModalFormCliente
-          open={modalFormAberto}
-          onClose={handleCloseModal}
-          cliente={undefined} // Vendedor só cria
-          // Passa os hooks corretos do VENDEDOR
-          onSave={handleSaveCliente}
-          isSaving={isCreating}
-          mutationError={createError}
-        />
-      )}
+      {/* MODAIS */}
+      <ModalFormCliente
+        open={modalFormAberto}
+        onClose={handleCloseModal}
+        cliente={undefined}
+        onSave={handleSaveCliente}
+        isSaving={isCreating}
+        mutationError={createError}
+      />
+      
       {clienteSelecionado && (
         <ModalGerenciarEnderecos
           open={modalEnderecosAberto}
-          onClose={() => setModalEnderecosAberto(false)}
+          onClose={handleCloseEnderecos}
           cliente={clienteSelecionado}
-          
-          // Passa os hooks específicos do VENDEDOR
           getEnderecosHook={getEnderecosHook}
           addEnderecoHook={addEnderecoHook}
           updateEnderecoHook={updateEnderecoHook}

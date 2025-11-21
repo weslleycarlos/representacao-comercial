@@ -26,8 +26,8 @@ const VENDEDOR_LISTA_CATALOGOS_KEY = (idEmpresa?: number) => ['listaCatalogosVen
 const VENDEDOR_CATALOGO_KEY = (idEmpresa?: number) => ['catalogoVendedor', idEmpresa];
 const VENDEDOR_CATEGORIAS_KEY = (idEmpresa?: number) => ['categoriasVendedor', idEmpresa];
 const CLIENTE_CACHE_KEY = (idEmpresa?: number) => ['clientesVendedor', idEmpresa];
-const VENDEDOR_PEDIDOS_KEY = (idEmpresa?: number) => ['pedidosVendedor', idEmpresa];
-const VENDEDOR_PEDIDO_DETALHE_KEY = (id: number) => ['pedidosVendedor', id];
+const VENDEDOR_PEDIDOS_KEY = (idEmpresa?: number) => ['pedidosVendedor', 'lista', idEmpresa];
+const VENDEDOR_PEDIDO_DETALHE_KEY = (id: number) => ['pedidosVendedor', 'detalhe', id];
 const VENDEDOR_FORMAS_PGTO_KEY = 'formasPagamentoVendedor';
 const VENDEDOR_ENDERECO_CACHE_KEY = (idCliente: number) => ['vendedor', 'enderecos', idCliente];
 
@@ -226,16 +226,15 @@ export const useGetCategoriasVenda = (idEmpresaAtiva?: number) => {
  */
 export const useGetMeusPedidos = (idEmpresaAtiva?: number) => {
   const fetchPedidos = async (): Promise<IPedidoCompleto[]> => {
-    // O backend já filtra pelo token, mas o frontend precisa do ID para o cache
     const { data } = await apiClient.get('/vendedor/pedidos/');
     return data;
   };
 
   return useQuery({
-    // A chave agora muda quando a empresa muda!
+    // Usa a nova chave 'lista'
     queryKey: VENDEDOR_PEDIDOS_KEY(idEmpresaAtiva), 
     queryFn: fetchPedidos,
-    enabled: !!idEmpresaAtiva, // Só busca se tiver empresa selecionada
+    enabled: !!idEmpresaAtiva,
   });
 };
 
@@ -249,25 +248,20 @@ export const useGetMeuPedidoDetalhe = (idPedido: number) => {
   };
 
   return useQuery({
-    queryKey: VENDEDOR_PEDIDO_DETALHE_KEY(idPedido),
+    // Usa a nova chave 'detalhe'
+    queryKey: VENDEDOR_PEDIDO_DETALHE_KEY(idPedido), 
     queryFn: fetchPedido,
-    enabled: !!idPedido, // Só executa se o ID for fornecido
+    enabled: !!idPedido,
   });
 };
 
 /**
  * Hook (useMutation) para CRIAR um novo Pedido.
- * (O 'PedidoCreateFormData' não deve conter 'vl_unitario')
  */
 export const useCreatePedido = () => {
   const queryClient = useQueryClient();
 
   const createPedido = async (pedidoData: PedidoCreateFormData): Promise<IPedidoCompleto> => {
-    // A API (backend) espera o formato PedidoCreate (sem dados extras de UI)
-    // Nós já limpamos o vl_unitario do schema da API (backend)
-    
-    // (Podemos precisar limpar dados extras do formulário aqui, se o Zod não o fizer)
-    
     const { data } = await apiClient.post('/vendedor/pedidos/', pedidoData);
     return data;
   };
@@ -275,7 +269,8 @@ export const useCreatePedido = () => {
   return useMutation({
     mutationFn: createPedido,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [VENDEDOR_PEDIDOS_KEY] });
+      // Invalida TUDO que começa com 'pedidosVendedor' (listas e detalhes)
+      queryClient.invalidateQueries({ queryKey: ['pedidosVendedor'] });
     },
   });
 };
@@ -297,8 +292,9 @@ export const useCancelarPedido = () => {
   return useMutation({
     mutationFn: cancelarPedido,
     onSuccess: (data) => {
-      // Atualiza o cache da lista E o cache do detalhe
-      queryClient.invalidateQueries({ queryKey: [VENDEDOR_PEDIDOS_KEY] });
+      // Invalida a lista geral
+      queryClient.invalidateQueries({ queryKey: ['pedidosVendedor'] });
+      // Atualiza o cache específico do detalhe deste pedido
       queryClient.setQueryData(VENDEDOR_PEDIDO_DETALHE_KEY(data.id_pedido), data);
     },
   });

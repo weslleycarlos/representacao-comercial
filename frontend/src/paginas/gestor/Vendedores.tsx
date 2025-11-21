@@ -1,9 +1,10 @@
 // /frontend/src/paginas/gestor/Vendedores.tsx
-// Versão ajustada - UX e Layout melhorados
-
 import React, { useState, useEffect } from 'react';
 import {
-  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip, Badge
+  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip, Badge,
+  Stack,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon, Link as LinkIcon } from '@mui/icons-material';
@@ -17,6 +18,9 @@ export const PaginaVendedores: React.FC = () => {
   const [modalFormAberto, setModalFormAberto] = useState(false);
   const [vendedorSelecionado, setVendedorSelecionado] = useState<IVendedor | undefined>(undefined);
   const [modalVincularAberto, setModalVincularAberto] = useState(false);
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const { 
     data: vendedores, 
@@ -56,6 +60,7 @@ export const PaginaVendedores: React.FC = () => {
       headerName: 'Telefone', 
       flex: 1,
       minWidth: 130,
+      // SEM formatação - valor já vem formatado do banco
     },
     { 
       field: 'empresas_vinculadas', 
@@ -64,18 +69,29 @@ export const PaginaVendedores: React.FC = () => {
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => {
-        const count = params.row.empresas_vinculadas.length || 0;
+        const count = params.row.empresas_vinculadas?.length || 0;
         return (
           <Badge 
             badgeContent={count} 
             color={count > 0 ? "primary" : "default"}
             max={99}
+            sx={{
+              '& .MuiBadge-badge': {
+                fontSize: '0.7rem',
+                height: '18px',
+                minWidth: '18px',
+              }
+            }}
           >
             <Chip 
               label={count === 0 ? "Nenhuma" : `${count}`}
               size="small"
               color={count > 0 ? "primary" : "default"}
               variant={count > 0 ? "filled" : "outlined"}
+              sx={{ 
+                fontWeight: 600,
+                minWidth: 60
+              }}
             />
           </Badge>
         );
@@ -92,7 +108,10 @@ export const PaginaVendedores: React.FC = () => {
           label={params.value ? "Ativo" : "Inativo"} 
           color={params.value ? "success" : "default"} 
           size="small"
-          sx={{ fontWeight: 500 }}
+          sx={{ 
+            fontWeight: 600,
+            minWidth: 70
+          }}
         />
       )
     },
@@ -100,27 +119,37 @@ export const PaginaVendedores: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      width: 100,
+      width: 120,
+      align: 'center',
+      headerAlign: 'center',
       getActions: (params) => [
         <GridActionsCellItem
+          key="edit"
           icon={
-            <Tooltip title="Editar">
+            <Tooltip title="Editar vendedor">
               <EditIcon />
             </Tooltip>
           }
           label="Editar Vendedor"
           onClick={() => handleOpenEdit(params.row as IVendedor)}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
         <GridActionsCellItem
+          key="link"
           icon={
-            <Tooltip title="Vincular Empresas">
+            <Tooltip title="Vincular empresas">
               <LinkIcon />
             </Tooltip>
           }
           label="Vincular Empresas"
           onClick={() => handleOpenVincular(params.row as IVendedor)}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
       ],
     },
@@ -153,13 +182,15 @@ export const PaginaVendedores: React.FC = () => {
   };
 
   return (
-    <Box>
-      {/* Header */}
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* Header Responsivo */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 3 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 2
       }}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -174,6 +205,11 @@ export const PaginaVendedores: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={handleOpenCreate}
           size="large"
+          fullWidth={isMobile}
+          sx={{ 
+            minWidth: { xs: '100%', sm: 'auto' },
+            whiteSpace: 'nowrap'
+          }}
         >
           Novo Vendedor
         </Button>
@@ -181,8 +217,8 @@ export const PaginaVendedores: React.FC = () => {
 
       {/* Estado de Erro */}
       {isError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          Erro ao carregar vendedores: {(error as any).message}
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          Erro ao carregar vendedores: {(error as any)?.message || 'Erro desconhecido'}
         </Alert>
       )}
 
@@ -190,12 +226,13 @@ export const PaginaVendedores: React.FC = () => {
       <Paper 
         elevation={0} 
         sx={{ 
-          height: 'calc(100vh - 240px)',
-          minHeight: 500,
+          height: { xs: '60vh', md: 'calc(100vh - 240px)' },
+          minHeight: 400,
           width: '100%',
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 2,
+          overflow: 'hidden'
         }}
       >
         <DataGrid
@@ -205,23 +242,47 @@ export const PaginaVendedores: React.FC = () => {
           loading={isLoadingVendedores}
           slots={{
             loadingOverlay: LinearProgress,
+            noRowsOverlay: () => (
+              <Stack height="100%" alignItems="center" justifyContent="center" spacing={1} p={3}>
+                <Box sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }}>
+                  👨‍💼
+                </Box>
+                <Typography variant="h6" color="text.secondary" textAlign="center">
+                  Nenhum vendedor cadastrado
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Clique em "Novo Vendedor" para adicionar o primeiro
+                </Typography>
+              </Stack>
+            ),
           }}
           initialState={{
             pagination: { 
               paginationModel: { pageSize: 25 } 
             },
+            sorting: {
+              sortModel: [{ field: 'no_completo', sort: 'asc' }]
+            }
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
           sx={{
             border: 0,
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'background.default',
-              borderRadius: 0,
+              backgroundColor: 'action.hover',
+              borderBottom: '2px solid',
+              borderColor: 'divider',
+            },
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid',
+              borderColor: 'divider',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'action.hover',
             },
+            '& .MuiDataGrid-virtualScroller': {
+              backgroundColor: 'background.paper'
+            }
           }}
         />
       </Paper>

@@ -511,8 +511,8 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               <Stack spacing={2}>
                 <TextField
                   select
-                  label="Tabela de Preços"
                   fullWidth
+                  label="Tabela de Preço"
                   value={idCatalogoSelecionado || ''}
                   onChange={(e) => {
                     const val = Number(e.target.value);
@@ -527,7 +527,6 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       sx: { height: '48px' }
                     }
                   }}
-                  helperText="Selecione a tabela de preços para visualizar os produtos"
                 >
                   <MenuItem value="" disabled>
                     Selecione uma tabela de preços
@@ -538,11 +537,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                         <Typography variant="body1" fontWeight="medium">
                           {cat.no_catalogo}
                         </Typography>
-                        {cat.ds_descricao && (
-                          <Typography variant="caption" color="text.secondary">
-                            {cat.ds_descricao}
-                          </Typography>
-                        )}
+
                       </Box>
                     </MenuItem>
                   ))}

@@ -1,9 +1,10 @@
 // /frontend/src/paginas/gestor/Clientes.tsx
-// Versão ajustada - UX e Layout melhorados
-
 import React, { useState } from 'react';
 import {
-  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip
+  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip,
+  Stack,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { 
@@ -14,8 +15,18 @@ import {
   Delete as DeleteIcon 
 } from '@mui/icons-material';
 
-import { useGetClientes, useDeleteCliente, useCreateCliente, useUpdateCliente, useGetEnderecosPorCliente, useAddEndereco, useUpdateEndereco, useDeleteEndereco } from '../../api/servicos/clienteService';
+import { 
+  useGetClientes, 
+  useDeleteCliente, 
+  useCreateCliente, 
+  useUpdateCliente, 
+  useGetEnderecosPorCliente, 
+  useAddEndereco, 
+  useUpdateEndereco, 
+  useDeleteEndereco 
+} from '../../api/servicos/clienteService';
 import type { IClienteCompleto } from '../../tipos/schemas';
+import type { ClienteFormData } from '../../tipos/validacao'; // IMPORT ADICIONADO
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalConfirmarExclusao } from '../../componentes/layout/ModalConfirmarExclusao';
 import { ModalGerenciarEnderecos } from '../../componentes/gestor/ModalGerenciarEnderecos';
@@ -28,6 +39,10 @@ export const PaginaClientes: React.FC = () => {
   const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | undefined>(undefined);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
+  
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const getEnderecosHook = useGetEnderecosPorCliente(clienteSelecionado?.id_cliente || 0);
   const addEnderecoHook = useAddEndereco();
   const updateEnderecoHook = useUpdateEndereco();
@@ -53,6 +68,7 @@ export const PaginaClientes: React.FC = () => {
       createCliente(data, options);
     }
   };
+
   // Definição das Colunas
   const colunas: GridColDef[] = [
     { 
@@ -72,6 +88,7 @@ export const PaginaClientes: React.FC = () => {
       headerName: 'CNPJ', 
       flex: 1.2,
       minWidth: 140,
+      // SEM formatação - valor já vem formatado do banco
     },
     { 
       field: 'ds_email', 
@@ -84,6 +101,7 @@ export const PaginaClientes: React.FC = () => {
       headerName: 'Telefone', 
       flex: 1,
       minWidth: 130,
+      // SEM formatação - valor já vem formatado do banco
     },
     { 
       field: 'fl_ativo', 
@@ -96,7 +114,10 @@ export const PaginaClientes: React.FC = () => {
           label={params.value ? "Ativo" : "Inativo"} 
           color={params.value ? "success" : "default"} 
           size="small"
-          sx={{ fontWeight: 500 }}
+          sx={{ 
+            fontWeight: 600,
+            minWidth: 70
+          }}
         />
       )
     },
@@ -104,41 +125,56 @@ export const PaginaClientes: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      width: 140,
+      width: 160,
+      align: 'center',
+      headerAlign: 'center',
       getActions: (params) => [
         <GridActionsCellItem
+          key="edit"
           icon={
-            <Tooltip title="Editar">
+            <Tooltip title="Editar cliente">
               <EditIcon />
             </Tooltip>
           }
           label="Editar Cliente"
           onClick={() => handleOpenEdit(params.row as IClienteCompleto)}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
         <GridActionsCellItem
+          key="enderecos"
           icon={
-            <Tooltip title="Endereços">
+            <Tooltip title="Gerenciar endereços">
               <LocationOnIcon />
             </Tooltip>
           }
           label="Gerenciar Endereços"
           onClick={() => handleOpenEnderecos(params.row as IClienteCompleto)}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
         <GridActionsCellItem
+          key="contatos"
           icon={
-            <Tooltip title="Contatos">
+            <Tooltip title="Gerenciar contatos">
               <ContactsIcon />
             </Tooltip>
           }
           label="Gerenciar Contatos"
           onClick={() => handleOpenContatos(params.row as IClienteCompleto)}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
         />,
         <GridActionsCellItem
+          key="delete"
           icon={
-            <Tooltip title={params.row.fl_ativo ? "Desativar" : "Cliente já inativo"}>
+            <Tooltip title={params.row.fl_ativo ? "Desativar cliente" : "Cliente já inativo"}>
               <DeleteIcon />
             </Tooltip>
           }
@@ -146,6 +182,12 @@ export const PaginaClientes: React.FC = () => {
           onClick={() => handleOpenDelete(params.id as number)}
           disabled={!params.row.fl_ativo}
           showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' },
+            '&.Mui-disabled': {
+              opacity: 0.3
+            }
+          }}
         />,
       ],
     },
@@ -198,14 +240,26 @@ export const PaginaClientes: React.FC = () => {
     setIdParaExcluir(null);
   };
 
+  const handleCloseEnderecos = () => {
+    setModalEnderecosAberto(false);
+    setClienteSelecionado(undefined);
+  };
+
+  const handleCloseContatos = () => {
+    setModalContatosAberto(false);
+    setClienteSelecionado(undefined);
+  };
+
   return (
-    <Box>
-      {/* Header */}
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* Header Responsivo */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 3 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 2
       }}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -220,6 +274,11 @@ export const PaginaClientes: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={handleOpenCreate}
           size="large"
+          fullWidth={isMobile}
+          sx={{ 
+            minWidth: { xs: '100%', sm: 'auto' },
+            whiteSpace: 'nowrap'
+          }}
         >
           Novo Cliente
         </Button>
@@ -227,8 +286,8 @@ export const PaginaClientes: React.FC = () => {
 
       {/* Estado de Erro */}
       {isError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          Erro ao carregar clientes: {(error as any).message}
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          Erro ao carregar clientes: {(error as any)?.message || 'Erro desconhecido'}
         </Alert>
       )}
 
@@ -236,12 +295,13 @@ export const PaginaClientes: React.FC = () => {
       <Paper 
         elevation={0} 
         sx={{ 
-          height: 'calc(100vh - 240px)',
-          minHeight: 500,
+          height: { xs: '60vh', md: 'calc(100vh - 240px)' },
+          minHeight: 400,
           width: '100%',
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 2,
+          overflow: 'hidden'
         }}
       >
         <DataGrid
@@ -251,23 +311,47 @@ export const PaginaClientes: React.FC = () => {
           loading={isLoadingClientes}
           slots={{
             loadingOverlay: LinearProgress,
+            noRowsOverlay: () => (
+              <Stack height="100%" alignItems="center" justifyContent="center" spacing={1} p={3}>
+                <Box sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }}>
+                  👥
+                </Box>
+                <Typography variant="h6" color="text.secondary" textAlign="center">
+                  Nenhum cliente cadastrado
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Clique em "Novo Cliente" para adicionar o primeiro
+                </Typography>
+              </Stack>
+            ),
           }}
           initialState={{
             pagination: { 
               paginationModel: { pageSize: 25 } 
             },
+            sorting: {
+              sortModel: [{ field: 'no_razao_social', sort: 'asc' }]
+            }
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
           sx={{
             border: 0,
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'background.default',
-              borderRadius: 0,
+              backgroundColor: 'action.hover',
+              borderBottom: '2px solid',
+              borderColor: 'divider',
+            },
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid',
+              borderColor: 'divider',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'action.hover',
             },
+            '& .MuiDataGrid-virtualScroller': {
+              backgroundColor: 'background.paper'
+            }
           }}
         />
       </Paper>
@@ -278,7 +362,6 @@ export const PaginaClientes: React.FC = () => {
           open={modalFormAberto}
           onClose={handleCloseModal}
           cliente={clienteSelecionado}
-          // Passa os hooks corretos do GESTOR
           onSave={handleSaveCliente}
           isSaving={isCreating || isUpdating}
           mutationError={createError || updateError}
@@ -294,23 +377,25 @@ export const PaginaClientes: React.FC = () => {
         mensagem="Tem certeza que deseja desativar este cliente? Esta ação pode ser revertida posteriormente."
         isLoading={isDeleting}
       />
+
+      {/* Modal de Gerenciar Endereços */}
       {clienteSelecionado && (
         <ModalGerenciarEnderecos
           open={modalEnderecosAberto}
-          onClose={() => setModalEnderecosAberto(false)}
+          onClose={handleCloseEnderecos}
           cliente={clienteSelecionado}
-          
-          // Passa os hooks específicos do GESTOR
           getEnderecosHook={getEnderecosHook}
           addEnderecoHook={addEnderecoHook}
           updateEnderecoHook={updateEnderecoHook}
           deleteEnderecoHook={deleteEnderecoHook}
         />
       )}
+
+      {/* Modal de Gerenciar Contatos */}
       {clienteSelecionado && (
         <ModalGerenciarContatos
           open={modalContatosAberto}
-          onClose={() => setModalContatosAberto(false)}
+          onClose={handleCloseContatos}
           cliente={clienteSelecionado}
         />
       )}

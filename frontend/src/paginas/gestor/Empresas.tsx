@@ -1,6 +1,4 @@
 // /frontend/src/paginas/gestor/Empresas.tsx
-// Versão ajustada - UX e Layout melhorados
-
 import React, { useState } from 'react';
 import {
   Box,
@@ -10,7 +8,10 @@ import {
   Alert,
   LinearProgress,
   Chip,
-  Tooltip
+  Tooltip,
+  Stack,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
 import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
@@ -26,6 +27,9 @@ export const PaginaEmpresas: React.FC = () => {
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
 
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const { 
     data: empresas, 
     isLoading: isLoadingEmpresas, 
@@ -36,88 +40,116 @@ export const PaginaEmpresas: React.FC = () => {
   const { mutate: deleteEmpresa, isPending: isDeleting } = useDeleteEmpresa();
   
   // Definição das Colunas
-  const colunas: GridColDef[] = [
-    { 
-      field: 'no_empresa', 
-      headerName: 'Nome da Empresa', 
-      flex: 2,
-      minWidth: 200,
-    },
-    { 
-      field: 'nr_cnpj', 
-      headerName: 'CNPJ', 
-      flex: 1.2,
-      minWidth: 140,
-    },
-    { 
-      field: 'ds_email_contato', 
-      headerName: 'E-mail', 
-      flex: 1.5,
-      minWidth: 180,
-    },
-    { 
-      field: 'nr_telefone_contato', 
-      headerName: 'Telefone', 
-      flex: 1,
-      minWidth: 130,
-    },
-    { 
-      field: 'pc_comissao_padrao', 
-      headerName: 'Comissão', 
-      width: 110,
-      align: 'center',
-      headerAlign: 'center',
-      renderCell: (params) => (
-        <Typography variant="body2" fontWeight={500}>
-          {params.value}%
-        </Typography>
-      )
-    },
-    { 
-      field: 'fl_ativa', 
-      headerName: 'Status', 
-      width: 100,
-      align: 'center',
-      headerAlign: 'center',
-      renderCell: (params) => (
-        <Chip 
-          label={params.value ? "Ativa" : "Inativa"} 
-          color={params.value ? "success" : "default"} 
-          size="small"
-          sx={{ fontWeight: 500 }}
-        />
-      )
-    },
-    {
-      field: 'actions',
-      type: 'actions',
-      headerName: 'Ações',
-      width: 100,
-      getActions: (params) => [
-        <GridActionsCellItem
-          icon={
-            <Tooltip title="Editar">
-              <EditIcon />
-            </Tooltip>
+ // /frontend/src/paginas/gestor/Empresas.tsx
+
+// /frontend/src/paginas/gestor/Empresas.tsx
+
+// Definição das Colunas CORRIGIDA - SEM valueFormatter:
+const colunas: GridColDef[] = [
+  { 
+    field: 'no_empresa', 
+    headerName: 'Nome da Empresa', 
+    flex: 2,
+    minWidth: 200,
+  },
+  { 
+    field: 'nr_cnpj', 
+    headerName: 'CNPJ', 
+    flex: 1.2,
+    minWidth: 140,
+    // REMOVIDO valueFormatter - o valor já vem formatado do banco
+  },
+  { 
+    field: 'ds_email_contato', 
+    headerName: 'E-mail', 
+    flex: 1.5,
+    minWidth: 180,
+
+  },
+  { 
+    field: 'nr_telefone_contato', 
+    headerName: 'Telefone', 
+    flex: 1,
+    minWidth: 130,
+    // REMOVIDO valueFormatter - o valor já vem formatado do banco
+  },
+  { 
+    field: 'pc_comissao_padrao', 
+    headerName: 'Comissão', 
+    width: 110,
+    align: 'center',
+    headerAlign: 'center',
+    renderCell: (params) => (
+      <Chip 
+        label={`${params.value || 0}%`}
+        size="small"
+        color="primary"
+        variant="outlined"
+        sx={{ fontWeight: 600 }}
+      />
+    )
+  },
+  { 
+    field: 'fl_ativa', 
+    headerName: 'Status', 
+    width: 100,
+    align: 'center',
+    headerAlign: 'center',
+    renderCell: (params) => (
+      <Chip 
+        label={params.value ? "Ativa" : "Inativa"} 
+        color={params.value ? "success" : "default"} 
+        size="small"
+        sx={{ 
+          fontWeight: 600,
+          minWidth: 80
+        }}
+      />
+    )
+  },
+  {
+    field: 'actions',
+    type: 'actions',
+    headerName: 'Ações',
+    width: 120,
+    align: 'center',
+    headerAlign: 'center',
+    getActions: (params) => [
+      <GridActionsCellItem
+        key="edit"
+        icon={
+          <Tooltip title="Editar empresa">
+            <EditIcon />
+          </Tooltip>
+        }
+        label="Editar"
+        onClick={() => handleOpenEdit(params.row as IEmpresaCompleta)}
+        showInMenu={false}
+        sx={{
+          '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+        }}
+      />,
+      <GridActionsCellItem
+        key="delete"
+        icon={
+          <Tooltip title={params.row.fl_ativa ? "Desativar empresa" : "Empresa já inativa"}>
+            <DeleteIcon />
+          </Tooltip>
+        }
+        label="Desativar"
+        onClick={() => handleOpenDelete(params.id as number)}
+        disabled={!params.row.fl_ativa}
+        showInMenu={false}
+        sx={{
+          '& .MuiSvgIcon-root': { fontSize: '1.2rem' },
+          '&.Mui-disabled': {
+            opacity: 0.3
           }
-          label="Editar"
-          onClick={() => handleOpenEdit(params.row as IEmpresaCompleta)}
-          showInMenu={false}
-        />,
-        <GridActionsCellItem
-          icon={
-            <Tooltip title={params.row.fl_ativa ? "Desativar" : "Empresa já inativa"}>
-              <DeleteIcon />
-            </Tooltip>
-          }
-          label="Desativar"
-          onClick={() => handleOpenDelete(params.id as number)}
-          disabled={!params.row.fl_ativa}
-          showInMenu={false}
-        />,
-      ],
-    },
-  ];
+        }}
+      />,
+    ],
+  },
+];
 
   // Funções de Manipulação
   const handleOpenCreate = () => {
@@ -157,13 +189,15 @@ export const PaginaEmpresas: React.FC = () => {
   };
 
   return (
-    <Box>
-      {/* Header */}
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* Header Responsivo */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 3 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
+        mb: 3,
+        flexDirection: { xs: 'column', sm: 'row' },
+        gap: 2
       }}>
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
@@ -178,6 +212,11 @@ export const PaginaEmpresas: React.FC = () => {
           startIcon={<AddIcon />}
           onClick={handleOpenCreate}
           size="large"
+          fullWidth={isMobile}
+          sx={{ 
+            minWidth: { xs: '100%', sm: 'auto' },
+            whiteSpace: 'nowrap'
+          }}
         >
           Nova Empresa
         </Button>
@@ -185,8 +224,8 @@ export const PaginaEmpresas: React.FC = () => {
 
       {/* Estado de Erro */}
       {isError && (
-        <Alert severity="error" sx={{ mb: 3 }}>
-          Erro ao carregar empresas: {(error as any).message}
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 2 }}>
+          Erro ao carregar empresas: {(error as any)?.message || 'Erro desconhecido'}
         </Alert>
       )}
 
@@ -194,12 +233,13 @@ export const PaginaEmpresas: React.FC = () => {
       <Paper 
         elevation={0} 
         sx={{ 
-          height: 'calc(100vh - 240px)',
-          minHeight: 500,
+          height: { xs: '60vh', md: 'calc(100vh - 240px)' },
+          minHeight: 400,
           width: '100%',
           border: '1px solid',
           borderColor: 'divider',
           borderRadius: 2,
+          overflow: 'hidden'
         }}
       >
         <DataGrid
@@ -209,23 +249,47 @@ export const PaginaEmpresas: React.FC = () => {
           loading={isLoadingEmpresas}
           slots={{
             loadingOverlay: LinearProgress,
+            noRowsOverlay: () => (
+              <Stack height="100%" alignItems="center" justifyContent="center" spacing={1} p={3}>
+                <Box sx={{ fontSize: 48, color: 'text.disabled', mb: 2 }}>
+                  🏢
+                </Box>
+                <Typography variant="h6" color="text.secondary" textAlign="center">
+                  Nenhuma empresa cadastrada
+                </Typography>
+                <Typography variant="body2" color="text.secondary" textAlign="center">
+                  Clique em "Nova Empresa" para adicionar a primeira
+                </Typography>
+              </Stack>
+            ),
           }}
           initialState={{
             pagination: { 
               paginationModel: { pageSize: 25 } 
             },
+            sorting: {
+              sortModel: [{ field: 'no_empresa', sort: 'asc' }]
+            }
           }}
           pageSizeOptions={[10, 25, 50, 100]}
           disableRowSelectionOnClick
           sx={{
             border: 0,
             '& .MuiDataGrid-columnHeaders': {
-              backgroundColor: 'background.default',
-              borderRadius: 0,
+              backgroundColor: 'action.hover',
+              borderBottom: '2px solid',
+              borderColor: 'divider',
+            },
+            '& .MuiDataGrid-cell': {
+              borderBottom: '1px solid',
+              borderColor: 'divider',
             },
             '& .MuiDataGrid-row:hover': {
               backgroundColor: 'action.hover',
             },
+            '& .MuiDataGrid-virtualScroller': {
+              backgroundColor: 'background.paper'
+            }
           }}
         />
       </Paper>

@@ -1,10 +1,11 @@
 // /frontend/src/paginas/gestor/Catalogo.tsx
-// Versão ajustada - UX e Layout melhorados
-
 import React, { useState } from 'react';
 import {
   Box, Typography, Paper, Alert,
-  Tabs, Tab, TextField, MenuItem, CircularProgress
+  Tabs, Tab, TextField, MenuItem, CircularProgress,
+  Stack,
+  useTheme,
+  useMediaQuery
 } from '@mui/material';
 import { Business as BusinessIcon } from '@mui/icons-material';
 
@@ -23,13 +24,15 @@ const TabPanel = (props: { children?: React.ReactNode; index: number; value: num
       aria-labelledby={`catalogo-tab-${index}`}
       {...other}
     >
-      {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+      {value === index && <Box sx={{ p: { xs: 2, md: 3 } }}>{children}</Box>}
     </div>
   );
 };
 
 export const PaginaCatalogo: React.FC = () => {
   const { data: empresas, isLoading: isLoadingEmpresas } = useGetEmpresas();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const [empresaSelecionadaId, setEmpresaSelecionadaId] = useState<number | null>(null);
   const [abaAtual, setAbaAtual] = useState(0);
@@ -41,26 +44,31 @@ export const PaginaCatalogo: React.FC = () => {
   const empresaSelecionada = empresas?.find(emp => emp.id_empresa === empresaSelecionadaId);
 
   return (
-    <Box>
-      {/* Header */}
+    <Box sx={{ p: { xs: 1, sm: 2 } }}>
+      {/* Header Responsivo */}
       <Box sx={{ 
         display: 'flex', 
         justifyContent: 'space-between', 
-        alignItems: 'center', 
+        alignItems: { xs: 'flex-start', sm: 'center' }, 
         mb: 3,
-        flexWrap: 'wrap',
+        flexDirection: { xs: 'column', sm: 'row' },
         gap: 2
       }}>
-        {empresaSelecionada && (
         <Box>
           <Typography variant="h4" fontWeight={700} gutterBottom>
             Catálogo
           </Typography>
           
-          <Typography variant="body2" color="text.secondary">
-            Gerencie produtos e listas de preço de {empresaSelecionada.no_empresa}
-          </Typography>
-        </Box>)}
+          {empresaSelecionada ? (
+            <Typography variant="body2" color="text.secondary">
+              Gerencie produtos e listas de preço de <strong>{empresaSelecionada.no_empresa}</strong>
+            </Typography>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Gerencie produtos e listas de preço das empresas
+            </Typography>
+          )}
+        </Box>
         
         {/* Seletor de Empresa */}
         <TextField
@@ -72,7 +80,10 @@ export const PaginaCatalogo: React.FC = () => {
             setAbaAtual(0); // Reset para primeira aba
           }}
           disabled={isLoadingEmpresas}
-          sx={{ minWidth: 280 }}
+          sx={{ 
+            minWidth: { xs: '100%', sm: 280 },
+            width: { xs: '100%', sm: 'auto' }
+          }}
           InputProps={{
             startAdornment: isLoadingEmpresas ? (
               <CircularProgress size={20} sx={{ mr: 1 }} />
@@ -80,9 +91,14 @@ export const PaginaCatalogo: React.FC = () => {
               <BusinessIcon sx={{ mr: 1, color: 'text.secondary' }} />
             ),
           }}
+          slotProps={{
+            select: {
+              displayEmpty: true,
+            }
+          }}
         >
           <MenuItem value="" disabled>
-            <em>Selecione uma empresa...</em>
+            Selecione uma empresa...
           </MenuItem>
           {(empresas || [])
             .filter(emp => emp.fl_ativa) // Apenas empresas ativas
@@ -99,11 +115,12 @@ export const PaginaCatalogo: React.FC = () => {
         <Paper
           elevation={0}
           sx={{
-            p: 6,
+            p: { xs: 4, md: 6 },
             textAlign: 'center',
             border: '1px solid',
             borderColor: 'divider',
             borderRadius: 2,
+            bgcolor: 'background.default'
           }}
         >
           <BusinessIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
@@ -122,27 +139,42 @@ export const PaginaCatalogo: React.FC = () => {
             border: '1px solid',
             borderColor: 'divider',
             borderRadius: 2,
+            bgcolor: 'background.paper'
           }}
         >
-
-
           {/* Tabs */}
-          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+          <Box sx={{ 
+            borderBottom: 1, 
+            borderColor: 'divider',
+            bgcolor: 'background.default'
+          }}>
             <Tabs 
               value={abaAtual} 
               onChange={handleMudancaAba} 
               aria-label="Abas de Gestão de Catálogo"
-              sx={{ px: 2 }}
+              sx={{ 
+                px: { xs: 1, md: 2 },
+                minHeight: '48px'
+              }}
+              variant={isMobile ? "fullWidth" : "standard"}
             >
               <Tab 
                 label="Produtos" 
                 id="catalogo-tab-0"
-                sx={{ fontWeight: 500 }}
+                sx={{ 
+                  fontWeight: 600,
+                  minHeight: '48px',
+                  fontSize: { xs: '0.875rem', md: '0.9375rem' }
+                }}
               />
               <Tab 
                 label="Listas de Preço" 
                 id="catalogo-tab-1"
-                sx={{ fontWeight: 500 }}
+                sx={{ 
+                  fontWeight: 600,
+                  minHeight: '48px',
+                  fontSize: { xs: '0.875rem', md: '0.9375rem' }
+                }}
               />
             </Tabs>
           </Box>

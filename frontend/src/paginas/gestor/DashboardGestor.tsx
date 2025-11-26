@@ -1,11 +1,21 @@
 // /frontend/src/paginas/gestor/DashboardGestor.tsx
-// Versão completa - Layout dashboard profissional com dados mockados
-
-import React from 'react';
-import { 
-  Box, Typography, Paper, Skeleton, Avatar, LinearProgress,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Chip
+import React, { useMemo } from 'react';
+import {
+  Box,
+  Typography,
+  Paper,
+  Skeleton,
+  Avatar,
+  LinearProgress,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
+  Grid,
+  Tooltip,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -14,10 +24,11 @@ import {
   ShoppingCart as CartIcon,
   People as PeopleIcon,
   AccountBalance as WalletIcon,
-  EmojiEvents as TrophyIcon
+  EmojiEvents as TrophyIcon,
 } from '@mui/icons-material';
+import { useGetGestorKpis, useGetRankingVendedores } from '../../api/servicos/dashboardService';
+import { formatCurrency } from '../../utils/format';
 
-// Tipos
 interface StatCardProps {
   title: string;
   value: string;
@@ -27,38 +38,48 @@ interface StatCardProps {
   isLoading: boolean;
 }
 
-// Componente StatCard melhorado
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon, isLoading }) => {
   const trendColor = trend >= 0 ? 'success' : 'error';
   const TrendIcon = trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
-  
+
   return (
-    <Paper 
+    <Paper
       elevation={0}
-      sx={{ 
+      sx={{
         p: 3,
         border: '1px solid',
         borderColor: 'divider',
-        borderRadius: 2,
+        borderRadius: 3,
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
-        transition: 'all 0.2s',
+        transition: 'all 0.2s ease-in-out',
         '&:hover': {
           borderColor: 'primary.main',
           transform: 'translateY(-2px)',
-        }
+          boxShadow: 2,
+        },
       }}
     >
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
         <Typography variant="body2" color="text.secondary" fontWeight={500}>
           {title}
         </Typography>
-        <Avatar sx={{ bgcolor: 'primary.main', width: 40, height: 40 }}>
-          {icon}
-        </Avatar>
+        <Box
+          sx={{
+            width: 48,
+            height: 48,
+            borderRadius: 2,
+            bgcolor: 'primary.50',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {React.cloneElement(icon, { color: 'primary' })}
+        </Box>
       </Box>
-      
+
       {isLoading ? (
         <Skeleton variant="text" width="60%" height={40} />
       ) : (
@@ -67,12 +88,12 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon
             {value}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip 
+            <Chip
               icon={<TrendIcon style={{ fontSize: 16 }} />}
               label={`${trend > 0 ? '+' : ''}${trend}%`}
               color={trendColor}
               size="small"
-              sx={{ fontWeight: 600 }}
+              sx={{ fontWeight: 600, height: 24 }}
             />
             <Typography variant="caption" color="text.secondary">
               {subtitle}
@@ -84,136 +105,160 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon
   );
 };
 
-// Mock de dados
-const mockData = {
-  kpis: {
-    faturamento: { value: 'R$ 245.890', trend: 12.5 },
-    pedidos: { value: '127', trend: 8.2 },
-    ticket: { value: 'R$ 1.936', trend: -3.1 },
-    comissoes: { value: 'R$ 24.589', trend: 15.3 }
-  },
-  evolucao: [
-    { mes: 'Jan', valor: 180000 },
-    { mes: 'Fev', valor: 195000 },
-    { mes: 'Mar', valor: 210000 },
-    { mes: 'Abr', valor: 198000 },
-    { mes: 'Mai', valor: 230000 },
-    { mes: 'Jun', valor: 245890 }
-  ],
-  topVendedores: [
-    { nome: 'Carlos Silva', vendas: 'R$ 89.450', pedidos: 42, avatar: 'CS' },
-    { nome: 'Ana Santos', vendas: 'R$ 76.200', pedidos: 38, avatar: 'AS' },
-    { nome: 'Pedro Oliveira', vendas: 'R$ 54.320', pedidos: 29, avatar: 'PO' },
-    { nome: 'Maria Costa', vendas: 'R$ 25.920', pedidos: 18, avatar: 'MC' }
-  ],
-  metas: {
-    mensal: { atual: 245890, meta: 300000 },
-    trimestral: { atual: 673890, meta: 800000 }
-  }
-};
-
 export const PaginaDashboardGestor: React.FC = () => {
-  const isLoading = false;
-  const { kpis, evolucao, topVendedores, metas } = mockData;
-  
-  const metaMensalPercent = (metas.mensal.atual / metas.mensal.meta) * 100;
-  const metaTrimestralPercent = (metas.trimestral.atual / metas.trimestral.meta) * 100;
-  
+  const { data: kpis, isLoading: loadingKpis } = useGetGestorKpis();
+  const { data: ranking, isLoading: loadingRanking } = useGetRankingVendedores();
+
+  // Trends mockadas
+  const mockTrends = useMemo(
+    () => ({
+      faturamento: 12.5,
+      pedidos: 8.2,
+      ticket: -3.1,
+      comissoes: 15.3,
+    }),
+    []
+  );
+
+  // Evolução de vendas (mockado)
+  const evolucaoMock = useMemo(
+    () => [
+      { mes: 'Jan', valor: 180000 },
+      { mes: 'Fev', valor: 195000 },
+      { mes: 'Mar', valor: 210000 },
+      { mes: 'Abr', valor: 198000 },
+      { mes: 'Mai', valor: 230000 },
+      { mes: 'Jun', valor: Number(kpis?.vendas_mes_atual || 245000) },
+    ],
+    [kpis?.vendas_mes_atual]
+  );
+
+  const metasMock = useMemo(
+    () => ({
+      mensal: { atual: Number(kpis?.vendas_mes_atual || 0), meta: 300000 },
+      trimestral: { atual: 673890, meta: 800000 },
+    }),
+    [kpis?.vendas_mes_atual]
+  );
+
+  const metaMensalPercent = Math.min((metasMock.mensal.atual / metasMock.mensal.meta) * 100, 100);
+
   return (
     <Box>
       {/* Header */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight={700} gutterBottom>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h5" fontWeight={600} gutterBottom>
           Dashboard
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Visão geral do desempenho - Junho 2024
+          Visão geral do desempenho
         </Typography>
       </Box>
 
-      {/* KPIs Grid - 4 colunas */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, 
-        gap: 3, 
-        mb: 4 
-      }}>
-        <StatCard 
-          title="Faturamento Total"
-          value={kpis.faturamento.value}
-          trend={kpis.faturamento.trend}
-          subtitle="vs mês anterior"
-          icon={<MoneyIcon />}
-          isLoading={isLoading}
-        />
-        <StatCard 
-          title="Total de Pedidos"
-          value={kpis.pedidos.value}
-          trend={kpis.pedidos.trend}
-          subtitle="vs mês anterior"
-          icon={<CartIcon />}
-          isLoading={isLoading}
-        />
-        <StatCard 
-          title="Ticket Médio"
-          value={kpis.ticket.value}
-          trend={kpis.ticket.trend}
-          subtitle="vs mês anterior"
-          icon={<PeopleIcon />}
-          isLoading={isLoading}
-        />
-        <StatCard 
-          title="Comissões"
-          value={kpis.comissoes.value}
-          trend={kpis.comissoes.trend}
-          subtitle="vs mês anterior"
-          icon={<WalletIcon />}
-          isLoading={isLoading}
-        />
-      </Box>
+      {/* KPIs */}
+      <Grid container spacing={2} sx={{ mb: 3 }}>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            title="Faturamento Total"
+            value={formatCurrency(kpis?.vendas_mes_atual)}
+            trend={mockTrends.faturamento}
+            subtitle="vs mês anterior"
+            icon={<MoneyIcon />}
+            isLoading={loadingKpis}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            title="Total de Pedidos"
+            value={kpis?.pedidos_mes_atual?.toString() || '0'}
+            trend={mockTrends.pedidos}
+            subtitle="vs mês anterior"
+            icon={<CartIcon />}
+            isLoading={loadingKpis}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            title="Ticket Médio"
+            value={formatCurrency(kpis?.ticket_medio_mes_atual)}
+            trend={mockTrends.ticket}
+            subtitle="vs mês anterior"
+            icon={<PeopleIcon />}
+            isLoading={loadingKpis}
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <StatCard
+            title="Comissões (Est.)"
+            value={formatCurrency(kpis?.comissoes_pendentes_mes_atual)}
+            trend={mockTrends.comissoes}
+            subtitle="vs mês anterior"
+            icon={<WalletIcon />}
+            isLoading={loadingKpis}
+          />
+        </Grid>
+      </Grid>
 
-      {/* Grid Principal - 2 colunas */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: { xs: '1fr', lg: '2fr 1fr' }, 
-        gap: 3, 
-        mb: 3 
-      }}>
-        
+      {/* Gráfico e Metas */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
         {/* Evolução de Vendas */}
-        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Evolução de Vendas
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-            Últimos 6 meses
-          </Typography>
-          
-          {isLoading ? (
-            <Skeleton variant="rectangular" height={280} sx={{ borderRadius: 1 }} />
-          ) : (
-            <Box sx={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-around', height: 280, gap: 1 }}>
-              {evolucao.map((item, idx) => {
-                const maxValor = Math.max(...evolucao.map(e => e.valor));
+        <Grid size={{ xs: 12, lg: 8 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              height: '100%',
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Evolução de Vendas
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Últimos 6 meses (Simulado)
+            </Typography>
+
+            <Box
+              sx={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                justifyContent: 'space-around',
+                height: 280,
+                gap: 1,
+              }}
+            >
+              {evolucaoMock.map((item, idx) => {
+                const maxValor = Math.max(...evolucaoMock.map((e) => e.valor));
                 const altura = (item.valor / maxValor) * 100;
-                const isCurrent = idx === evolucao.length - 1;
-                
+                const isCurrent = idx === evolucaoMock.length - 1;
+
                 return (
-                  <Box key={item.mes} sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
-                    <Typography variant="caption" fontWeight={600} color={isCurrent ? 'primary.main' : 'text.primary'}>
-                      {(item.valor / 1000).toFixed(0)}k
-                    </Typography>
-                    <Box 
-                      sx={{ 
-                        width: '100%',
-                        height: `${altura}%`,
-                        bgcolor: isCurrent ? 'primary.main' : 'primary.dark',
-                        opacity: isCurrent ? 1 : 0.5,
-                        borderRadius: '4px 4px 0 0',
-                        transition: 'all 0.3s',
-                        '&:hover': { opacity: 1 }
-                      }}
-                    />
+                  <Box
+                    key={item.mes}
+                    sx={{
+                      flex: 1,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: 1,
+                    }}
+                  >
+                    <Tooltip title={formatCurrency(item.valor)} arrow>
+                      <Box
+                        sx={{
+                          width: '100%',
+                          height: `${altura}%`,
+                          bgcolor: isCurrent ? 'primary.main' : 'primary.light',
+                          opacity: isCurrent ? 1 : 0.5,
+                          borderRadius: '6px 6px 0 0',
+                          transition: 'all 0.3s ease-in-out',
+                          cursor: 'pointer',
+                          '&:hover': { opacity: 1, transform: 'scaleY(1.02)' },
+                        }}
+                      />
+                    </Tooltip>
                     <Typography variant="caption" color="text.secondary" fontWeight={500}>
                       {item.mes}
                     </Typography>
@@ -221,146 +266,150 @@ export const PaginaDashboardGestor: React.FC = () => {
                 );
               })}
             </Box>
-          )}
-        </Paper>
+          </Paper>
+        </Grid>
 
-        {/* Progresso de Metas */}
-        <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
-          <Typography variant="h6" fontWeight={600} gutterBottom>
-            Metas
-          </Typography>
-          <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
-            Progresso atual
-          </Typography>
-          
-          {/* Meta Mensal */}
-          <Box sx={{ mb: 4 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Meta Mensal
-              </Typography>
-              <Typography variant="body2" color="primary.main" fontWeight={700}>
-                {metaMensalPercent.toFixed(0)}%
-              </Typography>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={metaMensalPercent} 
-              sx={{ 
-                height: 8, 
-                borderRadius: 1,
-                bgcolor: 'action.hover',
-                '& .MuiLinearProgress-bar': { borderRadius: 1 }
-              }} 
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
-                R$ {(metas.mensal.atual / 1000).toFixed(0)}k
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                R$ {(metas.mensal.meta / 1000).toFixed(0)}k
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Meta Trimestral */}
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-              <Typography variant="body2" fontWeight={600}>
-                Meta Trimestral
-              </Typography>
-              <Typography variant="body2" color="success.main" fontWeight={700}>
-                {metaTrimestralPercent.toFixed(0)}%
-              </Typography>
-            </Box>
-            <LinearProgress 
-              variant="determinate" 
-              value={metaTrimestralPercent} 
-              color="success"
-              sx={{ 
-                height: 8, 
-                borderRadius: 1,
-                bgcolor: 'action.hover',
-                '& .MuiLinearProgress-bar': { borderRadius: 1 }
-              }} 
-            />
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 0.5 }}>
-              <Typography variant="caption" color="text.secondary">
-                R$ {(metas.trimestral.atual / 1000).toFixed(0)}k
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                R$ {(metas.trimestral.meta / 1000).toFixed(0)}k
-              </Typography>
-            </Box>
-          </Box>
-
-          {/* Ícone decorativo */}
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
-            <Avatar sx={{ bgcolor: 'success.main', width: 56, height: 56, mx: 'auto' }}>
-              <TrophyIcon sx={{ fontSize: 32 }} />
-            </Avatar>
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              Continue assim!
+        {/* Metas */}
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <Paper
+            elevation={0}
+            sx={{
+              p: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+              borderRadius: 3,
+              height: '100%',
+              display: 'flex',
+              flexDirection: 'column',
+            }}
+          >
+            <Typography variant="h6" fontWeight={600} gutterBottom>
+              Metas
             </Typography>
-          </Box>
-        </Paper>
-      </Box>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+              Progresso atual (Simulado)
+            </Typography>
 
-      {/* Top Vendedores */}
-      <Paper elevation={0} sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 2 }}>
+            {/* Meta Mensal */}
+            <Box sx={{ mb: 4 }}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                <Typography variant="body2" fontWeight={600}>
+                  Meta Mensal
+                </Typography>
+                <Typography variant="body2" color="primary.main" fontWeight={700}>
+                  {metaMensalPercent.toFixed(0)}%
+                </Typography>
+              </Box>
+              <LinearProgress
+                variant="determinate"
+                value={metaMensalPercent}
+                sx={{ height: 8, borderRadius: 1 }}
+              />
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, display: 'block', textAlign: 'right' }}
+              >
+                {formatCurrency(metasMock.mensal.atual)} / {formatCurrency(metasMock.mensal.meta)}
+              </Typography>
+            </Box>
+
+            {/* Ícone decorativo */}
+            <Box sx={{ textAlign: 'center', mt: 'auto' }}>
+              <Box
+                sx={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: 3,
+                  bgcolor: 'warning.50',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  mx: 'auto',
+                  mb: 2,
+                }}
+              >
+                <TrophyIcon sx={{ fontSize: 32, color: 'warning.main' }} />
+              </Box>
+              <Typography variant="body2" color="text.secondary">
+                Sua equipe está em {ranking && ranking.length > 0 ? 'bom' : 'início de'} ritmo!
+              </Typography>
+            </Box>
+          </Paper>
+        </Grid>
+      </Grid>
+
+      {/* Ranking de Vendedores */}
+      <Paper
+        elevation={0}
+        sx={{ p: 3, border: '1px solid', borderColor: 'divider', borderRadius: 3 }}
+      >
         <Typography variant="h6" fontWeight={600} gutterBottom>
-          Top Vendedores do Mês
+          Ranking de Vendedores
         </Typography>
         <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-          Ranking de desempenho
+          Baseado nas vendas aprovadas deste mês
         </Typography>
-        
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.875rem' }}>Posição</TableCell>
-                <TableCell sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.875rem' }}>Vendedor</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.875rem' }}>Vendas</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 600, color: 'text.secondary', fontSize: '0.875rem' }}>Pedidos</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {topVendedores.map((vendedor, index) => (
-                <TableRow key={vendedor.nome} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
-                  <TableCell>
-                    <Chip 
-                      label={`#${index + 1}`} 
-                      size="small" 
-                      color={index === 0 ? 'primary' : 'default'}
-                      sx={{ fontWeight: 700, minWidth: 48 }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <Avatar sx={{ bgcolor: 'primary.main', width: 36, height: 36, fontSize: '0.875rem' }}>
-                        {vendedor.avatar}
-                      </Avatar>
-                      <Typography variant="body2" fontWeight={600}>
-                        {vendedor.nome}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight={600} color="success.main">
-                      {vendedor.vendas}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" color="text.secondary">
-                      {vendedor.pedidos}
-                    </Typography>
-                  </TableCell>
+
+        {loadingRanking ? (
+          <LinearProgress sx={{ borderRadius: 1 }} />
+        ) : (
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell width={100}>Posição</TableCell>
+                  <TableCell>Vendedor</TableCell>
+                  <TableCell align="right">Vendas</TableCell>
+                  <TableCell align="right">Pedidos</TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
+              </TableHead>
+              <TableBody>
+                {ranking?.map((vendedor, index) => (
+                  <TableRow key={vendedor.id_usuario} hover>
+                    <TableCell>
+                      <Chip
+                        label={`#${index + 1}`}
+                        size="small"
+                        color={index === 0 ? 'primary' : 'default'}
+                        sx={{ fontWeight: 700, minWidth: 48 }}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Avatar sx={{ width: 36, height: 36, fontSize: '0.875rem', bgcolor: 'primary.light' }}>
+                          {vendedor.no_vendedor?.[0]?.toUpperCase() || '?'}
+                        </Avatar>
+                        <Typography variant="body2" fontWeight={600}>
+                          {vendedor.no_vendedor}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" fontWeight={600} color="success.main">
+                        {formatCurrency(vendedor.vl_total_vendas)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell align="right">
+                      <Typography variant="body2" color="text.secondary">
+                        {vendedor.qt_pedidos}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {!ranking?.length && (
+                  <TableRow>
+                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Nenhuma venda registrada neste mês.
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        )}
       </Paper>
     </Box>
   );

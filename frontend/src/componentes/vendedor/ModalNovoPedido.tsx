@@ -689,65 +689,80 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                    {fields.map((item, index) => (
-                      <TableRow key={item.id} hover>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {item.ds_produto}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            Cód: {item.cd_produto}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <TextField
-                            type="number"
-                            size="small"
-                            sx={{ width: '70px' }}
-                            InputProps={{
-                              inputProps: { min: 1 },
-                              sx: { textAlign: 'center' }
-                            }}
-                            {...register(`itens.${index}.qt_quantidade`, { valueAsNumber: true })}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2">
-                            {formatCurrency(item.vl_unitario_base)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <TextField
-                            type="number"
-                            size="small"
-                            sx={{ width: '70px' }}
-                            InputProps={{
-                              inputProps: { min: 0, max: 100 },
-                              sx: { textAlign: 'center' }
-                            }}
-                            {...register(`itens.${index}.pc_desconto_item`, { valueAsNumber: true })}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight="bold" color="primary.main">
-                            {formatCurrency(calcularSubtotalItem(item))}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <Tooltip title="Remover item">
-                            <IconButton
-                              onClick={() => {
-                                remove(index);
-                              }}
-                              color="error"
+                    {fields.map((fieldItem, index) => {
+                      // --- CORREÇÃO AQUI ---
+                      // Pega o item "vivo" (atualizado) do useWatch
+                      // Se não houver (edge case), usa o fieldItem (estático)
+                      const itemVivo = itensDoFormulario?.[index] || fieldItem;
+
+                      // Usa os valores "vivos" para o cálculo
+                      const precoUnit = Number(itemVivo.vl_unitario_base) || 0;
+                      const qtd = Number(itemVivo.qt_quantidade) || 0;
+                      const desc = Number(itemVivo.pc_desconto_item) || 0;
+                      
+                      // Calcula o subtotal dinâmico
+                      const subtotalItem = (precoUnit * qtd) * (1 - desc / 100);
+                      
+                      return (
+                        <TableRow key={fieldItem.id} hover>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="medium">
+                              {fieldItem.ds_produto} {/* Nome/Cod não mudam, ok usar fieldItem */}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Cód: {fieldItem.cd_produto}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <TextField
+                              type="number"
                               size="small"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
-                          </Tooltip>
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                              sx={{ width: '70px' }}
+                              InputProps={{
+                                inputProps: { min: 1 },
+                                sx: { textAlign: 'center' }
+                              }}
+                              // O register já conecta o input ao estado global
+                              {...register(`itens.${index}.qt_quantidade`, { valueAsNumber: true })}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2">
+                              {formatCurrency(precoUnit)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <TextField
+                              type="number"
+                              size="small"
+                              sx={{ width: '70px' }}
+                              InputProps={{
+                                inputProps: { min: 0, max: 100 },
+                                sx: { textAlign: 'center' }
+                              }}
+                              {...register(`itens.${index}.pc_desconto_item`, { valueAsNumber: true })}
+                            />
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" fontWeight="bold" color="primary.main">
+                              {/* Exibe o subtotal calculado com dados vivos */}
+                              {formatCurrency(subtotalItem)}
+                            </Typography>
+                          </TableCell>
+                          <TableCell align="center">
+                            <Tooltip title="Remover item">
+                              <IconButton
+                                onClick={() => remove(index)}
+                                color="error"
+                                size="small"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                   </Table>
                 </TableContainer>
@@ -755,12 +770,13 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                 {/* Resumo Visual */}
                 <Paper sx={{ p: 2, bgcolor: 'primary.50', border: '2px solid', borderColor: 'primary.200' }}>
                   <Grid container spacing={2} alignItems="center">
-                    <Grid size={{ xs: 12, sm: 6 }}>
+                    <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
                         Total de Itens: <strong>{fields.length}</strong>
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
-                        Quantidade Total: <strong>{fields.reduce((sum, item) => sum + Number(item.qt_quantidade || 0), 0)}</strong> unidades
+                        {/* --- CORREÇÃO AQUI: Usa itensDoFormulario para somar --- */}
+                        Quantidade Total: <strong>{(itensDoFormulario || []).reduce((sum, item) => sum + (Number(item.qt_quantidade) || 0), 0)}</strong> unidades
                       </Typography>
                     </Grid>
                     <Grid size={{ xs: 12, sm: 6 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
@@ -779,6 +795,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         );
 
       case 2:
+        const totalUnidades = (itensDoFormulario || []).reduce((sum, item) => sum + (Number(item.qt_quantidade) || 0), 0);
         return (
           <Box>
             {/* Header da Etapa */}
@@ -831,7 +848,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                   Produtos
                 </Typography>
                 <Chip
-                  label={`${fields.length} ${fields.length === 1 ? 'item' : 'itens'}`}
+                  label={`${fields.length} ${fields.length === 1 ? 'item' : 'itens'} • ${totalUnidades} ${totalUnidades === 1 ? 'unidade' : 'unidades'}`}
                   size="small"
                   color="primary"
                 />
@@ -848,26 +865,37 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {fields.map((item) => {
-                      const subtotal = (item.vl_unitario_base * item.qt_quantidade) * (1 - (item.pc_desconto_item || 0) / 100);
+                    {/* --- CORREÇÃO: Usa itensDoFormulario (dados vivos) em vez de fields --- */}
+                    {(itensDoFormulario || []).map((item, index) => {
+                      // Converte para número para garantir o cálculo correto
+                      const precoUnit = Number(item.vl_unitario_base) || 0;
+                      const qtd = Number(item.qt_quantidade) || 0;
+                      const desc = Number(item.pc_desconto_item) || 0;
+                      
+                      // Calcula o subtotal com os valores editados
+                      const subtotal = (precoUnit * qtd) * (1 - desc / 100);
+
                       return (
-                        <TableRow key={item.id} hover>
+                        // Podemos usar o index como key aqui pois é apenas visualização
+                        <TableRow key={index} hover>
                           <TableCell>
                             <Typography variant="body2" fontWeight="medium">
                               {item.ds_produto}
                             </Typography>
                             <Typography variant="caption" color="text.secondary">
                               {item.cd_produto}
-                              {item.pc_desconto_item > 0 && ` • ${item.pc_desconto_item}% desc.`}
+                              {desc > 0 && ` • ${desc}% desc.`}
                             </Typography>
                           </TableCell>
                           <TableCell align="center">
-                            <Typography variant="body2">{item.qt_quantidade}</Typography>
+                            {/* Mostra a quantidade editada */}
+                            <Typography variant="body2">{qtd}</Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2">{formatCurrency(item.vl_unitario_base)}</Typography>
+                            <Typography variant="body2">{formatCurrency(precoUnit)}</Typography>
                           </TableCell>
                           <TableCell align="right">
+                            {/* Mostra o subtotal recalculado */}
                             <Typography variant="body2" fontWeight="bold">
                               {formatCurrency(subtotal)}
                             </Typography>

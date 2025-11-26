@@ -57,7 +57,7 @@ Este documento rastreia o progresso do desenvolvimento do frontend, baseado no P
 O fluxo principal do Vendedor (criar um pedido) ainda não foi implementado.
 
 - [ ] **Criar Pedido (Formulário)** (`/vendedor/pedidos/novo`):
-    - [ ] Criar a `PaginaNovoPedido.tsx`.
+    - [x] Criar a `PaginaNovoPedido.tsx`.
     - [ ] UI do "Carrinho de Compras" (Adicionar/Remover itens do catálogo).
     - [ ] UI para selecionar Cliente, Endereço de Entrega, Endereço de Cobrança.
     - [ ] UI para selecionar Forma de Pagamento.

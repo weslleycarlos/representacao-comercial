@@ -3,12 +3,16 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Páginas
 import { PaginaLogin } from './paginas/Login';
+import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
 import { PaginaDashboardGestor } from './paginas/gestor/DashboardGestor';
 import { PaginaEmpresas } from './paginas/gestor/Empresas';
 import { PaginaVendedores } from './paginas/gestor/Vendedores';
-import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
 import { PaginaClientes } from './paginas/gestor/Clientes';
 import { PaginaCatalogo } from './paginas/gestor/Catalogo';
+import { PaginaGestorPedidos } from './paginas/gestor/Pedidos';
+import { PaginaConfiguracoes } from './paginas/gestor/Configuracoes';
+import { PaginaRelatorios } from './paginas/gestor/Relatorios';
+import { PaginaLogs } from './paginas/gestor/Logs';
 import { PaginaVendedorCatalogo } from './paginas/vendedor/Catalogo';
 import { PaginaVendedorClientes } from './paginas/vendedor/Clientes';
 import { PaginaVendedorPedidos } from './paginas/vendedor/Pedidos';
@@ -62,9 +66,10 @@ function App() {
           <Route path="/gestor/vendedores" element={<PaginaVendedores />} />
           <Route path="/gestor/clientes" element={<PaginaClientes />} />
           <Route path="/gestor/catalogo" element={<PaginaCatalogo />} />
-          <Route path="/gestor/pedidos" element={<h1>Página de Pedidos (Gestor)</h1>} />
-          <Route path="/gestor/relatorios" element={<h1>Página de Relatórios (Gestor)</h1>} />
-          <Route path="/gestor/configuracoes" element={<h1>Página de Configs (Gestor)</h1>} />
+          <Route path="/gestor/pedidos" element={<PaginaGestorPedidos />} />
+          <Route path="/gestor/relatorios" element={<PaginaRelatorios />} />
+          <Route path="/gestor/configuracoes" element={<PaginaConfiguracoes />} />
+          <Route path="/gestor/logs" element={<PaginaLogs />} />
         </Route>
       </Route>
       

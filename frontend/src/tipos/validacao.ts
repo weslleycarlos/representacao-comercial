@@ -293,3 +293,57 @@ export const pedidoCancelSchema = z.object({
 });
 
 export type PedidoCancelRequestData = z.infer<typeof pedidoCancelSchema>;
+
+// Validação para MUDANÇA DE STATUS (Gestor)
+export const pedidoStatusSchema = z.object({
+  novo_status: z.string().min(1, "Selecione um status."),
+  // (O backend adiciona a observação de auditoria automaticamente, 
+  // mas se quisermos permitir uma obs manual, adicionaríamos aqui)
+});
+
+export type PedidoStatusFormData = z.infer<typeof pedidoStatusSchema>;
+
+// ============================================
+// Validação: Configurações (Gestor)
+// ============================================
+
+// 1. Forma de Pagamento
+export const formaPagamentoSchema = z.object({
+  no_forma_pagamento: z.string().min(3, "O nome é obrigatório (mín. 3 caracteres)."),
+  fl_permite_parcelamento: z.boolean().default(false),
+  qt_maximo_parcelas: z.coerce.number()
+    .min(1, "O mínimo é 1 parcela.")
+    .max(24, "O máximo permitido é 24 parcelas.")
+    .default(1),
+  fl_ativa: z.boolean().default(true),
+});
+
+export type FormaPagamentoFormData = z.infer<typeof formaPagamentoSchema>;
+
+// 2. Regra de Comissão
+export const regraComissaoSchema = z.object({
+  pc_comissao: z.coerce.number({ invalid_type_error: "Comissão é obrigatória" })
+    .min(0, "A comissão não pode ser negativa.")
+    .max(100, "A comissão não pode ser maior que 100%."),
+    
+  // Pode ser nulo (significa "Todas as Empresas" ou "Todos os Vendedores")
+  id_empresa: z.coerce.number().nullable().optional().transform(v => v === 0 ? null : v),
+  id_usuario: z.coerce.number().nullable().optional().transform(v => v === 0 ? null : v),
+  
+  nr_prioridade: z.coerce.number().default(0),
+  
+  dt_inicio_vigencia: z.coerce.date().nullable().optional(),
+  dt_fim_vigencia: z.coerce.date().nullable().optional(),
+  
+  fl_ativa: z.boolean().default(true),
+}).refine((data) => {
+  if (data.dt_inicio_vigencia && data.dt_fim_vigencia) {
+    return data.dt_fim_vigencia >= data.dt_inicio_vigencia;
+  }
+  return true;
+}, {
+  message: "A data final deve ser posterior à data inicial.",
+  path: ["dt_fim_vigencia"],
+});
+
+export type RegraComissaoFormData = z.infer<typeof regraComissaoSchema>;

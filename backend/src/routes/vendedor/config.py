@@ -1,7 +1,7 @@
 # /backend/src/routes/vendedor/config.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 from typing import List
 
 from src.database import get_db
@@ -29,11 +29,13 @@ def get_formas_pagamento_vendedor(
     _, id_organizacao, _ = contexto
     
     formas_pgto = db.query(models.FormaPagamento).filter(
-        or_(
-            models.FormaPagamento.id_organizacao == id_organizacao,
-            models.FormaPagamento.id_organizacao == None
-        ),
-        models.FormaPagamento.fl_ativa == True
+        and_(
+            or_(
+                models.FormaPagamento.id_organizacao == id_organizacao,
+                models.FormaPagamento.id_organizacao.is_(None) # <-- Mais seguro
+            ),
+            models.FormaPagamento.fl_ativa == True
+        )
     ).order_by(models.FormaPagamento.no_forma_pagamento).all()
     
     return formas_pgto

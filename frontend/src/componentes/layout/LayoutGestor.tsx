@@ -29,6 +29,7 @@ import {
   Logout as LogoutIcon,
   People as PeopleIcon,
   Category as CategoryIcon,
+  History as HistoryIcon,
   Menu as MenuIcon, // 2. Importa o ícone de Menu
   ChevronLeft as ChevronLeftIcon, // (Opcional) Ícone para fechar
 } from '@mui/icons-material';
@@ -63,6 +64,7 @@ export const LayoutGestor: React.FC = () => {
     { text: 'Catálogo', icon: <CategoryIcon />, path: '/gestor/catalogo' },
     { text: 'Pedidos', icon: <ShoppingCartIcon />, path: '/gestor/pedidos' },
     { text: 'Relatórios', icon: <BarChartIcon />, path: '/gestor/relatorios' },
+    { text: 'Logs de Auditoria', icon: <HistoryIcon />, path: '/gestor/logs' },
   ];
 
   // 4. Calcula a largura atual (para animação)

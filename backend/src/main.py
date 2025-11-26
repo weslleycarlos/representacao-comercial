@@ -86,24 +86,35 @@ app.add_middleware(
 def create_sqlite_views(db: Session):
     """
     (Apenas SQLite) Cria as Views necessárias para os Dashboards.
-    O SQLAlchemy create_all cria tabelas vazias no lugar das views,
-    então precisamos deletá-las e criar as views reais com SQL.
+    Trata erros de DROP para garantir que funcione independente se é Table ou View.
     """
     print("Verificando/Criando Views no SQLite...")
-
+    
     views = [
-        "VW_VENDAS_VENDEDOR_MES",
-        "VW_COMISSOES_CALCULADAS",
-        "VW_VENDAS_EMPRESA_MES",
+        "VW_VENDAS_VENDEDOR_MES", 
+        "VW_COMISSOES_CALCULADAS", 
+        "VW_VENDAS_EMPRESA_MES", 
         "VW_VENDAS_POR_CIDADE"
     ]
+    
     for view in views:
-        db.execute(text(f"DROP TABLE IF EXISTS {view}"))
-        db.execute(text(f"DROP VIEW IF EXISTS {view}"))
+        # Tenta dropar como VIEW
+        try:
+            db.execute(text(f"DROP VIEW IF EXISTS {view}"))
+            db.commit()
+        except Exception:
+            db.rollback()
+            
+        # Tenta dropar como TABLE (caso o SQLAlchemy tenha criado errado)
+        try:
+            db.execute(text(f"DROP TABLE IF EXISTS {view}"))
+            db.commit()
+        except Exception:
+            db.rollback()
 
-    # 1. View: Vendas por Vendedor no Mês
+    # 1. View: Vendas por Vendedor
     db.execute(text("""
-    CREATE VIEW VW_VENDAS_VENDEDOR_MES AS
+    CREATE VIEW IF NOT EXISTS VW_VENDAS_VENDEDOR_MES AS
     SELECT 
         u.ID_USUARIO,
         u.NO_COMPLETO AS NO_VENDEDOR,
@@ -119,9 +130,9 @@ def create_sqlite_views(db: Session):
     GROUP BY u.ID_USUARIO, u.NO_COMPLETO, u.ID_ORGANIZACAO, strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO);
     """))
 
-    # 2. View: Comissões Calculadas — CORRIGIDA (JOIN com u.ID_USUARIO)
+    # 2. View: Comissões Calculadas
     db.execute(text("""
-    CREATE VIEW VW_COMISSOES_CALCULADAS AS
+    CREATE VIEW IF NOT EXISTS VW_COMISSOES_CALCULADAS AS
     SELECT 
         p.ID_PEDIDO,
         p.NR_PEDIDO,
@@ -134,14 +145,14 @@ def create_sqlite_views(db: Session):
         (p.VL_TOTAL * COALESCE(e.PC_COMISSAO_PADRAO, 0) / 100) AS VL_COMISSAO_CALCULADA,
         p.DT_PEDIDO
     FROM TB_PEDIDOS p
-    INNER JOIN TB_USUARIOS u ON p.ID_USUARIO = u.ID_USUARIO  -- CORRIGIDO AQUI
+    INNER JOIN TB_USUARIOS u ON p.ID_USUARIO = u.ID_USUARIO
     INNER JOIN TB_EMPRESAS e ON p.ID_EMPRESA = e.ID_EMPRESA
     WHERE p.ST_PEDIDO NOT IN ('cancelado');
     """))
-
+    
     # 3. View: Vendas por Empresa
     db.execute(text("""
-    CREATE VIEW VW_VENDAS_EMPRESA_MES AS
+    CREATE VIEW IF NOT EXISTS VW_VENDAS_EMPRESA_MES AS
     SELECT 
         e.ID_EMPRESA,
         e.NO_EMPRESA,
@@ -155,10 +166,10 @@ def create_sqlite_views(db: Session):
     WHERE p.ST_PEDIDO NOT IN ('cancelado')
     GROUP BY e.ID_EMPRESA, e.NO_EMPRESA, e.ID_ORGANIZACAO, strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO);
     """))
-
+    
     # 4. View: Vendas por Cidade
     db.execute(text("""
-    CREATE VIEW VW_VENDAS_POR_CIDADE AS
+    CREATE VIEW IF NOT EXISTS VW_VENDAS_POR_CIDADE AS
     SELECT 
         en.NO_CIDADE,
         en.SG_ESTADO,
@@ -175,6 +186,7 @@ def create_sqlite_views(db: Session):
 
     db.commit()
     print("Views SQLite recriadas com sucesso.")
+
 
 
 # --- POPULAÇÃO DE DADOS INICIAIS (SEED COMPLETO) ---

@@ -343,7 +343,7 @@ class LogAuditoria(Base):
     """ Mapeia a tabela TB_LOGS_AUDITORIA (COM TIPOS CORRIGIDOS) """
     __tablename__ = 'TB_LOGS_AUDITORIA'
     
-    id_log = Column('ID_LOG', BigInteger, primary_key=True)
+    id_log = Column('ID_LOG', Integer, primary_key=True, autoincrement=True)
     id_organizacao = Column('ID_ORGANIZACAO', Integer, ForeignKey('TB_ORGANIZACOES.ID_ORGANIZACAO', ondelete='CASCADE'))
     id_usuario = Column('ID_USUARIO', Integer, ForeignKey('TB_USUARIOS.ID_USUARIO', ondelete='SET NULL'))
     tp_entidade = Column('TP_ENTIDADE', String(50), nullable=False)

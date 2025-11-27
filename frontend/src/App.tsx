@@ -4,6 +4,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 // Páginas
 import { PaginaLogin } from './paginas/Login';
 import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
+import { PaginaAdminOrganizacoes } from './paginas/admin/Organizacoes';
+import { PaginaAdminLogs } from './paginas/admin/Logs';
 import { PaginaDashboardGestor } from './paginas/gestor/DashboardGestor';
 import { PaginaEmpresas } from './paginas/gestor/Empresas';
 import { PaginaVendedores } from './paginas/gestor/Vendedores';
@@ -77,8 +79,8 @@ function App() {
       <Route element={<RotaProtegida permissoes={['super_admin']} />}>
         <Route element={<LayoutSuperAdmin />}>
           <Route path="/admin/dashboard" element={<PaginaAdminDashboard />} />
-          <Route path="/admin/organizacoes" element={<h1>Página de Organizações (Admin)</h1>} />
-          <Route path="/admin/logs" element={<h1>Página de Logs (Admin)</h1>} />
+          <Route path="/admin/organizacoes" element={<PaginaAdminOrganizacoes />} />
+          <Route path="/admin/logs" element={<PaginaAdminLogs />} />
         </Route>
       </Route>
 

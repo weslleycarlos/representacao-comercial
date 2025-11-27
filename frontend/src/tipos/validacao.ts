@@ -347,3 +347,36 @@ export const regraComissaoSchema = z.object({
 });
 
 export type RegraComissaoFormData = z.infer<typeof regraComissaoSchema>;
+
+
+// ============================================
+// Validação: Super Admin
+// ============================================
+
+// Schema para o Gestor Inicial (aninhado na criação da organização)
+const adminGestorSchema = z.object({
+  ds_email: z.string().email("Email inválido."),
+  password: z.string().min(6, "A senha deve ter pelo menos 6 caracteres."),
+  no_completo: z.string().min(3, "Nome obrigatório."),
+  nr_telefone: z.string().optional().or(z.literal('')),
+});
+
+// Schema para Criar/Editar Organização
+export const adminOrganizacaoSchema = z.object({
+  no_organizacao: z.string().min(3, "Nome da organização é obrigatório."),
+  nr_cnpj: z.string()
+    .min(14, "CNPJ inválido.") // (Pode usar o regex de CNPJ aqui se quiser)
+    .optional().or(z.literal('')),
+  
+  tp_plano: z.string().min(1, "Selecione um plano."),
+  
+  st_assinatura: z.string().optional().default('ativo'), // Para edição
+  
+  qt_limite_usuarios: z.coerce.number().min(1, "Mínimo 1 usuário."),
+  qt_limite_empresas: z.coerce.number().min(1, "Mínimo 1 empresa."),
+  
+  // O campo 'gestor' é obrigatório apenas na criação
+  gestor: adminGestorSchema.optional(),
+});
+
+export type AdminOrganizacaoFormData = z.infer<typeof adminOrganizacaoSchema>;

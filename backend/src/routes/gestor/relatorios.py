@@ -25,18 +25,27 @@ gestor_relatorios_router = APIRouter(
 
 
 def get_date_filters(start_date: Optional[date], end_date: Optional[date]):
-    """ Helper para criar filtros de data padrão (Mês Atual) """
+    """ Helper para criar filtros de data (Mês Atual ou Intervalo Personalizado) """
     if not start_date or not end_date:
+        # Padrão: Mês Atual
         today = datetime.utcnow()
-        start_date = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-
-        # Encontra o último dia do mês
-        # (Usa timedelta, que agora está importado)
+        start = today.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        
+        # Último dia do mês
         next_month = (today.replace(day=28) + timedelta(days=4))
-        end_date = next_month - timedelta(days=next_month.day)
-        end_date = end_date.replace(hour=23, minute=59, second=59)
-
-    return start_date, end_date
+        end = next_month - timedelta(days=next_month.day)
+        end = end.replace(hour=23, minute=59, second=59, microsecond=999999)
+        
+        return start, end
+    
+    # Se as datas forem fornecidas (filtro manual), converte para datetime
+    # start vira 00:00:00
+    start_dt = datetime.combine(start_date, datetime.min.time())
+    
+    # end vira 23:59:59 (CORREÇÃO DO BUG DE FILTRO)
+    end_dt = datetime.combine(end_date, datetime.max.time())
+    
+    return start_dt, end_dt
 
 
 @gestor_relatorios_router.get("/kpis", response_model=GestorDashboardKpiSchema)
@@ -48,37 +57,47 @@ def get_dashboard_gestor_kpis(
     Retorna os KPIs (Indicadores Chave) para o dashboard principal do gestor
     (Focado no Mês Atual).
     """
-    start_date, end_date = get_date_filters(None, None)  # Mês Atual
+    # Usa a data atual para extrair Mês e Ano
+    # (Essa abordagem é mais segura para SQLite + Views do que comparar datas completas)
+    hoje = datetime.utcnow()
+    mes_atual = hoje.month
+    ano_atual = hoje.year
 
     # 1. Total de Vendas, Pedidos e Clientes (usando VW_VENDAS_EMPRESA_MES)
-    # Esta query estava correta, pois a View já tem id_organizacao
+    # Somamos os KPIs de todas as empresas da organização no mês
     kpis_vendas = db.query(
         func.sum(models.VwVendasEmpresaMes.vl_total_vendas).label("vendas"),
         func.sum(models.VwVendasEmpresaMes.qt_pedidos).label("pedidos"),
         func.sum(models.VwVendasEmpresaMes.qt_clientes_atendidos).label("clientes")
     ).filter(
         models.VwVendasEmpresaMes.id_organizacao == id_organizacao,
-        models.VwVendasEmpresaMes.dt_mes_referencia >= start_date,
-        models.VwVendasEmpresaMes.dt_mes_referencia <= end_date
+        # --- ALTERAÇÃO AQUI: Usa extract() igual ao Vendedor ---
+        extract('year', models.VwVendasEmpresaMes.dt_mes_referencia) == ano_atual,
+        extract('month', models.VwVendasEmpresaMes.dt_mes_referencia) == mes_atual
+        # -------------------------------------------------------
     ).first()
 
-    # --- 2. CORREÇÃO DA QUERY DE COMISSÕES ---
-    # A View VW_COMISSOES_CALCULADAS não tem id_organizacao.
-    # Devemos fazer o JOIN com a TB_EMPRESAS (via id_empresa) para filtrar.
+    # 2. Total de Comissões (usando VW_COMISSOES_CALCULADAS)
+    # Precisamos juntar com Empresa para filtrar pela Organização
     kpis_comissoes = db.query(
         func.sum(models.VwComissoesCalculadas.vl_comissao_calculada).label("comissoes")
     ).join(
         models.Empresa, models.VwComissoesCalculadas.id_empresa == models.Empresa.id_empresa
     ).filter(
-        models.Empresa.id_organizacao == id_organizacao,  # Filtra pela Organização da Empresa
-        models.VwComissoesCalculadas.dt_pedido.between(start_date, end_date)
+        models.Empresa.id_organizacao == id_organizacao,
+        # --- ALTERAÇÃO AQUI: Usa extract() igual ao Vendedor ---
+        extract('year', models.VwComissoesCalculadas.dt_pedido) == ano_atual,
+        extract('month', models.VwComissoesCalculadas.dt_pedido) == mes_atual
+        # -------------------------------------------------------
     ).scalar()
 
     vendas = kpis_vendas.vendas or Decimal(0.0)
     pedidos = kpis_vendas.pedidos or 0
     clientes = kpis_vendas.clientes or 0
+    
+    # Evita divisão por zero
     ticket_medio = (vendas / pedidos) if pedidos > 0 else Decimal(0.0)
-
+    
     return GestorDashboardKpiSchema(
         vendas_mes_atual=vendas,
         pedidos_mes_atual=pedidos,

@@ -83,12 +83,58 @@ app.add_middleware(
 )
 
 
+# --- FUNÇÃO PARA CRIAR TRIGGERS (LOGS AUTOMÁTICOS) ---
+def create_sqlite_triggers(db: Session):
+    """
+    Cria triggers no SQLite para popular a TB_LOGS_AUDITORIA automaticamente.
+    """
+    print("Verificando/Criando Triggers de Auditoria...")
+    
+    # Trigger: Insert Pedido
+    db.execute(text("""
+    CREATE TRIGGER IF NOT EXISTS tg_log_pedido_ins AFTER INSERT ON TB_PEDIDOS
+    BEGIN
+        INSERT INTO TB_LOGS_AUDITORIA (TP_ENTIDADE, ID_ENTIDADE, TP_ACAO, DT_ACAO, ID_USUARIO, ID_ORGANIZACAO)
+        VALUES (
+            'Pedido', 
+            NEW.ID_PEDIDO, 
+            'CREATE', 
+            datetime('now'), 
+            NEW.ID_USUARIO,
+            (SELECT ID_ORGANIZACAO FROM TB_EMPRESAS WHERE ID_EMPRESA = NEW.ID_EMPRESA)
+        );
+    END;
+    """))
+    
+    # Trigger: Update Pedido (Mudança de Status)
+    db.execute(text("""
+    CREATE TRIGGER IF NOT EXISTS tg_log_pedido_upd AFTER UPDATE ON TB_PEDIDOS
+    WHEN OLD.ST_PEDIDO <> NEW.ST_PEDIDO
+    BEGIN
+        INSERT INTO TB_LOGS_AUDITORIA (TP_ENTIDADE, ID_ENTIDADE, TP_ACAO, DT_ACAO, ID_USUARIO, ID_ORGANIZACAO, DS_VALORES_ANTIGOS, DS_VALORES_NOVOS)
+        VALUES (
+            'Pedido', 
+            NEW.ID_PEDIDO, 
+            'UPDATE_STATUS', 
+            datetime('now'), 
+            NEW.ID_USUARIO,
+            (SELECT ID_ORGANIZACAO FROM TB_EMPRESAS WHERE ID_EMPRESA = NEW.ID_EMPRESA),
+            json_object('status', OLD.ST_PEDIDO),
+            json_object('status', NEW.ST_PEDIDO)
+        );
+    END;
+    """))
+    
+    db.commit()
+    print("Triggers de auditoria criados com sucesso.")
+
+
 def create_sqlite_views(db: Session):
     """
     (Apenas SQLite) Cria as Views necessárias para os Dashboards.
-    Trata erros de DROP para garantir que funcione independente se é Table ou View.
+    Usa 'date(..., 'start of month')' para garantir compatibilidade de datas.
     """
-    print("Verificando/Criando Views no SQLite...")
+    print("Recriando Views no SQLite...")
     
     views = [
         "VW_VENDAS_VENDEDOR_MES", 
@@ -96,43 +142,67 @@ def create_sqlite_views(db: Session):
         "VW_VENDAS_EMPRESA_MES", 
         "VW_VENDAS_POR_CIDADE"
     ]
-    
     for view in views:
-        # Tenta dropar como VIEW
-        try:
-            db.execute(text(f"DROP VIEW IF EXISTS {view}"))
-            db.commit()
-        except Exception:
-            db.rollback()
-            
-        # Tenta dropar como TABLE (caso o SQLAlchemy tenha criado errado)
-        try:
-            db.execute(text(f"DROP TABLE IF EXISTS {view}"))
-            db.commit()
-        except Exception:
-            db.rollback()
-
+        try: db.execute(text(f"DROP VIEW IF EXISTS {view}"))
+        except: pass
+        try: db.execute(text(f"DROP TABLE IF EXISTS {view}"))
+        except: pass
+        
     # 1. View: Vendas por Vendedor
+    # (Usa datetime(..., 'start of month') para gerar 'YYYY-MM-01 00:00:00')
     db.execute(text("""
-    CREATE VIEW IF NOT EXISTS VW_VENDAS_VENDEDOR_MES AS
+    CREATE VIEW VW_VENDAS_VENDEDOR_MES AS
     SELECT 
         u.ID_USUARIO,
         u.NO_COMPLETO AS NO_VENDEDOR,
         u.ID_ORGANIZACAO,
-        datetime(strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO)) AS DT_MES_REFERENCIA,
+        datetime(p.DT_PEDIDO, 'start of month') AS DT_MES_REFERENCIA,
         COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
         SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS,
         AVG(p.VL_TOTAL) AS VL_TICKET_MEDIO
     FROM TB_USUARIOS u
     INNER JOIN TB_PEDIDOS p ON u.ID_USUARIO = p.ID_USUARIO
-    WHERE u.TP_USUARIO = 'vendedor'
-        AND p.ST_PEDIDO NOT IN ('cancelado')
-    GROUP BY u.ID_USUARIO, u.NO_COMPLETO, u.ID_ORGANIZACAO, strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO);
+    WHERE u.TP_USUARIO = 'vendedor' AND p.ST_PEDIDO != 'cancelado'
+    GROUP BY u.ID_USUARIO, u.NO_COMPLETO, u.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
     """))
 
-    # 2. View: Comissões Calculadas
+    # 2. View: Vendas por Empresa
     db.execute(text("""
-    CREATE VIEW IF NOT EXISTS VW_COMISSOES_CALCULADAS AS
+    CREATE VIEW VW_VENDAS_EMPRESA_MES AS
+    SELECT 
+        e.ID_EMPRESA,
+        e.NO_EMPRESA,
+        e.ID_ORGANIZACAO,
+        datetime(p.DT_PEDIDO, 'start of month') AS DT_MES_REFERENCIA,
+        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
+        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS,
+        COUNT(DISTINCT p.ID_CLIENTE) AS QT_CLIENTES_ATENDIDOS
+    FROM TB_EMPRESAS e
+    INNER JOIN TB_PEDIDOS p ON e.ID_EMPRESA = p.ID_EMPRESA
+    WHERE p.ST_PEDIDO != 'cancelado'
+    GROUP BY e.ID_EMPRESA, e.NO_EMPRESA, e.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
+    """))
+    
+    # 3. View: Vendas por Cidade
+    db.execute(text("""
+    CREATE VIEW VW_VENDAS_POR_CIDADE AS
+    SELECT 
+        en.NO_CIDADE,
+        en.SG_ESTADO,
+        c.ID_ORGANIZACAO,
+        datetime(p.DT_PEDIDO, 'start of month') AS DT_MES_REFERENCIA,
+        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
+        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS
+    FROM TB_PEDIDOS p
+    INNER JOIN TB_CLIENTES c ON p.ID_CLIENTE = c.ID_CLIENTE
+    INNER JOIN TB_ENDERECOS en ON p.ID_ENDERECO_ENTREGA = en.ID_ENDERECO
+    WHERE p.ST_PEDIDO != 'cancelado'
+    GROUP BY en.NO_CIDADE, en.SG_ESTADO, c.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
+    """))
+
+    # 4. View: Comissões (Mantida, pois já funcionava)
+    db.execute(text("""
+    CREATE VIEW VW_COMISSOES_CALCULADAS AS
     SELECT 
         p.ID_PEDIDO,
         p.NR_PEDIDO,
@@ -147,47 +217,11 @@ def create_sqlite_views(db: Session):
     FROM TB_PEDIDOS p
     INNER JOIN TB_USUARIOS u ON p.ID_USUARIO = u.ID_USUARIO
     INNER JOIN TB_EMPRESAS e ON p.ID_EMPRESA = e.ID_EMPRESA
-    WHERE p.ST_PEDIDO NOT IN ('cancelado');
-    """))
-    
-    # 3. View: Vendas por Empresa
-    db.execute(text("""
-    CREATE VIEW IF NOT EXISTS VW_VENDAS_EMPRESA_MES AS
-    SELECT 
-        e.ID_EMPRESA,
-        e.NO_EMPRESA,
-        e.ID_ORGANIZACAO,
-        datetime(strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO)) AS DT_MES_REFERENCIA,
-        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
-        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS,
-        COUNT(DISTINCT p.ID_CLIENTE) AS QT_CLIENTES_ATENDIDOS
-    FROM TB_EMPRESAS e
-    INNER JOIN TB_PEDIDOS p ON e.ID_EMPRESA = p.ID_EMPRESA
-    WHERE p.ST_PEDIDO NOT IN ('cancelado')
-    GROUP BY e.ID_EMPRESA, e.NO_EMPRESA, e.ID_ORGANIZACAO, strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO);
-    """))
-    
-    # 4. View: Vendas por Cidade
-    db.execute(text("""
-    CREATE VIEW IF NOT EXISTS VW_VENDAS_POR_CIDADE AS
-    SELECT 
-        en.NO_CIDADE,
-        en.SG_ESTADO,
-        c.ID_ORGANIZACAO,
-        datetime(strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO)) AS DT_MES_REFERENCIA,
-        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
-        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS
-    FROM TB_PEDIDOS p
-    INNER JOIN TB_CLIENTES c ON p.ID_CLIENTE = c.ID_CLIENTE
-    INNER JOIN TB_ENDERECOS en ON p.ID_ENDERECO_ENTREGA = en.ID_ENDERECO
-    WHERE p.ST_PEDIDO NOT IN ('cancelado')
-    GROUP BY en.NO_CIDADE, en.SG_ESTADO, c.ID_ORGANIZACAO, strftime('%Y-%m-01 00:00:00', p.DT_PEDIDO);
+    WHERE p.ST_PEDIDO != 'cancelado';
     """))
 
     db.commit()
     print("Views SQLite recriadas com sucesso.")
-
-
 
 # --- POPULAÇÃO DE DADOS INICIAIS (SEED COMPLETO) ---
 def seed_initial_data():
@@ -413,11 +447,12 @@ if os.getenv("AMBIENTE") == "dev":
     Base.metadata.create_all(bind=engine)
     print("Tabelas criadas com sucesso.")
 
-    # 2. Se for SQLite, corrige as views
+    # 2. Se for SQLite, corrige as views e cria triggers
     if 'sqlite' in str(engine.url).lower():
         db = SessionLocal()
         try:
             create_sqlite_views(db)
+            create_sqlite_triggers(db)  # <-- NOVA FUNÇÃO ADICIONADA
         finally:
             db.close()
 

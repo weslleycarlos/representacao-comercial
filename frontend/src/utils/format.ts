@@ -2,11 +2,10 @@
 
 /**
  * Formata um número para o padrão de moeda BRL (R$)
- * @param value O número a ser formatado
  */
-export const formatCurrency = (value: number | undefined | null): string => {
-  if (value === undefined || value === null) {
-    // Retorna um valor padrão ou 'R$ 0,00'
+export const formatCurrency = (value: number | undefined | null | string): string => {
+  const num = typeof value === 'string' ? parseFloat(value) : value;
+  if (num === undefined || num === null || isNaN(num)) {
     return new Intl.NumberFormat('pt-BR', {
       style: 'currency',
       currency: 'BRL',
@@ -16,12 +15,11 @@ export const formatCurrency = (value: number | undefined | null): string => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
-  }).format(value);
+  }).format(num);
 };
 
 /**
  * Formata um número inteiro
- * @param value O número a ser formatado
  */
 export const formatInteger = (value: number | undefined | null): string => {
    if (value === undefined || value === null) {
@@ -30,24 +28,27 @@ export const formatInteger = (value: number | undefined | null): string => {
    return value.toString();
 };
 
-/**
- * Função auxiliar para operações de ponto flutuante (inspirada no Decimal.js)
- * @param value O número a ser manipulado
- */
-export const Decimal = (value: number | string): {
+// Interface para o retorno do Decimal
+interface DecimalResult {
   toNumber: () => number;
-  mul: (n: number | string) => ReturnType<typeof Decimal>;
-  div: (n: number | string) => ReturnType<typeof Decimal>;
-  add: (n: number | string) => ReturnType<typeof Decimal>;
-  sub: (n: number | string) => ReturnType<typeof Decimal>;
-} => {
+  mul: (n: number | string) => DecimalResult;
+  div: (n: number | string) => DecimalResult;
+  add: (n: number | string) => DecimalResult;
+  sub: (n: number | string) => DecimalResult;
+}
+
+/**
+ * Função auxiliar para operações de ponto flutuante
+ */
+export const Decimal = (value: number | string): DecimalResult => {
   const num = typeof value === 'string' ? parseFloat(value) : value;
+  const safeNum = isNaN(num) ? 0 : num;
 
   return {
-    toNumber: () => num,
-    mul: (n: number | string) => Decimal(num * (typeof n === 'string' ? parseFloat(n) : n)),
-    div: (n: number | string) => Decimal(num / (typeof n === 'string' ? parseFloat(n) : n)),
-    add: (n: number | string) => Decimal(num + (typeof n === 'string' ? parseFloat(n) : n)),
-    sub: (n: number | string) => Decimal(num - (typeof n === 'string' ? parseFloat(n) : n)),
+    toNumber: () => safeNum,
+    mul: (n: number | string) => Decimal(safeNum * (typeof n === 'string' ? parseFloat(n) : n)),
+    div: (n: number | string) => Decimal(safeNum / (typeof n === 'string' ? parseFloat(n) : n)),
+    add: (n: number | string) => Decimal(safeNum + (typeof n === 'string' ? parseFloat(n) : n)),
+    sub: (n: number | string) => Decimal(safeNum - (typeof n === 'string' ? parseFloat(n) : n)),
   };
 };

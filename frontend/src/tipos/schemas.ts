@@ -234,6 +234,7 @@ export interface IPedidoCompleto {
   st_pedido: string;
   vl_total: number;
   dt_pedido: string;
+  ds_observacoes?: string;
   
   // Relacionamentos Aninhados
   cliente: ICliente;

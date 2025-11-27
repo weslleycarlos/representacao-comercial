@@ -70,7 +70,7 @@ app = FastAPI(
 # --- CONFIGURAÇÃO DO CORS ---
 origins = [
     "http://localhost:5173",
-    "https://representacao-frontend.onrender.com"
+    "https://repcom-front-production.up.railway.app"
 ]
 
 app.add_middleware(

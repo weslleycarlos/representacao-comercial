@@ -594,6 +594,18 @@ def seed_initial_data():
         )
         db.add(comissao)
 
+            # AGORA: Criar Variações para a Camiseta (ID 1)
+            # Vamos criar uma grade: Azul (P, M, G) e Branco (P, M, G)
+        variacoes_camiseta = [
+                # Azul
+                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="P", qt_estoque=10, vl_ajuste_preco=0),
+                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="M", qt_estoque=15, vl_ajuste_preco=0),
+                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="G", qt_estoque=5, vl_ajuste_preco=2.00), # G é mais caro?
+                # Branco
+                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Branco", ds_tamanho="P", qt_estoque=8, vl_ajuste_preco=0),
+                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Branco", ds_tamanho="M", qt_estoque=20, vl_ajuste_preco=0),
+            ]
+        db.bulk_save_objects(variacoes_camiseta)
         db.commit()
         print("✅ Dados de teste completos criados com sucesso!")
 

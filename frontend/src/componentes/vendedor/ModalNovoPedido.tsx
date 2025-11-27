@@ -33,6 +33,7 @@ import type { IClienteCompleto, IItemCatalogoVenda, IEndereco } from '../../tipo
 import { formatCurrency, Decimal } from '../../utils/format';
 import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
 import { ModalFormEndereco } from '../../componentes/gestor/ModalFormEndereco';
+import { SeletorGrade } from '../../componentes/vendedor/SeletorGrade';
 
 interface ModalNovoPedidoProps {
   open: boolean;
@@ -72,6 +73,9 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   
   // Busque os catálogos
   const { data: listaCatalogos } = useGetCatalogosDisponiveis(empresaAtiva?.id_empresa);
+
+  // State para armazenar as quantidades da grade { id_variacao: quantidade }
+  const [gradeQuantidades, setGradeQuantidades] = useState<Record<number, number>>({});
 
   // Configuração do Formulário
   const {
@@ -178,22 +182,62 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
 
   // Handlers de Itens
   const handleAddItemAoCarrinho = () => {
-    if (!produtoSelecionado || qtdItem <= 0) return;
+    if (!produtoSelecionado) return;
 
-    const precoBase = produtoSelecionado.vl_preco_catalogo;
+    const temVariacoes = produtoSelecionado.produto.variacoes && produtoSelecionado.produto.variacoes.length > 0;
+    const precoBase = Number(produtoSelecionado.vl_preco_catalogo);
 
-    append({
-      id_produto: produtoSelecionado.produto.id_produto,
-      id_variacao: undefined,
-      cd_produto: produtoSelecionado.produto.cd_produto,
-      ds_produto: produtoSelecionado.produto.ds_produto,
-      vl_unitario_base: precoBase,
-      qt_quantidade: qtdItem,
-      pc_desconto_item: 0,
-    });
+    if (temVariacoes) {
+      // --- MODO GRADE: Adiciona uma linha por variação com qtd > 0 ---
+      
+      // Itera sobre as quantidades preenchidas
+      Object.entries(gradeQuantidades).forEach(([idVarStr, qtd]) => {
+        const idVar = Number(idVarStr);
+        if (qtd <= 0) return;
 
+        // Encontra os dados da variação (para pegar o nome e ajuste de preço)
+        const variacao = produtoSelecionado.produto.variacoes.find(v => v.id_variacao === idVar);
+        if (!variacao) return;
+
+        const precoFinal = precoBase + Number(variacao.vl_ajuste_preco || 0);
+        
+        // Cria descrição rica: "Camiseta (Azul - P)"
+        const descVariacao = `${variacao.ds_cor || ''} ${variacao.ds_tamanho || ''}`.trim();
+        const nomeProdutoCompleto = `${produtoSelecionado.produto.ds_produto} - ${descVariacao}`;
+
+        append({
+          id_produto: produtoSelecionado.produto.id_produto,
+          id_variacao: idVar,
+          cd_produto: produtoSelecionado.produto.cd_produto, // (Opcional: poderia concatenar o SKU da variação)
+          ds_produto: nomeProdutoCompleto, // Exibe o nome com a variação no carrinho
+          vl_unitario_base: precoFinal, // Preço já ajustado
+          qt_quantidade: qtd,
+          pc_desconto_item: 0,
+        });
+      });
+
+      // Limpa a grade após adicionar
+      setGradeQuantidades({});
+
+    } else {
+      // --- MODO SIMPLES (Como era antes) ---
+      if (qtdItem <= 0) return;
+
+      append({
+        id_produto: produtoSelecionado.produto.id_produto,
+        id_variacao: null, // Sem variação
+        cd_produto: produtoSelecionado.produto.cd_produto,
+        ds_produto: produtoSelecionado.produto.ds_produto,
+        vl_unitario_base: precoBase,
+        qt_quantidade: qtdItem,
+        pc_desconto_item: 0,
+      });
+      
+      setQtdItem(1);
+    }
+    
+    // Limpa o produto selecionado para forçar nova escolha
     setProdutoSelecionado(null);
-    setQtdItem(1);
   };
 
   // Cálculos
@@ -551,13 +595,21 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                 <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
                   Adicionar Item ao Pedido
                 </Typography>
-                <Grid container spacing={2} alignItems="center">
-                  <Grid size={{ xs: 12, md: 6 }}>
+                
+                {/* Use alignItems="flex-start" para acomodar a grade que cresce verticalmente */}
+                <Grid container spacing={2} alignItems="flex-start">
+                  
+                  {/* 1. Busca de Produto */}
+                  <Grid xs={12} md={5}>
                     <Autocomplete
                       options={catalogo || []}
                       getOptionLabel={(option) => `${option.produto.ds_produto} (${option.produto.cd_produto})`}
                       value={produtoSelecionado}
-                      onChange={(_, newValue) => setProdutoSelecionado(newValue)}
+                      onChange={(_, newValue) => {
+                          setProdutoSelecionado(newValue);
+                          setQtdItem(1); 
+                          setGradeQuantidades({}); 
+                      }}
                       loading={isLoadingCatalogo}
                       renderOption={(props, option) => {
                         const { key, ...restProps } = props as any; 
@@ -568,7 +620,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                                 {option.produto.ds_produto}
                               </Typography>
                               <Typography variant="caption" color="text.secondary">
-                                Código: {option.produto.cd_produto} • Preço: {formatCurrency(option.vl_preco_catalogo)}
+                                Cód: {option.produto.cd_produto} • Preço: {formatCurrency(option.vl_preco_catalogo)}
                               </Typography>
                             </Box>
                           </Box>
@@ -584,32 +636,70 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       )}
                     />
                   </Grid>
-                  <Grid size={{ xs: 6, md: 2 }}>
-                    <TextField
-                      label="Quantidade"
-                      type="number"
-                      value={qtdItem}
-                      onChange={(e) => setQtdItem(Math.max(1, Number(e.target.value)))}
-                      fullWidth
-                      InputProps={{ inputProps: { min: 1 } }}
-                      helperText="Qtd."
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 6, md: 2 }}>
-                    <TextField
-                      label="Preço Unit."
-                      value={formatCurrency(produtoSelecionado?.vl_preco_catalogo || 0)}
-                      fullWidth
-                      disabled
-                      helperText="Preço"
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 2 }}>
+
+                  {/* 2. Lógica Condicional: Grade vs Simples */}
+                  {produtoSelecionado && (
+                    <>
+                      {/* CASO A: Produto com Grade */}
+                      {produtoSelecionado.produto.variacoes && produtoSelecionado.produto.variacoes.length > 0 ? (
+                        <Grid xs={12} md={7}>
+                          <SeletorGrade
+                            produto={produtoSelecionado.produto}
+                            precoBase={Number(produtoSelecionado.vl_preco_catalogo)}
+                            quantidades={gradeQuantidades}
+                            onChange={(idVar, qtd) => {
+                              setGradeQuantidades(prev => ({
+                                ...prev,
+                                [idVar]: qtd
+                              }));
+                            }}
+                          />
+                        </Grid>
+                      ) : (
+                        /* CASO B: Produto Simples (Quantidade + Preço) */
+                        <>
+                          <Grid xs={6} md={2}>
+                            <TextField
+                              label="Quantidade"
+                              type="number"
+                              value={qtdItem}
+                              onChange={(e) => setQtdItem(Math.max(1, Number(e.target.value)))}
+                              fullWidth
+                              InputProps={{ inputProps: { min: 1 } }}
+                              helperText="Unidades"
+                            />
+                          </Grid>
+                          <Grid xs={6} md={3}>
+                            <TextField
+                              label="Preço Unit."
+                              value={formatCurrency(produtoSelecionado.vl_preco_catalogo)}
+                              fullWidth
+                              disabled
+                              helperText="Preço Base"
+                            />
+                          </Grid>
+                        </>
+                      )}
+                    </>
+                  )}
+
+                  {/* 3. Botão Adicionar (Sempre visível se produto selecionado) */}
+                  {/* Ajustamos o 'mt' (margem topo) para alinhar com a grade ou inputs */}
+                  <Grid xs={12} md={2} sx={{ 
+                      display: 'flex', 
+                      alignItems: 'flex-start', // Alinha no topo
+                      mt: produtoSelecionado?.produto.variacoes?.length ? 6 : 0 // Se for grade, empurra pra baixo (opcional, ajuste conforme layout)
+                  }}>
                     <Button
-                      variant="filled"
+                      variant="contained"
                       startIcon={<AddCartIcon />}
                       onClick={handleAddItemAoCarrinho}
-                      disabled={!produtoSelecionado || qtdItem <= 0}
+                      disabled={
+                        !produtoSelecionado || 
+                        (produtoSelecionado.produto.variacoes.length > 0 
+                          ? Object.values(gradeQuantidades).reduce((a, b) => a + b, 0) === 0
+                          : qtdItem <= 0)
+                      }
                       fullWidth
                       size="large"
                       sx={{ height: '56px' }}

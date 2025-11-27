@@ -85,6 +85,24 @@ def create_pedido(
         db_itens_pedido = []
 
         for item_in in pedido_in.itens:
+            
+            variacoes_produto = db.query(models.VariacaoProduto).filter(
+                models.VariacaoProduto.id_produto == item_in.id_produto,
+                models.VariacaoProduto.fl_ativa == True
+            ).count()
+
+            # Regra: Se tem variação, id_variacao é obrigatório
+            if variacoes_produto > 0 and not item_in.id_variacao:
+                 raise HTTPException(
+                    status_code=422, 
+                    detail=f"O produto {item_in.id_produto} possui grade (tamanho/cor). É necessário especificar a variação."
+                )
+            
+            # Regra: Se NÃO tem variação, id_variacao deve ser nulo (ou ignorado)
+            if variacoes_produto == 0 and item_in.id_variacao:
+                 # Opcional: pode limpar ou dar erro. Vamos apenas ignorar ou logar.
+                 item_in.id_variacao = None
+            
             item_catalogo = db.query(models.ItemCatalogo).filter(
                 models.ItemCatalogo.id_catalogo == catalogo_ativo.id_catalogo,
                 models.ItemCatalogo.id_produto == item_in.id_produto,

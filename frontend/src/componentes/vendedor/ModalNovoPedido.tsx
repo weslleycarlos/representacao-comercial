@@ -1,15 +1,41 @@
-import React, { useState, useEffect } from 'react';
-import { useForm, Controller, useFieldArray, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
+import React, { useState, useEffect } from "react";
+import { useForm, Controller, useFieldArray, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Typography, Grid, Paper, Alert, CircularProgress, TextField,
-  MenuItem, InputAdornment, IconButton, Button, Divider, Autocomplete,
-  Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-  Stepper, Step, StepLabel, Stack, Card, CardContent, Chip, Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Box,
+  Typography,
+  Grid,
+  Paper,
+  Alert,
+  CircularProgress,
+  TextField,
+  MenuItem,
+  InputAdornment,
+  IconButton,
+  Button,
+  Divider,
+  Autocomplete,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Stepper,
+  Step,
+  StepLabel,
+  Stack,
+  Card,
+  CardContent,
+  Chip,
+  Tooltip,
   useTheme,
-  useMediaQuery
-} from '@mui/material';
+  useMediaQuery,
+} from "@mui/material";
 import {
   Search as SearchIcon,
   AddShoppingCart as AddCartIcon,
@@ -20,20 +46,39 @@ import {
   Description as DescriptionIcon,
   Check as CheckIcon,
   Add as AddIcon,
-  Info as InfoIcon
-} from '@mui/icons-material';
+  Info as InfoIcon,
+} from "@mui/icons-material";
 
-import { type PedidoCreateFormData, type ItemPedidoFormData, pedidoCreateSchema, type ClienteFormData } from '../../tipos/validacao';
-import { useAuth } from '../../contextos/AuthContext';
-import { useGetVendedorClientes, useCreateVendedorCliente } from '../../api/servicos/vendedorService';
-import { useGetCatalogoVenda, useGetFormasPagamento } from '../../api/servicos/vendedorService';
-import { useCreatePedido } from '../../api/servicos/vendedorService';
-import { useAddVendedorEndereco, useUpdateVendedorEndereco, useGetCatalogosDisponiveis } from '../../api/servicos/vendedorService';
-import type { IClienteCompleto, IItemCatalogoVenda, IEndereco } from '../../tipos/schemas';
-import { formatCurrency, Decimal } from '../../utils/format';
-import { ModalFormCliente } from '../../componentes/gestor/ModalFormCliente';
-import { ModalFormEndereco } from '../../componentes/gestor/ModalFormEndereco';
-import { SeletorGrade } from '../../componentes/vendedor/SeletorGrade';
+import {
+  type PedidoCreateFormData,
+  type ItemPedidoFormData,
+  pedidoCreateSchema,
+  type ClienteFormData,
+} from "../../tipos/validacao";
+import { useAuth } from "../../contextos/AuthContext";
+import {
+  useGetVendedorClientes,
+  useCreateVendedorCliente,
+} from "../../api/servicos/vendedorService";
+import {
+  useGetCatalogoVenda,
+  useGetFormasPagamento,
+} from "../../api/servicos/vendedorService";
+import { useCreatePedido } from "../../api/servicos/vendedorService";
+import {
+  useAddVendedorEndereco,
+  useUpdateVendedorEndereco,
+  useGetCatalogosDisponiveis,
+} from "../../api/servicos/vendedorService";
+import type {
+  IClienteCompleto,
+  IItemCatalogoVenda,
+  IEndereco,
+} from "../../tipos/schemas";
+import { formatCurrency, Decimal } from "../../utils/format";
+import { ModalFormCliente } from "../../componentes/gestor/ModalFormCliente";
+import { ModalFormEndereco } from "../../componentes/gestor/ModalFormEndereco";
+import { SeletorGrade } from "../../componentes/vendedor/SeletorGrade";
 
 interface ModalNovoPedidoProps {
   open: boolean;
@@ -42,7 +87,7 @@ interface ModalNovoPedidoProps {
 }
 
 // Steps do processo
-const steps = ['Cliente', 'Produtos', 'Confirmar'];
+const steps = ["Cliente", "Produtos", "Confirmar"];
 // Função helper para calcular subtotal (mantém da Solução 2)
 const calcularSubtotalItem = (item: any) => {
   const precoUnit = Number(item.vl_unitario_base) || 0;
@@ -55,27 +100,32 @@ const calcularSubtotalItem = (item: any) => {
 export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   open,
   onClose,
-  onPedidoCriado
+  onPedidoCriado,
 }) => {
-
   const { usuario, empresaAtiva } = useAuth();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
+  const isMobile = useMediaQuery(theme.breakpoints.down("md"));
+
   const [activeStep, setActiveStep] = useState(0);
-  const [clienteSelecionado, setClienteSelecionado] = useState<IClienteCompleto | null>(null);
+  const [clienteSelecionado, setClienteSelecionado] =
+    useState<IClienteCompleto | null>(null);
   const [modalClienteAberto, setModalClienteAberto] = useState(false);
   const [modalEnderecoAberto, setModalEnderecoAberto] = useState(false);
-  const [produtoSelecionado, setProdutoSelecionado] = useState<IItemCatalogoVenda | null>(null);
+  const [produtoSelecionado, setProdutoSelecionado] =
+    useState<IItemCatalogoVenda | null>(null);
   const addEnderecoHook = useAddVendedorEndereco();
   const updateEnderecoHook = useUpdateVendedorEndereco();
   const [qtdItem, setQtdItem] = useState(1);
-  
+
   // Busque os catálogos
-  const { data: listaCatalogos } = useGetCatalogosDisponiveis(empresaAtiva?.id_empresa);
+  const { data: listaCatalogos } = useGetCatalogosDisponiveis(
+    empresaAtiva?.id_empresa,
+  );
 
   // State para armazenar as quantidades da grade { id_variacao: quantidade }
-  const [gradeQuantidades, setGradeQuantidades] = useState<Record<number, number>>({});
+  const [gradeQuantidades, setGradeQuantidades] = useState<
+    Record<number, number>
+  >({});
 
   // Configuração do Formulário
   const {
@@ -86,18 +136,18 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
     setValue,
     watch,
     reset,
-    trigger
+    trigger,
   } = useForm<PedidoCreateFormData>({
     resolver: zodResolver(pedidoCreateSchema),
     defaultValues: {
       itens: [],
       pc_desconto: 0,
-      ds_observacoes: '',
+      ds_observacoes: "",
     },
   });
 
   // Assista o campo id_catalogo do formulário
-  const idCatalogoSelecionado = useWatch({ control, name: 'id_catalogo' });
+  const idCatalogoSelecionado = useWatch({ control, name: "id_catalogo" });
 
   // Field Array para os itens do carrinho
   const { fields, append, remove } = useFieldArray({
@@ -110,27 +160,37 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   };
 
   // Observadores para cálculos
-  const itensDoFormulario = useWatch({ control, name: 'itens' });
-  const descontoGeral = useWatch({ control, name: 'pc_desconto' });
+  const itensDoFormulario = useWatch({ control, name: "itens" });
+  const descontoGeral = useWatch({ control, name: "pc_desconto" });
 
   // Hooks de API
-  const { data: clientes, isLoading: isLoadingClientes, refetch: refetchClientes } = useGetVendedorClientes(empresaAtiva?.id_empresa);
-  const { data: catalogo, isLoading: isLoadingCatalogo } = useGetCatalogoVenda(empresaAtiva?.id_empresa,idCatalogoSelecionado);
-  const { data: formasPgto, isLoading: isLoadingFormasPgto } = useGetFormasPagamento();
+  const {
+    data: clientes,
+    isLoading: isLoadingClientes,
+    refetch: refetchClientes,
+  } = useGetVendedorClientes(empresaAtiva?.id_empresa);
+  const { data: catalogo, isLoading: isLoadingCatalogo } = useGetCatalogoVenda(
+    empresaAtiva?.id_empresa,
+    idCatalogoSelecionado,
+  );
+  const { data: formasPgto, isLoading: isLoadingFormasPgto } =
+    useGetFormasPagamento();
 
   // Adicione logo após os hooks de API
   useEffect(() => {
     if (clienteSelecionado && clientes) {
-      const clienteAtualizado = clientes.find(c => c.id_cliente === clienteSelecionado.id_cliente);
+      const clienteAtualizado = clientes.find(
+        (c) => c.id_cliente === clienteSelecionado.id_cliente,
+      );
       if (clienteAtualizado) {
         // Atualiza o state local com os novos dados (incluindo o novo endereço)
         setClienteSelecionado(clienteAtualizado);
-        
+
         // Opcional: Se for o único endereço, já seleciona ele nos campos
         if (clienteAtualizado.enderecos.length === 1) {
-             const endId = clienteAtualizado.enderecos[0].id_endereco;
-             setValue('id_endereco_entrega', endId);
-             setValue('id_endereco_cobranca', endId);
+          const endId = clienteAtualizado.enderecos[0].id_endereco;
+          setValue("id_endereco_entrega", endId);
+          setValue("id_endereco_cobranca", endId);
         }
       }
     }
@@ -139,12 +199,20 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   // Auto-selecionar o primeiro catálogo se houver apenas um (UX)
   useEffect(() => {
     if (listaCatalogos && listaCatalogos.length > 0 && !idCatalogoSelecionado) {
-       setValue('id_catalogo', listaCatalogos[0].id_catalogo);
+      setValue("id_catalogo", listaCatalogos[0].id_catalogo);
     }
-  }, [listaCatalogos, idCatalogoSelecionado, setValue]); 
+  }, [listaCatalogos, idCatalogoSelecionado, setValue]);
 
-  const { mutate: criarCliente, isPending: isCriandoCliente, error: erroCriarCliente } = useCreateVendedorCliente();
-  const { mutate: salvarPedido, isPending: isSalvando, error: erroSalvar } = useCreatePedido();
+  const {
+    mutate: criarCliente,
+    isPending: isCriandoCliente,
+    error: erroCriarCliente,
+  } = useCreateVendedorCliente();
+  const {
+    mutate: salvarPedido,
+    isPending: isSalvando,
+    error: erroSalvar,
+  } = useCreatePedido();
 
   const apiError = erroCriarCliente || erroSalvar;
 
@@ -164,19 +232,20 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   const handleSelecionarCliente = (cliente: IClienteCompleto | null) => {
     setClienteSelecionado(cliente);
     if (cliente) {
-      setValue('id_cliente', cliente.id_cliente);
+      setValue("id_cliente", cliente.id_cliente);
       // Auto-seleciona endereços
       if (cliente.enderecos && cliente.enderecos.length > 0) {
-        const endPrincipal = cliente.enderecos.find(e => e.fl_principal) || cliente.enderecos[0];
-        setValue('id_endereco_entrega', endPrincipal.id_endereco);
-        setValue('id_endereco_cobranca', endPrincipal.id_endereco);
+        const endPrincipal =
+          cliente.enderecos.find((e) => e.fl_principal) || cliente.enderecos[0];
+        setValue("id_endereco_entrega", endPrincipal.id_endereco);
+        setValue("id_endereco_cobranca", endPrincipal.id_endereco);
       } else {
         // Se o cliente não tem endereços, limpa (usuário terá que adicionar)
-        setValue('id_endereco_entrega', 0);
-        setValue('id_endereco_cobranca', 0);
+        setValue("id_endereco_entrega", 0);
+        setValue("id_endereco_cobranca", 0);
       }
     } else {
-      setValue('id_cliente', 0);
+      setValue("id_cliente", 0);
     }
   };
 
@@ -184,25 +253,30 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   const handleAddItemAoCarrinho = () => {
     if (!produtoSelecionado) return;
 
-    const temVariacoes = produtoSelecionado.produto.variacoes && produtoSelecionado.produto.variacoes.length > 0;
+    const temVariacoes =
+      produtoSelecionado.produto.variacoes &&
+      produtoSelecionado.produto.variacoes.length > 0;
     const precoBase = Number(produtoSelecionado.vl_preco_catalogo);
 
     if (temVariacoes) {
       // --- MODO GRADE: Adiciona uma linha por variação com qtd > 0 ---
-      
+
       // Itera sobre as quantidades preenchidas
       Object.entries(gradeQuantidades).forEach(([idVarStr, qtd]) => {
         const idVar = Number(idVarStr);
         if (qtd <= 0) return;
 
         // Encontra os dados da variação (para pegar o nome e ajuste de preço)
-        const variacao = produtoSelecionado.produto.variacoes.find(v => v.id_variacao === idVar);
+        const variacao = produtoSelecionado.produto.variacoes.find(
+          (v) => v.id_variacao === idVar,
+        );
         if (!variacao) return;
 
         const precoFinal = precoBase + Number(variacao.vl_ajuste_preco || 0);
-        
+
         // Cria descrição rica: "Camiseta (Azul - P)"
-        const descVariacao = `${variacao.ds_cor || ''} ${variacao.ds_tamanho || ''}`.trim();
+        const descVariacao =
+          `${variacao.ds_cor || ""} ${variacao.ds_tamanho || ""}`.trim();
         const nomeProdutoCompleto = `${produtoSelecionado.produto.ds_produto} - ${descVariacao}`;
 
         append({
@@ -218,7 +292,6 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
 
       // Limpa a grade após adicionar
       setGradeQuantidades({});
-
     } else {
       // --- MODO SIMPLES (Como era antes) ---
       if (qtdItem <= 0) return;
@@ -232,45 +305,46 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         qt_quantidade: qtdItem,
         pc_desconto_item: 0,
       });
-      
+
       setQtdItem(1);
     }
-    
+
     // Limpa o produto selecionado para forçar nova escolha
     setProdutoSelecionado(null);
   };
 
   // Cálculos
-  const { subTotal, totalDescontoItens, valorDescontoGeral, totalPedido } = React.useMemo(() => {
-  let subTotalCalc = 0;
-  let totalDescontosCalc = 0;
-  
-  // Itera sobre os itens do formulário - AGORA OBSERVA TODOS OS CAMPOS
-  (itensDoFormulario || []).forEach((item) => {
-    // Garante que os valores sejam números (usando os valores atuais do formulário)
-    const precoUnit = Number(item.vl_unitario_base) || 0;
-    const qtd = Number(item.qt_quantidade) || 0;
-    const descItemPct = Number(item.pc_desconto_item) || 0;
+  const { subTotal, totalDescontoItens, valorDescontoGeral, totalPedido } =
+    React.useMemo(() => {
+      let subTotalCalc = 0;
+      let totalDescontosCalc = 0;
 
-    const totalBrutoItem = precoUnit * qtd;
-    const valorDescontoItem = totalBrutoItem * (descItemPct / 100);
-    
-    subTotalCalc += totalBrutoItem;
-    totalDescontosCalc += valorDescontoItem;
-  });
-  
-  const descGeralPct = Number(descontoGeral) || 0;
-  const subTotalLiquido = subTotalCalc - totalDescontosCalc;
-  const valorDescontoGeralCalc = subTotalLiquido * (descGeralPct / 100);
-  const totalFinal = subTotalLiquido - valorDescontoGeralCalc;
-  
-  return {
-    subTotal: subTotalCalc,
-    totalDescontoItens: totalDescontosCalc,
-    valorDescontoGeral: valorDescontoGeralCalc,
-    totalPedido: totalFinal > 0 ? totalFinal : 0, // Garante que não seja negativo
-  };
-}, [itensDoFormulario, descontoGeral]); // Já está observando as mudanças
+      // Itera sobre os itens do formulário - AGORA OBSERVA TODOS OS CAMPOS
+      (itensDoFormulario || []).forEach((item) => {
+        // Garante que os valores sejam números (usando os valores atuais do formulário)
+        const precoUnit = Number(item.vl_unitario_base) || 0;
+        const qtd = Number(item.qt_quantidade) || 0;
+        const descItemPct = Number(item.pc_desconto_item) || 0;
+
+        const totalBrutoItem = precoUnit * qtd;
+        const valorDescontoItem = totalBrutoItem * (descItemPct / 100);
+
+        subTotalCalc += totalBrutoItem;
+        totalDescontosCalc += valorDescontoItem;
+      });
+
+      const descGeralPct = Number(descontoGeral) || 0;
+      const subTotalLiquido = subTotalCalc - totalDescontosCalc;
+      const valorDescontoGeralCalc = subTotalLiquido * (descGeralPct / 100);
+      const totalFinal = subTotalLiquido - valorDescontoGeralCalc;
+
+      return {
+        subTotal: subTotalCalc,
+        totalDescontoItens: totalDescontosCalc,
+        valorDescontoGeral: valorDescontoGeralCalc,
+        totalPedido: totalFinal > 0 ? totalFinal : 0, // Garante que não seja negativo
+      };
+    }, [itensDoFormulario, descontoGeral]); // Já está observando as mudanças
 
   // Navegação entre steps
   const handleNext = async () => {
@@ -278,10 +352,10 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
 
     if (activeStep === 0) {
       isValid = await trigger([
-        'id_cliente',
-        'id_endereco_entrega',
-        'id_endereco_cobranca',
-        'id_forma_pagamento'
+        "id_cliente",
+        "id_endereco_entrega",
+        "id_endereco_cobranca",
+        "id_forma_pagamento",
       ]);
       if (isValid) setActiveStep(1);
     } else if (activeStep === 1) {
@@ -309,7 +383,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
   // Handler para o modal de cliente
   const handleSaveClienteModal = (
     data: ClienteFormData,
-    options: { onSuccess: () => void }
+    options: { onSuccess: () => void },
   ) => {
     criarCliente(data, {
       onSuccess: () => {
@@ -327,14 +401,19 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         return (
           <Box>
             {/* Header da Etapa */}
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ mb: 3 }}
+            >
               <Box
                 sx={{
-                  bgcolor: 'primary.main',
-                  color: 'white',
+                  bgcolor: "primary.main",
+                  color: "white",
                   p: 1,
                   borderRadius: 2,
-                  display: 'flex'
+                  display: "flex",
                 }}
               >
                 <PersonIcon />
@@ -360,10 +439,16 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       <Autocomplete
                         {...field}
                         options={clientes || []}
-                        getOptionLabel={(option) => `${option.no_razao_social} (${option.nr_cnpj})`}
-                        isOptionEqualToValue={(option, value) => option.id_cliente === value.id_cliente}
+                        getOptionLabel={(option) =>
+                          `${option.no_razao_social} (${option.nr_cnpj})`
+                        }
+                        isOptionEqualToValue={(option, value) =>
+                          option.id_cliente === value.id_cliente
+                        }
                         value={clienteSelecionado}
-                        onChange={(_, newValue) => handleSelecionarCliente(newValue)}
+                        onChange={(_, newValue) =>
+                          handleSelecionarCliente(newValue)
+                        }
                         loading={isLoadingClientes}
                         renderInput={(params) => (
                           <TextField
@@ -372,7 +457,10 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                             placeholder="Digite o nome do cliente..."
                             fullWidth
                             error={!!errors.id_cliente}
-                            helperText={errors.id_cliente?.message || "Busque na lista de clientes cadastrados"}
+                            helperText={
+                              errors.id_cliente?.message ||
+                              "Busque na lista de clientes cadastrados"
+                            }
                           />
                         )}
                       />
@@ -388,11 +476,11 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                     startIcon={<AddIcon />}
                     fullWidth
                     size="large"
-                    sx={{ 
-                      height: '76px',
-                      minHeight: '56px'
+                    sx={{
+                      height: "76px",
+                      minHeight: "56px",
                     }}
-                  >             
+                  >
                     Novo Cliente
                   </Button>
                 </Grid>
@@ -400,25 +488,34 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             </Paper>
 
             {/* Se selecionou cliente mas ele não tem endereços */}
-            {clienteSelecionado && clienteSelecionado.enderecos.length === 0 && (
-              <Grid size={{ xs: 12 }}>
-                <Alert 
-                  severity="warning" 
-                  action={
-                    <Button color="inherit" size="small" onClick={handleOpenNovoEndereco}>
-                      Cadastrar Endereço
-                    </Button>
-                  }
-                >
-                  Este cliente não possui endereços cadastrados.
-                </Alert>
-              </Grid>
-            )}
+            {clienteSelecionado &&
+              clienteSelecionado.enderecos.length === 0 && (
+                <Grid size={{ xs: 12 }}>
+                  <Alert
+                    severity="warning"
+                    action={
+                      <Button
+                        color="inherit"
+                        size="small"
+                        onClick={handleOpenNovoEndereco}
+                      >
+                        Cadastrar Endereço
+                      </Button>
+                    }
+                  >
+                    Este cliente não possui endereços cadastrados.
+                  </Alert>
+                </Grid>
+              )}
 
             {/* Renderiza os selects de endereço APENAS se houver endereços */}
             {clienteSelecionado && clienteSelecionado.enderecos.length > 0 && (
               <Paper variant="outlined" sx={{ p: 2.5 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 2 }}>
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ mb: 2 }}
+                >
                   Informações do Pedido
                 </Typography>
                 <Grid container spacing={2}>
@@ -430,20 +527,23 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       select
                       required
                       fullWidth
-                      value={watch('id_endereco_entrega') || ''}
+                      value={watch("id_endereco_entrega") || ""}
                       error={!!errors.id_endereco_entrega}
                       helperText={
-                        (clienteSelecionado.enderecos?.length === 0)
+                        clienteSelecionado.enderecos?.length === 0
                           ? "Este cliente não possui endereços. Cadastre na tela de Clientes."
-                          : (errors.id_endereco_entrega?.message || "Onde os produtos serão entregues")
+                          : errors.id_endereco_entrega?.message ||
+                            "Onde os produtos serão entregues"
                       }
                       disabled={clienteSelecionado.enderecos?.length === 0}
                       InputLabelProps={{ shrink: true }}
                     >
-                      <MenuItem value="" disabled>Selecione um endereço...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Selecione um endereço...
+                      </MenuItem>
                       {(clienteSelecionado.enderecos || []).map((end) => (
                         <MenuItem key={end.id_endereco} value={end.id_endereco}>
-                          {`${end.ds_logradouro}, ${end.nr_endereco || 'S/N'} - ${end.no_cidade}`}
+                          {`${end.ds_logradouro}, ${end.nr_endereco || "S/N"} - ${end.no_cidade}`}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -457,20 +557,22 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       select
                       required
                       fullWidth
-                      value={watch('id_endereco_cobranca') || ''}
+                      value={watch("id_endereco_cobranca") || ""}
                       error={!!errors.id_endereco_cobranca}
                       helperText={
-                        (clienteSelecionado.enderecos?.length === 0)
+                        clienteSelecionado.enderecos?.length === 0
                           ? "Este cliente não possui endereços."
-                          : (errors.id_endereco_cobranca?.message)
+                          : errors.id_endereco_cobranca?.message
                       }
                       disabled={clienteSelecionado.enderecos?.length === 0}
                       InputLabelProps={{ shrink: true }}
                     >
-                      <MenuItem value="" disabled>Selecione um endereço...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Selecione um endereço...
+                      </MenuItem>
                       {(clienteSelecionado.enderecos || []).map((end) => (
                         <MenuItem key={end.id_endereco} value={end.id_endereco}>
-                          {`${end.ds_logradouro}, ${end.nr_endereco || 'S/N'} - ${end.no_cidade}`}
+                          {`${end.ds_logradouro}, ${end.nr_endereco || "S/N"} - ${end.no_cidade}`}
                         </MenuItem>
                       ))}
                     </TextField>
@@ -486,11 +588,19 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       fullWidth
                       defaultValue=""
                       error={!!errors.id_forma_pagamento}
-                      helperText={errors.id_forma_pagamento?.message || "Selecione a forma de pagamento"}
+                      helperText={
+                        errors.id_forma_pagamento?.message ||
+                        "Selecione a forma de pagamento"
+                      }
                     >
-                      <MenuItem value="" disabled>Selecione uma forma...</MenuItem>
+                      <MenuItem value="" disabled>
+                        Selecione uma forma...
+                      </MenuItem>
                       {(formasPgto || []).map((fp) => (
-                        <MenuItem key={fp.id_forma_pagamento} value={fp.id_forma_pagamento}>
+                        <MenuItem
+                          key={fp.id_forma_pagamento}
+                          value={fp.id_forma_pagamento}
+                        >
                           {fp.no_forma_pagamento}
                         </MenuItem>
                       ))}
@@ -505,7 +615,9 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       fullWidth
                       InputProps={{
                         inputProps: { min: 0, max: 100 },
-                        endAdornment: <InputAdornment position="end">%</InputAdornment>,
+                        endAdornment: (
+                          <InputAdornment position="end">%</InputAdornment>
+                        ),
                       }}
                       helperText="Desconto aplicado sobre o subtotal do pedido"
                     />
@@ -520,14 +632,19 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         return (
           <Box>
             {/* Header da Etapa */}
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ mb: 3 }}
+            >
               <Box
                 sx={{
-                  bgcolor: 'primary.main',
-                  color: 'white',
+                  bgcolor: "primary.main",
+                  color: "white",
                   p: 1,
                   borderRadius: 2,
-                  display: 'flex'
+                  display: "flex",
                 }}
               >
                 <CartIcon />
@@ -543,13 +660,13 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             </Stack>
 
             {/* Seletor de Tabela de Preço (Catálogo) - VERSÃO SIMPLIFICADA */}
-            <Paper 
-              variant="outlined" 
-              sx={{ 
-                p: 2, 
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
                 mb: 3,
                 borderRadius: 2,
-                borderColor: 'divider'
+                borderColor: "divider",
               }}
             >
               <Stack spacing={2}>
@@ -557,10 +674,10 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                   select
                   fullWidth
                   label="Tabela de Preço"
-                  value={idCatalogoSelecionado || ''}
+                  value={idCatalogoSelecionado || ""}
                   onChange={(e) => {
                     const val = Number(e.target.value);
-                    setValue('id_catalogo', val);
+                    setValue("id_catalogo", val);
                     setProdutoSelecionado(null);
                   }}
                   slotProps={{
@@ -568,8 +685,8 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       displayEmpty: true,
                     },
                     input: {
-                      sx: { height: '48px' }
-                    }
+                      sx: { height: "48px" },
+                    },
                   }}
                 >
                   <MenuItem value="" disabled>
@@ -581,7 +698,6 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                         <Typography variant="body1" fontWeight="medium">
                           {cat.no_catalogo}
                         </Typography>
-
                       </Box>
                     </MenuItem>
                   ))}
@@ -590,144 +706,310 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             </Paper>
 
             {/* Formulário de Adicionar Item (Só mostra se tiver catálogo) */}
+            {/* Cole esta seção substituindo a partir de idCatalogoSelecionado ? ( */}
+
             {idCatalogoSelecionado ? (
-              <Paper variant="outlined" sx={{ p: 2.5, mb: 3, bgcolor: 'grey.50' }}>
-                <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2 }}>
+              <Paper
+                variant="outlined"
+                sx={{
+                  p: 3,
+                  mb: 3,
+                  bgcolor: "grey.50",
+                  borderRadius: 3,
+                  border: "2px solid",
+                  borderColor: "divider",
+                }}
+              >
+                <Typography
+                  variant="subtitle1"
+                  fontWeight={600}
+                  sx={{ mb: 2.5 }}
+                >
                   Adicionar Item ao Pedido
                 </Typography>
-                
-                {/* Use alignItems="flex-start" para acomodar a grade que cresce verticalmente */}
-                <Grid container spacing={2} alignItems="flex-start">
-                  
-                  {/* 1. Busca de Produto */}
-                  <Grid xs={12} md={5}>
-                    <Autocomplete
-                      options={catalogo || []}
-                      getOptionLabel={(option) => `${option.produto.ds_produto} (${option.produto.cd_produto})`}
-                      value={produtoSelecionado}
-                      onChange={(_, newValue) => {
-                          setProdutoSelecionado(newValue);
-                          setQtdItem(1); 
-                          setGradeQuantidades({}); 
-                      }}
-                      loading={isLoadingCatalogo}
-                      renderOption={(props, option) => {
-                        const { key, ...restProps } = props as any; 
-                        return (
-                          <Box component="li" key={key} {...restProps}> 
-                            <Box sx={{ flex: 1 }}>
-                              <Typography variant="body2" fontWeight="medium">
-                                {option.produto.ds_produto}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Cód: {option.produto.cd_produto} • Preço: {formatCurrency(option.vl_preco_catalogo)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        );
-                      }}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Buscar Produto"
-                          placeholder="Digite o nome ou código..."
-                          helperText="Selecione o produto desejado"
-                        />
-                      )}
-                    />
-                  </Grid>
 
-                  {/* 2. Lógica Condicional: Grade vs Simples */}
-                  {produtoSelecionado && (
-                    <>
-                      {/* CASO A: Produto com Grade */}
-                      {produtoSelecionado.produto.variacoes && produtoSelecionado.produto.variacoes.length > 0 ? (
-                        <Grid xs={12} md={7}>
-                          <SeletorGrade
-                            produto={produtoSelecionado.produto}
-                            precoBase={Number(produtoSelecionado.vl_preco_catalogo)}
-                            quantidades={gradeQuantidades}
-                            onChange={(idVar, qtd) => {
-                              setGradeQuantidades(prev => ({
-                                ...prev,
-                                [idVar]: qtd
-                              }));
+                {/* Busca de Produto */}
+                <Box sx={{ mb: 3 }}>
+                  <Autocomplete
+                    options={catalogo || []}
+                    getOptionLabel={(option) =>
+                      `${option.produto.ds_produto} (${option.produto.cd_produto})`
+                    }
+                    value={produtoSelecionado}
+                    onChange={(_, newValue) => {
+                      setProdutoSelecionado(newValue);
+                      setQtdItem(1);
+                      setGradeQuantidades({});
+                    }}
+                    loading={isLoadingCatalogo}
+                    renderOption={(props, option) => {
+                      const { key, ...restProps } = props as any;
+                      return (
+                        <Box component="li" key={key} {...restProps}>
+                          <Box sx={{ flex: 1 }}>
+                            <Typography variant="body2" fontWeight={500}>
+                              {option.produto.ds_produto}
+                            </Typography>
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
+                              Cód: {option.produto.cd_produto} • Preço:{" "}
+                              {formatCurrency(option.vl_preco_catalogo)}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        label="Buscar Produto"
+                        placeholder="Digite o nome ou código..."
+                        helperText="Selecione o produto para adicionar ao pedido"
+                      />
+                    )}
+                  />
+                </Box>
+
+                {/* Área de Configuração do Produto Selecionado */}
+                {produtoSelecionado && (
+                  <Box
+                    sx={{
+                      p: 2.5,
+                      bgcolor: "background.paper",
+                      borderRadius: 2,
+                      border: "1px solid",
+                      borderColor: "primary.main",
+                      boxShadow: 1,
+                    }}
+                  >
+                    {/* Header do Produto Selecionado */}
+                    <Box
+                      sx={{
+                        mb: 2,
+                        pb: 2,
+                        borderBottom: "1px solid",
+                        borderColor: "divider",
+                      }}
+                    >
+                      <Typography variant="body1" fontWeight={600} gutterBottom>
+                        {produtoSelecionado.produto.ds_produto}
+                      </Typography>
+                      <Box
+                        sx={{ display: "flex", gap: 2, alignItems: "center" }}
+                      >
+                        <Chip
+                          label={`Cód: ${produtoSelecionado.produto.cd_produto}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                        <Typography variant="body2" color="text.secondary">
+                          Preço base:{" "}
+                          <strong>
+                            {formatCurrency(
+                              produtoSelecionado.vl_preco_catalogo,
+                            )}
+                          </strong>
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {/* CASO A: Produto com Grade */}
+                    {produtoSelecionado.produto.variacoes &&
+                    produtoSelecionado.produto.variacoes.length > 0 ? (
+                      <>
+                        <SeletorGrade
+                          produto={produtoSelecionado.produto}
+                          precoBase={Number(
+                            produtoSelecionado.vl_preco_catalogo,
+                          )}
+                          quantidades={gradeQuantidades}
+                          onChange={(idVar, qtd) => {
+                            setGradeQuantidades((prev) => ({
+                              ...prev,
+                              [idVar]: qtd,
+                            }));
+                          }}
+                        />
+
+                        {/* Resumo da Grade */}
+                        <Box
+                          sx={{
+                            mt: 2,
+                            p: 2,
+                            bgcolor: "primary.50",
+                            borderRadius: 2,
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Typography variant="body2" color="text.secondary">
+                            Total de unidades selecionadas:
+                          </Typography>
+                          <Typography
+                            variant="h6"
+                            fontWeight={700}
+                            color="primary.main"
+                          >
+                            {Object.values(gradeQuantidades).reduce(
+                              (a, b) => a + b,
+                              0,
+                            )}
+                          </Typography>
+                        </Box>
+
+                        {/* Botão Adicionar - Grade */}
+                        <Button
+                          variant="contained"
+                          fullWidth
+                          size="large"
+                          startIcon={<AddCartIcon />}
+                          onClick={handleAddItemAoCarrinho}
+                          disabled={
+                            Object.values(gradeQuantidades).reduce(
+                              (a, b) => a + b,
+                              0,
+                            ) === 0
+                          }
+                          sx={{
+                            mt: 2,
+                            height: 56,
+                            fontWeight: 600,
+                            borderRadius: 2,
+                          }}
+                        >
+                          Adicionar ao Carrinho
+                        </Button>
+                      </>
+                    ) : (
+                      /* CASO B: Produto Simples */
+                      <Grid container spacing={2} alignItems="flex-end">
+                        <Grid size={{ xs: 12, sm: 5 }}>
+                          <TextField
+                            label="Quantidade"
+                            type="number"
+                            value={qtdItem}
+                            onChange={(e) =>
+                              setQtdItem(Math.max(1, Number(e.target.value)))
+                            }
+                            fullWidth
+                            slotProps={{
+                              input: {
+                                inputProps: { min: 1 },
+                              },
                             }}
+                            helperText="Quantidade de unidades"
                           />
                         </Grid>
-                      ) : (
-                        /* CASO B: Produto Simples (Quantidade + Preço) */
-                        <>
-                          <Grid xs={6} md={2}>
-                            <TextField
-                              label="Quantidade"
-                              type="number"
-                              value={qtdItem}
-                              onChange={(e) => setQtdItem(Math.max(1, Number(e.target.value)))}
-                              fullWidth
-                              InputProps={{ inputProps: { min: 1 } }}
-                              helperText="Unidades"
-                            />
-                          </Grid>
-                          <Grid xs={6} md={3}>
-                            <TextField
-                              label="Preço Unit."
-                              value={formatCurrency(produtoSelecionado.vl_preco_catalogo)}
-                              fullWidth
-                              disabled
-                              helperText="Preço Base"
-                            />
-                          </Grid>
-                        </>
-                      )}
-                    </>
-                  )}
 
-                  {/* 3. Botão Adicionar (Sempre visível se produto selecionado) */}
-                  {/* Ajustamos o 'mt' (margem topo) para alinhar com a grade ou inputs */}
-                  <Grid xs={12} md={2} sx={{ 
-                      display: 'flex', 
-                      alignItems: 'flex-start', // Alinha no topo
-                      mt: produtoSelecionado?.produto.variacoes?.length ? 6 : 0 // Se for grade, empurra pra baixo (opcional, ajuste conforme layout)
-                  }}>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddCartIcon />}
-                      onClick={handleAddItemAoCarrinho}
-                      disabled={
-                        !produtoSelecionado || 
-                        (produtoSelecionado.produto.variacoes.length > 0 
-                          ? Object.values(gradeQuantidades).reduce((a, b) => a + b, 0) === 0
-                          : qtdItem <= 0)
-                      }
-                      fullWidth
-                      size="large"
-                      sx={{ height: '56px' }}
-                    >
-                      Adicionar
-                    </Button>
-                  </Grid>
-                </Grid>
+                        <Grid size={{ xs: 12, sm: 4 }}>
+                          <TextField
+                            label="Preço Unitário"
+                            value={formatCurrency(
+                              produtoSelecionado.vl_preco_catalogo,
+                            )}
+                            fullWidth
+                            disabled
+                            helperText="Preço do catálogo"
+                          />
+                        </Grid>
+
+                        <Grid size={{ xs: 12, sm: 3 }}>
+                          <Box
+                            sx={{
+                              p: 1.5,
+                              bgcolor: "success.50",
+                              borderRadius: 2,
+                              textAlign: "center",
+                            }}
+                          >
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                              display="block"
+                            >
+                              Subtotal
+                            </Typography>
+                            <Typography
+                              variant="h6"
+                              fontWeight={700}
+                              color="success.main"
+                            >
+                              {formatCurrency(
+                                Number(produtoSelecionado.vl_preco_catalogo) *
+                                  qtdItem,
+                              )}
+                            </Typography>
+                          </Box>
+                        </Grid>
+
+                        {/* Botão Adicionar - Simples */}
+                        <Grid size={12}>
+                          <Button
+                            variant="contained"
+                            fullWidth
+                            size="large"
+                            startIcon={<AddCartIcon />}
+                            onClick={handleAddItemAoCarrinho}
+                            disabled={qtdItem <= 0}
+                            sx={{
+                              height: 56,
+                              fontWeight: 600,
+                              borderRadius: 2,
+                            }}
+                          >
+                            Adicionar ao Carrinho
+                          </Button>
+                        </Grid>
+                      </Grid>
+                    )}
+                  </Box>
+                )}
+
+                {/* Placeholder quando nenhum produto selecionado */}
+                {!produtoSelecionado && (
+                  <Box
+                    sx={{
+                      p: 4,
+                      textAlign: "center",
+                      bgcolor: "background.paper",
+                      borderRadius: 2,
+                      border: "2px dashed",
+                      borderColor: "divider",
+                    }}
+                  >
+                    <AddCartIcon
+                      sx={{ fontSize: 48, color: "text.disabled", mb: 1 }}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                      Busque e selecione um produto acima para adicionar ao
+                      pedido
+                    </Typography>
+                  </Box>
+                )}
               </Paper>
             ) : (
-              <Alert 
-                severity="info" 
-                sx={{ 
+              <Alert
+                severity="info"
+                sx={{
                   mb: 3,
                   borderRadius: 2,
-                  '& .MuiAlert-message': {
-                    width: '100%'
-                  }
+                  "& .MuiAlert-message": {
+                    width: "100%",
+                  },
                 }}
               >
                 <Stack direction="row" alignItems="center" spacing={1.5}>
                   <InfoIcon color="info" />
                   <Box>
-                    <Typography variant="body2" fontWeight="medium">
+                    <Typography variant="body2" fontWeight={500}>
                       Selecione uma tabela de preços
                     </Typography>
                     <Typography variant="caption">
-                      Escolha um catálogo acima para visualizar e adicionar produtos ao pedido
+                      Escolha um catálogo acima para visualizar e adicionar
+                      produtos ao pedido
                     </Typography>
                   </Box>
                 </Stack>
@@ -735,20 +1017,35 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             )}
 
             {/* Lista de Itens */}
-            <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+              sx={{ mb: 2 }}
+            >
               <Typography variant="subtitle1" fontWeight="bold">
                 Itens do Pedido
               </Typography>
               <Chip
-                label={`${fields.length} ${fields.length === 1 ? 'item' : 'itens'}`}
+                label={`${fields.length} ${fields.length === 1 ? "item" : "itens"}`}
                 color="primary"
                 size="small"
               />
             </Stack>
 
             {fields.length === 0 ? (
-              <Paper sx={{ p: 4, textAlign: 'center', bgcolor: 'grey.50', border: '2px dashed', borderColor: 'grey.300' }}>
-                <CartIcon sx={{ fontSize: 64, color: 'text.disabled', mb: 2 }} />
+              <Paper
+                sx={{
+                  p: 4,
+                  textAlign: "center",
+                  bgcolor: "grey.50",
+                  border: "2px dashed",
+                  borderColor: "grey.300",
+                }}
+              >
+                <CartIcon
+                  sx={{ fontSize: 64, color: "text.disabled", mb: 2 }}
+                />
                 <Typography variant="h6" color="text.secondary" gutterBottom>
                   Nenhum produto adicionado
                 </Typography>
@@ -758,107 +1055,156 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               </Paper>
             ) : (
               <>
-                <TableContainer 
-                  component={Paper} 
-                  variant="outlined" 
-                  sx={{ 
+                <TableContainer
+                  component={Paper}
+                  variant="outlined"
+                  sx={{
                     mb: 2,
                     maxHeight: { xs: 300, md: 400 },
-                    overflow: 'auto'
+                    overflow: "auto",
                   }}
                 >
                   <Table size="small" stickyHeader>
                     <TableHead>
-                      <TableRow sx={{ bgcolor: 'grey.100' }}>
-                        <TableCell sx={{ fontWeight: 'bold', minWidth: 200 }}>Produto</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 'bold', width: 100 }}>Qtd.</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold', width: 120 }}>Preço Unit.</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 'bold', width: 100 }}>Desc. %</TableCell>
-                        <TableCell align="right" sx={{ fontWeight: 'bold', width: 130 }}>Subtotal</TableCell>
-                        <TableCell align="center" sx={{ fontWeight: 'bold', width: 80 }}>Ações</TableCell>
+                      <TableRow sx={{ bgcolor: "grey.100" }}>
+                        <TableCell sx={{ fontWeight: "bold", minWidth: 200 }}>
+                          Produto
+                        </TableCell>
+                        <TableCell
+                          align="center"
+                          sx={{ fontWeight: "bold", width: 100 }}
+                        >
+                          Qtd.
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ fontWeight: "bold", width: 120 }}
+                        >
+                          Preço Unit.
+                        </TableCell>
+                        <TableCell
+                          align="center"
+                          sx={{ fontWeight: "bold", width: 100 }}
+                        >
+                          Desc. %
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{ fontWeight: "bold", width: 130 }}
+                        >
+                          Subtotal
+                        </TableCell>
+                        <TableCell
+                          align="center"
+                          sx={{ fontWeight: "bold", width: 80 }}
+                        >
+                          Ações
+                        </TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                    {fields.map((fieldItem, index) => {
-                      // --- CORREÇÃO AQUI ---
-                      // Pega o item "vivo" (atualizado) do useWatch
-                      // Se não houver (edge case), usa o fieldItem (estático)
-                      const itemVivo = itensDoFormulario?.[index] || fieldItem;
+                      {fields.map((fieldItem, index) => {
+                        // --- CORREÇÃO AQUI ---
+                        // Pega o item "vivo" (atualizado) do useWatch
+                        // Se não houver (edge case), usa o fieldItem (estático)
+                        const itemVivo =
+                          itensDoFormulario?.[index] || fieldItem;
 
-                      // Usa os valores "vivos" para o cálculo
-                      const precoUnit = Number(itemVivo.vl_unitario_base) || 0;
-                      const qtd = Number(itemVivo.qt_quantidade) || 0;
-                      const desc = Number(itemVivo.pc_desconto_item) || 0;
-                      
-                      // Calcula o subtotal dinâmico
-                      const subtotalItem = (precoUnit * qtd) * (1 - desc / 100);
-                      
-                      return (
-                        <TableRow key={fieldItem.id} hover>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="medium">
-                              {fieldItem.ds_produto} {/* Nome/Cod não mudam, ok usar fieldItem */}
-                            </Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Cód: {fieldItem.cd_produto}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <TextField
-                              type="number"
-                              size="small"
-                              sx={{ width: '70px' }}
-                              InputProps={{
-                                inputProps: { min: 1 },
-                                sx: { textAlign: 'center' }
-                              }}
-                              // O register já conecta o input ao estado global
-                              {...register(`itens.${index}.qt_quantidade`, { valueAsNumber: true })}
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2">
-                              {formatCurrency(precoUnit)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <TextField
-                              type="number"
-                              size="small"
-                              sx={{ width: '70px' }}
-                              InputProps={{
-                                inputProps: { min: 0, max: 100 },
-                                sx: { textAlign: 'center' }
-                              }}
-                              {...register(`itens.${index}.pc_desconto_item`, { valueAsNumber: true })}
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <Typography variant="body2" fontWeight="bold" color="primary.main">
-                              {/* Exibe o subtotal calculado com dados vivos */}
-                              {formatCurrency(subtotalItem)}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Tooltip title="Remover item">
-                              <IconButton
-                                onClick={() => remove(index)}
-                                color="error"
-                                size="small"
+                        // Usa os valores "vivos" para o cálculo
+                        const precoUnit =
+                          Number(itemVivo.vl_unitario_base) || 0;
+                        const qtd = Number(itemVivo.qt_quantidade) || 0;
+                        const desc = Number(itemVivo.pc_desconto_item) || 0;
+
+                        // Calcula o subtotal dinâmico
+                        const subtotalItem = precoUnit * qtd * (1 - desc / 100);
+
+                        return (
+                          <TableRow key={fieldItem.id} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight="medium">
+                                {fieldItem.ds_produto}{" "}
+                                {/* Nome/Cod não mudam, ok usar fieldItem */}
+                              </Typography>
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
                               >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
+                                Cód: {fieldItem.cd_produto}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <TextField
+                                type="number"
+                                size="small"
+                                sx={{ width: "70px" }}
+                                InputProps={{
+                                  inputProps: { min: 1 },
+                                  sx: { textAlign: "center" },
+                                }}
+                                // O register já conecta o input ao estado global
+                                {...register(`itens.${index}.qt_quantidade`, {
+                                  valueAsNumber: true,
+                                })}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2">
+                                {formatCurrency(precoUnit)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <TextField
+                                type="number"
+                                size="small"
+                                sx={{ width: "70px" }}
+                                InputProps={{
+                                  inputProps: { min: 0, max: 100 },
+                                  sx: { textAlign: "center" },
+                                }}
+                                {...register(
+                                  `itens.${index}.pc_desconto_item`,
+                                  { valueAsNumber: true },
+                                )}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography
+                                variant="body2"
+                                fontWeight="bold"
+                                color="primary.main"
+                              >
+                                {/* Exibe o subtotal calculado com dados vivos */}
+                                {formatCurrency(subtotalItem)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="center">
+                              <Tooltip title="Remover item">
+                                <IconButton
+                                  onClick={() => remove(index)}
+                                  color="error"
+                                  size="small"
+                                >
+                                  <DeleteIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
                   </Table>
                 </TableContainer>
 
                 {/* Resumo Visual */}
-                <Paper sx={{ p: 2, bgcolor: 'primary.50', border: '2px solid', borderColor: 'primary.200' }}>
+                <Paper
+                  sx={{
+                    p: 2,
+                    bgcolor: "primary.50",
+                    border: "2px solid",
+                    borderColor: "primary.200",
+                  }}
+                >
                   <Grid container spacing={2} alignItems="center">
                     <Grid item xs={12} sm={6}>
                       <Typography variant="body2" color="text.secondary">
@@ -866,14 +1212,29 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       </Typography>
                       <Typography variant="body2" color="text.secondary">
                         {/* --- CORREÇÃO AQUI: Usa itensDoFormulario para somar --- */}
-                        Quantidade Total: <strong>{(itensDoFormulario || []).reduce((sum, item) => sum + (Number(item.qt_quantidade) || 0), 0)}</strong> unidades
+                        Quantidade Total:{" "}
+                        <strong>
+                          {(itensDoFormulario || []).reduce(
+                            (sum, item) =>
+                              sum + (Number(item.qt_quantidade) || 0),
+                            0,
+                          )}
+                        </strong>{" "}
+                        unidades
                       </Typography>
                     </Grid>
-                    <Grid size={{ xs: 12, sm: 6 }} sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
+                    <Grid
+                      size={{ xs: 12, sm: 6 }}
+                      sx={{ textAlign: { xs: "left", sm: "right" } }}
+                    >
                       <Typography variant="body2" color="text.secondary">
                         Total do Pedido (atual)
                       </Typography>
-                      <Typography variant="h5" fontWeight="bold" color="primary.main">
+                      <Typography
+                        variant="h5"
+                        fontWeight="bold"
+                        color="primary.main"
+                      >
                         {formatCurrency(totalPedido)}
                       </Typography>
                     </Grid>
@@ -885,18 +1246,26 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         );
 
       case 2:
-        const totalUnidades = (itensDoFormulario || []).reduce((sum, item) => sum + (Number(item.qt_quantidade) || 0), 0);
+        const totalUnidades = (itensDoFormulario || []).reduce(
+          (sum, item) => sum + (Number(item.qt_quantidade) || 0),
+          0,
+        );
         return (
           <Box>
             {/* Header da Etapa */}
-            <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 3 }}>
+            <Stack
+              direction="row"
+              alignItems="center"
+              spacing={1.5}
+              sx={{ mb: 3 }}
+            >
               <Box
                 sx={{
-                  bgcolor: 'success.main',
-                  color: 'white',
+                  bgcolor: "success.main",
+                  color: "white",
                   p: 1,
                   borderRadius: 2,
-                  display: 'flex'
+                  display: "flex",
                 }}
               >
                 <CheckIcon />
@@ -913,32 +1282,51 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
 
             {/* Resumo do Cliente */}
             <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="flex-start"
+                sx={{ mb: 2 }}
+              >
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   <PersonIcon fontSize="small" color="primary" />
                   Cliente
                 </Typography>
                 <Chip label="Etapa 1" size="small" variant="outlined" />
               </Stack>
-              <Box sx={{ bgcolor: 'grey.50', p: 2, borderRadius: 1 }}>
+              <Box sx={{ bgcolor: "grey.50", p: 2, borderRadius: 1 }}>
                 <Typography variant="body2" fontWeight="bold">
-                  {clienteSelecionado?.no_razao_social || 'Cliente não selecionado'}
+                  {clienteSelecionado?.no_razao_social ||
+                    "Cliente não selecionado"}
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  CNPJ: {clienteSelecionado?.nr_cnpj || 'N/D'}
+                  CNPJ: {clienteSelecionado?.nr_cnpj || "N/D"}
                 </Typography>
               </Box>
             </Paper>
 
             {/* Resumo dos Itens */}
             <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 2 }}>
-                <Typography variant="subtitle1" fontWeight="bold" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                alignItems="flex-start"
+                sx={{ mb: 2 }}
+              >
+                <Typography
+                  variant="subtitle1"
+                  fontWeight="bold"
+                  sx={{ display: "flex", alignItems: "center", gap: 1 }}
+                >
                   <CartIcon fontSize="small" color="primary" />
                   Produtos
                 </Typography>
                 <Chip
-                  label={`${fields.length} ${fields.length === 1 ? 'item' : 'itens'} • ${totalUnidades} ${totalUnidades === 1 ? 'unidade' : 'unidades'}`}
+                  label={`${fields.length} ${fields.length === 1 ? "item" : "itens"} • ${totalUnidades} ${totalUnidades === 1 ? "unidade" : "unidades"}`}
                   size="small"
                   color="primary"
                 />
@@ -947,11 +1335,17 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               <TableContainer sx={{ maxHeight: 300 }}>
                 <Table size="small">
                   <TableHead>
-                    <TableRow sx={{ bgcolor: 'grey.50' }}>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Produto</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 'bold' }}>Qtd.</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Preço</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Subtotal</TableCell>
+                    <TableRow sx={{ bgcolor: "grey.50" }}>
+                      <TableCell sx={{ fontWeight: "bold" }}>Produto</TableCell>
+                      <TableCell align="center" sx={{ fontWeight: "bold" }}>
+                        Qtd.
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: "bold" }}>
+                        Preço
+                      </TableCell>
+                      <TableCell align="right" sx={{ fontWeight: "bold" }}>
+                        Subtotal
+                      </TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -961,9 +1355,9 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                       const precoUnit = Number(item.vl_unitario_base) || 0;
                       const qtd = Number(item.qt_quantidade) || 0;
                       const desc = Number(item.pc_desconto_item) || 0;
-                      
+
                       // Calcula o subtotal com os valores editados
-                      const subtotal = (precoUnit * qtd) * (1 - desc / 100);
+                      const subtotal = precoUnit * qtd * (1 - desc / 100);
 
                       return (
                         // Podemos usar o index como key aqui pois é apenas visualização
@@ -972,7 +1366,10 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                             <Typography variant="body2" fontWeight="medium">
                               {item.ds_produto}
                             </Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography
+                              variant="caption"
+                              color="text.secondary"
+                            >
                               {item.cd_produto}
                               {desc > 0 && ` • ${desc}% desc.`}
                             </Typography>
@@ -982,7 +1379,9 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                             <Typography variant="body2">{qtd}</Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography variant="body2">{formatCurrency(precoUnit)}</Typography>
+                            <Typography variant="body2">
+                              {formatCurrency(precoUnit)}
+                            </Typography>
                           </TableCell>
                           <TableCell align="right">
                             {/* Mostra o subtotal recalculado */}
@@ -1000,7 +1399,11 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
 
             {/* Observações */}
             <Paper variant="outlined" sx={{ p: 2.5, mb: 2 }}>
-              <Typography variant="subtitle1" fontWeight="bold" sx={{ mb: 1.5 }}>
+              <Typography
+                variant="subtitle1"
+                fontWeight="bold"
+                sx={{ mb: 1.5 }}
+              >
                 Observações
               </Typography>
               <TextField
@@ -1011,7 +1414,11 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
                 fullWidth
                 variant="outlined"
               />
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ mt: 0.5, display: "block" }}
+              >
                 Informações adicionais sobre o pedido (opcional)
               </Typography>
             </Paper>
@@ -1022,7 +1429,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               sx={{
                 p: 3,
                 background: `linear-gradient(135deg, #4A90E2 0%, #2D5FA4 100%)`,
-                color: 'white'
+                color: "white",
               }}
             >
               <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
@@ -1030,40 +1437,77 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               </Typography>
 
               <Stack spacing={1.5}>
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
+                  <Typography
+                    variant="body2"
+                    sx={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}
+                  >
                     Subtotal dos Produtos:
                   </Typography>
-                  <Typography variant="body1" fontWeight="medium" sx={{ color: 'white' }}>
+                  <Typography
+                    variant="body1"
+                    fontWeight="medium"
+                    sx={{ color: "white" }}
+                  >
                     {formatCurrency(subTotal)}
                   </Typography>
                 </Stack>
 
                 {totalDescontoItens > 0 && (
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
-                        Descontos nos Itens:
-                      </Typography>
-                      <Typography variant="body1" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                        -{formatCurrency(totalDescontoItens)}
-                      </Typography>
-                    </Stack>
-                  )}
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}
+                    >
+                      Descontos nos Itens:
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      fontWeight="medium"
+                      sx={{ color: "rgba(255,255,255,0.9)" }}
+                    >
+                      -{formatCurrency(totalDescontoItens)}
+                    </Typography>
+                  </Stack>
+                )}
 
-                  {Number(descontoGeral) > 0 && (
-                    <Stack direction="row" justifyContent="space-between" alignItems="center">
-                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.95)', fontWeight: 500 }}>
-                        Desconto Geral ({descontoGeral}%):
-                      </Typography>
-                      <Typography variant="body1" fontWeight="medium" sx={{ color: 'rgba(255,255,255,0.9)' }}>
-                        -{formatCurrency(valorDescontoGeral)}
-                      </Typography>
-                    </Stack>
-                  )}
+                {Number(descontoGeral) > 0 && (
+                  <Stack
+                    direction="row"
+                    justifyContent="space-between"
+                    alignItems="center"
+                  >
+                    <Typography
+                      variant="body2"
+                      sx={{ color: "rgba(255,255,255,0.95)", fontWeight: 500 }}
+                    >
+                      Desconto Geral ({descontoGeral}%):
+                    </Typography>
+                    <Typography
+                      variant="body1"
+                      fontWeight="medium"
+                      sx={{ color: "rgba(255,255,255,0.9)" }}
+                    >
+                      -{formatCurrency(valorDescontoGeral)}
+                    </Typography>
+                  </Stack>
+                )}
 
-                <Divider sx={{ bgcolor: 'rgba(255,255,255,0.3)', my: 1 }} />
+                <Divider sx={{ bgcolor: "rgba(255,255,255,0.3)", my: 1 }} />
 
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  alignItems="center"
+                >
                   <Typography variant="h6" fontWeight="bold">
                     TOTAL DO PEDIDO:
                   </Typography>
@@ -1077,8 +1521,9 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             {/* Alerta de Confirmação */}
             <Alert severity="info" sx={{ mt: 2 }}>
               <Typography variant="body2">
-                <strong>Atenção:</strong> Ao clicar em "Finalizar Pedido", o pedido será enviado para análise.
-                Você poderá acompanhar o status na tela de pedidos.
+                <strong>Atenção:</strong> Ao clicar em "Finalizar Pedido", o
+                pedido será enviado para análise. Você poderá acompanhar o
+                status na tela de pedidos.
               </Typography>
             </Alert>
           </Box>
@@ -1097,15 +1542,20 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
       fullWidth
       PaperProps={{
         sx: {
-          height: { xs: '100vh', md: '90vh' },
-          maxHeight: { xs: '100vh', md: '900px' },
+          height: { xs: "100vh", md: "90vh" },
+          maxHeight: { xs: "100vh", md: "900px" },
           m: { xs: 0, md: 2 },
-          borderRadius: { xs: 0, md: 2 }
-        }
+          borderRadius: { xs: 0, md: 2 },
+        },
       }}
     >
       <DialogTitle sx={{ pb: 1 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          sx={{ mb: 2 }}
+        >
           <Box>
             <Typography variant="h5" fontWeight="bold">
               Novo Pedido
@@ -1118,8 +1568,8 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             onClick={onClose}
             disabled={isSalvando}
             sx={{
-              bgcolor: 'grey.100',
-              '&:hover': { bgcolor: 'grey.200' }
+              bgcolor: "grey.100",
+              "&:hover": { bgcolor: "grey.200" },
             }}
           >
             <CloseIcon />
@@ -1133,19 +1583,19 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
               <StepLabel
                 StepIconProps={{
                   sx: {
-                    '&.Mui-active': {
-                      color: 'primary.main',
-                      fontSize: '2rem'
+                    "&.Mui-active": {
+                      color: "primary.main",
+                      fontSize: "2rem",
                     },
-                    '&.Mui-completed': {
-                      color: 'success.main'
-                    }
-                  }
+                    "&.Mui-completed": {
+                      color: "success.main",
+                    },
+                  },
                 }}
               >
                 <Typography
                   variant="body2"
-                  fontWeight={activeStep === index ? 'bold' : 'normal'}
+                  fontWeight={activeStep === index ? "bold" : "normal"}
                 >
                   {label}
                 </Typography>
@@ -1158,12 +1608,14 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
       <DialogContent dividers sx={{ p: { xs: 2, md: 3 } }}>
         <Box component="form" onSubmit={handleSubmit(onSubmit)}>
           {apiError && (
-            <Alert severity="error" sx={{ mb: 3 }} onClose={() => { }}>
+            <Alert severity="error" sx={{ mb: 3 }} onClose={() => {}}>
               <Typography variant="body2" fontWeight="bold" gutterBottom>
                 Erro ao processar solicitação
               </Typography>
               <Typography variant="body2">
-                {(apiError as any)?.response?.data?.detail || (apiError as any).message || 'Ocorreu um erro. Tente novamente.'}
+                {(apiError as any)?.response?.data?.detail ||
+                  (apiError as any).message ||
+                  "Ocorreu um erro. Tente novamente."}
               </Typography>
             </Alert>
           )}
@@ -1172,20 +1624,24 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2.5, gap: 1, bgcolor: 'grey.50' }}>
+      <DialogActions sx={{ p: 2.5, gap: 1, bgcolor: "grey.50" }}>
         <Button
           onClick={activeStep === 0 ? onClose : handleBack}
           disabled={isSalvando}
           variant="outlined"
           size="large"
         >
-          {activeStep === 0 ? 'Cancelar' : 'Voltar'}
+          {activeStep === 0 ? "Cancelar" : "Voltar"}
         </Button>
 
         <Box sx={{ flex: 1 }} />
 
         {/* Indicador de Progresso */}
-        <Typography variant="caption" color="text.secondary" sx={{ display: { xs: 'none', sm: 'block' } }}>
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ display: { xs: "none", sm: "block" } }}
+        >
           Etapa {activeStep + 1} de {steps.length}
         </Typography>
 
@@ -1196,7 +1652,7 @@ export const ModalNovoPedido: React.FC<ModalNovoPedidoProps> = ({
             disabled={isSalvando}
             size="large"
           >
-            {isSalvando ? 'Salvando...' : 'Finalizar Pedido'}
+            {isSalvando ? "Salvando..." : "Finalizar Pedido"}
           </Button>
         ) : (
           <Button

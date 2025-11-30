@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from datetime import datetime, timedelta
 from decimal import Decimal
+import threading
 
 # Importações da nossa aplicação
 from src.database import engine, Base, SessionLocal
@@ -38,6 +39,9 @@ from src.routes.vendedor.clientes import vendedor_clientes_router
 from src.routes.vendedor.dashboard import vendedor_dashboard_router
 from src.routes.vendedor.config import vendedor_config_router
 
+# Lock para evitar múltiplas inicializações simultâneas
+_init_lock = threading.Lock()
+_initialized = False
 
 # --- DEFINIÇÃO DAS TAGS PARA ORDENAÇÃO NO SWAGGER UI ---
 tags_metadata = [
@@ -106,6 +110,68 @@ def is_postgresql() -> bool:
     return "postgres" in str(engine.url).lower()
 
 
+# --- FUNÇÕES AUXILIARES PARA VERIFICAÇÃO ---
+def trigger_exists(db: Session, trigger_name: str) -> bool:
+    """Verifica se um trigger existe no PostgreSQL"""
+    try:
+        result = db.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM pg_trigger 
+                    WHERE tgname = :trigger_name
+                )
+            """),
+            {"trigger_name": trigger_name},
+        )
+        return result.scalar()
+    except:
+        return False
+
+
+def function_exists(db: Session, function_name: str) -> bool:
+    """Verifica se uma função existe no PostgreSQL"""
+    try:
+        result = db.execute(
+            text("""
+                SELECT EXISTS (
+                    SELECT 1 
+                    FROM pg_proc 
+                    WHERE proname = :function_name
+                )
+            """),
+            {"function_name": function_name},
+        )
+        return result.scalar()
+    except:
+        return False
+
+
+def view_exists(db: Session, view_name: str, is_postgres: bool = False) -> bool:
+    """Verifica se uma view existe"""
+    try:
+        if is_postgres:
+            result = db.execute(
+                text("""
+                    SELECT EXISTS (
+                        SELECT 1 
+                        FROM information_schema.views 
+                        WHERE table_name = :view_name
+                    )
+                """),
+                {"view_name": view_name.lower()},
+            )
+        else:
+            result = db.execute(
+                text(
+                    f"SELECT name FROM sqlite_master WHERE type='view' AND name='{view_name}'"
+                )
+            )
+        return bool(result.scalar())
+    except:
+        return False
+
+
 # --- FUNÇÕES PARA CRIAR TRIGGERS (LOGS AUTOMÁTICOS) ---
 def create_sqlite_triggers(db: Session):
     """Cria triggers no SQLite para popular a TB_LOGS_AUDITORIA automaticamente."""
@@ -160,91 +226,97 @@ def create_postgresql_triggers(db: Session):
 
     # Função para Insert Pedido
     try:
-        db.execute(
-            text("""
-        CREATE OR REPLACE FUNCTION fn_log_pedido_ins()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO")
-            VALUES (
-                'Pedido', 
-                NEW."ID_PEDIDO", 
-                'CREATE', 
-                NOW(), 
-                NEW."ID_USUARIO",
-                (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA")
-            );
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        """)
-        )
+        if not function_exists(db, "fn_log_pedido_ins"):
+            db.execute(
+                text("""
+            CREATE FUNCTION fn_log_pedido_ins()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO")
+                VALUES (
+                    'Pedido', 
+                    NEW."ID_PEDIDO", 
+                    'CREATE', 
+                    NOW(), 
+                    NEW."ID_USUARIO",
+                    (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA")
+                );
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+            """)
+            )
+            print("  ✓ Função fn_log_pedido_ins criada")
+        else:
+            print("  ℹ️ Função fn_log_pedido_ins já existe")
 
-        db.execute(
-            text("""
-        DROP TRIGGER IF EXISTS tg_log_pedido_ins ON "TB_PEDIDOS";
-        """)
-        )
+        if not trigger_exists(db, "tg_log_pedido_ins"):
+            db.execute(
+                text("""
+            CREATE TRIGGER tg_log_pedido_ins
+            AFTER INSERT ON "TB_PEDIDOS"
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_log_pedido_ins();
+            """)
+            )
+            print("  ✓ Trigger tg_log_pedido_ins criado")
+        else:
+            print("  ℹ️ Trigger tg_log_pedido_ins já existe")
 
-        db.execute(
-            text("""
-        CREATE TRIGGER tg_log_pedido_ins
-        AFTER INSERT ON "TB_PEDIDOS"
-        FOR EACH ROW
-        EXECUTE FUNCTION fn_log_pedido_ins();
-        """)
-        )
         db.commit()
     except Exception as e:
-        print(f"❌ Erro ao criar Trigger Insert Pedido: {e}")
+        print(f"  ⚠️ Erro ao criar Trigger Insert Pedido: {e}")
         db.rollback()
 
     # Função para Update Pedido (Mudança de Status)
     try:
-        db.execute(
-            text("""
-        CREATE OR REPLACE FUNCTION fn_log_pedido_upd()
-        RETURNS TRIGGER AS $$
-        BEGIN
-            IF OLD."ST_PEDIDO" <> NEW."ST_PEDIDO" THEN
-                INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO", "DS_VALORES_ANTIGOS", "DS_VALORES_NOVOS")
-                VALUES (
-                    'Pedido', 
-                    NEW."ID_PEDIDO", 
-                    'UPDATE_STATUS', 
-                    NOW(), 
-                    NEW."ID_USUARIO",
-                    (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA"),
-                    json_build_object('status', OLD."ST_PEDIDO")::TEXT,
-                    json_build_object('status', NEW."ST_PEDIDO")::TEXT
-                );
-            END IF;
-            RETURN NEW;
-        END;
-        $$ LANGUAGE plpgsql;
-        """)
-        )
+        if not function_exists(db, "fn_log_pedido_upd"):
+            db.execute(
+                text("""
+            CREATE FUNCTION fn_log_pedido_upd()
+            RETURNS TRIGGER AS $$
+            BEGIN
+                IF OLD."ST_PEDIDO" <> NEW."ST_PEDIDO" THEN
+                    INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO", "DS_VALORES_ANTIGOS", "DS_VALORES_NOVOS")
+                    VALUES (
+                        'Pedido', 
+                        NEW."ID_PEDIDO", 
+                        'UPDATE_STATUS', 
+                        NOW(), 
+                        NEW."ID_USUARIO",
+                        (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA"),
+                        json_build_object('status', OLD."ST_PEDIDO")::TEXT,
+                        json_build_object('status', NEW."ST_PEDIDO")::TEXT
+                    );
+                END IF;
+                RETURN NEW;
+            END;
+            $$ LANGUAGE plpgsql;
+            """)
+            )
+            print("  ✓ Função fn_log_pedido_upd criada")
+        else:
+            print("  ℹ️ Função fn_log_pedido_upd já existe")
 
-        db.execute(
-            text("""
-        DROP TRIGGER IF EXISTS tg_log_pedido_upd ON "TB_PEDIDOS";
-        """)
-        )
+        if not trigger_exists(db, "tg_log_pedido_upd"):
+            db.execute(
+                text("""
+            CREATE TRIGGER tg_log_pedido_upd
+            AFTER UPDATE ON "TB_PEDIDOS"
+            FOR EACH ROW
+            EXECUTE FUNCTION fn_log_pedido_upd();
+            """)
+            )
+            print("  ✓ Trigger tg_log_pedido_upd criado")
+        else:
+            print("  ℹ️ Trigger tg_log_pedido_upd já existe")
 
-        db.execute(
-            text("""
-        CREATE TRIGGER tg_log_pedido_upd
-        AFTER UPDATE ON "TB_PEDIDOS"
-        FOR EACH ROW
-        EXECUTE FUNCTION fn_log_pedido_upd();
-        """)
-        )
         db.commit()
     except Exception as e:
-        print(f"❌ Erro ao criar Trigger Update Pedido: {e}")
+        print(f"  ⚠️ Erro ao criar Trigger Update Pedido: {e}")
         db.rollback()
 
-    print("✅ Tentativa de criação de Triggers (PostgreSQL) finalizada.")
+    print("✅ Triggers de auditoria PostgreSQL verificados/criados.")
 
 
 # --- FUNÇÕES PARA CRIAR VIEWS ---
@@ -258,6 +330,7 @@ def create_sqlite_views(db: Session):
         "VW_VENDAS_EMPRESA_MES",
         "VW_VENDAS_POR_CIDADE",
     ]
+
     for view in views:
         try:
             db.execute(text(f"DROP VIEW IF EXISTS {view}"))
@@ -356,28 +429,9 @@ def create_postgresql_views(db: Session):
     print("📊 Criando Views (PostgreSQL)...")
 
     views = [
-        "VW_VENDAS_VENDEDOR_MES",
-        "VW_COMISSOES_CALCULADAS",
-        "VW_VENDAS_EMPRESA_MES",
-        "VW_VENDAS_POR_CIDADE",
-    ]
-
-    # 1. Dropar Views Antigas
-    for view in views:
-        try:
-            db.execute(text(f'DROP VIEW IF EXISTS "{view}" CASCADE'))
-            db.commit()
-        except Exception as e:
-            print(f"⚠️ Erro ao dropar view {view}: {e}")
-            db.rollback()
-
-    # 2. Criar Views (uma por uma, com commit individual)
-
-    # View: Vendas por Vendedor
-    try:
-        db.execute(
-            text("""
-        CREATE VIEW "VW_VENDAS_VENDEDOR_MES" AS
+        (
+            "VW_VENDAS_VENDEDOR_MES",
+            """
         SELECT 
             u."ID_USUARIO",
             u."NO_COMPLETO" AS "NO_VENDEDOR",
@@ -389,19 +443,12 @@ def create_postgresql_views(db: Session):
         FROM "TB_USUARIOS" u
         INNER JOIN "TB_PEDIDOS" p ON u."ID_USUARIO" = p."ID_USUARIO"
         WHERE u."TP_USUARIO" = 'vendedor' AND p."ST_PEDIDO" != 'cancelado'
-        GROUP BY u."ID_USUARIO", u."NO_COMPLETO", u."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
-        """)
-        )
-        db.commit()
-    except Exception as e:
-        print(f"❌ Erro ao criar VW_VENDAS_VENDEDOR_MES: {e}")
-        db.rollback()
-
-    # View: Vendas por Empresa
-    try:
-        db.execute(
-            text("""
-        CREATE VIEW "VW_VENDAS_EMPRESA_MES" AS
+        GROUP BY u."ID_USUARIO", u."NO_COMPLETO", u."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO")
+        """,
+        ),
+        (
+            "VW_VENDAS_EMPRESA_MES",
+            """
         SELECT 
             e."ID_EMPRESA",
             e."NO_EMPRESA",
@@ -413,19 +460,12 @@ def create_postgresql_views(db: Session):
         FROM "TB_EMPRESAS" e
         INNER JOIN "TB_PEDIDOS" p ON e."ID_EMPRESA" = p."ID_EMPRESA"
         WHERE p."ST_PEDIDO" != 'cancelado'
-        GROUP BY e."ID_EMPRESA", e."NO_EMPRESA", e."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
-        """)
-        )
-        db.commit()
-    except Exception as e:
-        print(f"❌ Erro ao criar VW_VENDAS_EMPRESA_MES: {e}")
-        db.rollback()
-
-    # View: Vendas por Cidade
-    try:
-        db.execute(
-            text("""
-        CREATE VIEW "VW_VENDAS_POR_CIDADE" AS
+        GROUP BY e."ID_EMPRESA", e."NO_EMPRESA", e."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO")
+        """,
+        ),
+        (
+            "VW_VENDAS_POR_CIDADE",
+            """
         SELECT 
             en."NO_CIDADE",
             en."SG_ESTADO",
@@ -437,19 +477,12 @@ def create_postgresql_views(db: Session):
         INNER JOIN "TB_CLIENTES" c ON p."ID_CLIENTE" = c."ID_CLIENTE"
         INNER JOIN "TB_ENDERECOS" en ON p."ID_ENDERECO_ENTREGA" = en."ID_ENDERECO"
         WHERE p."ST_PEDIDO" != 'cancelado'
-        GROUP BY en."NO_CIDADE", en."SG_ESTADO", c."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
-        """)
-        )
-        db.commit()
-    except Exception as e:
-        print(f"❌ Erro ao criar VW_VENDAS_POR_CIDADE: {e}")
-        db.rollback()
-
-    # View: Comissões
-    try:
-        db.execute(
-            text("""
-        CREATE VIEW "VW_COMISSOES_CALCULADAS" AS
+        GROUP BY en."NO_CIDADE", en."SG_ESTADO", c."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO")
+        """,
+        ),
+        (
+            "VW_COMISSOES_CALCULADAS",
+            """
         SELECT 
             p."ID_PEDIDO",
             p."NR_PEDIDO",
@@ -464,15 +497,24 @@ def create_postgresql_views(db: Session):
         FROM "TB_PEDIDOS" p
         INNER JOIN "TB_USUARIOS" u ON p."ID_USUARIO" = u."ID_USUARIO"
         INNER JOIN "TB_EMPRESAS" e ON p."ID_EMPRESA" = e."ID_EMPRESA"
-        WHERE p."ST_PEDIDO" != 'cancelado';
-        """)
-        )
-        db.commit()
-    except Exception as e:
-        print(f"❌ Erro ao criar VW_COMISSOES_CALCULADAS: {e}")
-        db.rollback()
+        WHERE p."ST_PEDIDO" != 'cancelado'
+        """,
+        ),
+    ]
 
-    print("✅ Tentativa de criação de Views (PostgreSQL) finalizada.")
+    for view_name, view_sql in views:
+        try:
+            if not view_exists(db, view_name, is_postgres=True):
+                db.execute(text(f'CREATE VIEW "{view_name}" AS {view_sql}'))
+                db.commit()
+                print(f"  ✓ View {view_name} criada")
+            else:
+                print(f"  ℹ️ View {view_name} já existe")
+        except Exception as e:
+            print(f"  ⚠️ Erro ao criar view {view_name}: {e}")
+            db.rollback()
+
+    print("✅ Views PostgreSQL verificadas/criadas.")
 
 
 # --- POPULAÇÃO DE DADOS INICIAIS (SEED COMPLETO) ---
@@ -732,10 +774,8 @@ def seed_initial_data():
         )
         db.add(comissao)
 
-        # AGORA: Criar Variações para a Camiseta (ID 1)
-        # Vamos criar uma grade: Azul (P, M, G) e Branco (P, M, G)
+        # Variações para a Camiseta
         variacoes_camiseta = [
-            # Azul
             models.VariacaoProduto(
                 id_produto=prods[0].id_produto,
                 ds_cor="Azul",
@@ -756,8 +796,7 @@ def seed_initial_data():
                 ds_tamanho="G",
                 qt_estoque=5,
                 vl_ajuste_preco=2.00,
-            ),  # G é mais caro?
-            # Branco
+            ),
             models.VariacaoProduto(
                 id_produto=prods[0].id_produto,
                 ds_cor="Branco",
@@ -820,73 +859,56 @@ def create_super_admin():
 # --- INICIALIZAÇÃO DO BANCO DE DADOS ---
 def initialize_database():
     """
-    Inicializa o banco de dados:
-    - Detecta SQLite ou PostgreSQL
-    - Cria tabelas (DEV e PROD)
-    - Cria triggers e views específicos do banco (DEV e PROD)
-    - Cria Super Admin (DEV e PROD)
-    - Popula dados de teste (APENAS DEV)
+    Inicializa o banco de dados com proteção contra múltiplas execuções
     """
-    ambiente = os.getenv("AMBIENTE", "dev")
+    global _initialized
 
-    print(f"\n{'=' * 70}")
-    print(f"🚀 INICIALIZANDO APLICAÇÃO")
-    print(f"{'=' * 70}")
+    # Proteção contra múltiplas inicializações
+    with _init_lock:
+        if _initialized:
+            print("ℹ️  Banco já inicializado (worker secundário)")
+            return
 
-    # 2. CRIAR VIEWS E TRIGGERS
-    db: Session = SessionLocal()
-    try:
-        if is_sqlite():
-            print("🔧 Banco SQLite detectado: Criando Views e Triggers...")
-            create_sqlite_views(db)
-            create_sqlite_triggers(db)
-        elif is_postgresql():
-            print("🐘 Banco PostgreSQL detectado: Criando Views e Triggers...")
-            # Utiliza Advisory Lock para garantir que apenas um worker execute a inicialização por vez
-            print("🔒 Adquirindo Lock de inicialização (PostgreSQL)...")
-            try:
-                # ID arbitrário para o lock (deve ser único para essa finalidade no banco)
-                LOCK_ID = 8675309
-                db.execute(text(f"SELECT pg_advisory_lock({LOCK_ID})"))
+        ambiente = os.getenv("AMBIENTE", "dev")
 
+        print(f"\n{'=' * 70}")
+        print(f"🚀 INICIALIZANDO APLICAÇÃO - Ambiente: {ambiente.upper()}")
+        print(f"{'=' * 70}")
+
+        # CRIAR VIEWS E TRIGGERS
+        db: Session = SessionLocal()
+        try:
+            if is_sqlite():
+                print("🔧 Banco SQLite detectado")
+                create_sqlite_views(db)
+                create_sqlite_triggers(db)
+            elif is_postgresql():
+                print("🐘 Banco PostgreSQL detectado")
                 create_postgresql_views(db)
                 create_postgresql_triggers(db)
+            else:
+                print("⚠️  Tipo de banco não reconhecido")
+        except Exception as e:
+            print(f"❌ Erro ao criar Views/Triggers: {e}")
+        finally:
+            db.close()
 
-                print("🔓 Liberando Lock de inicialização...")
-                db.execute(text(f"SELECT pg_advisory_unlock({LOCK_ID})"))
-            except Exception as e:
-                print(f"⚠️ Erro durante inicialização com Lock: {e}")
-                # Tenta liberar o lock em caso de erro, por segurança
-                try:
-                    db.execute(text(f"SELECT pg_advisory_unlock({LOCK_ID})"))
-                except:
-                    pass
-                raise e
+        # CRIAR SUPER ADMIN
+        create_super_admin()
+
+        # POPULAR DADOS DE TESTE (APENAS DEV)
+        if ambiente == "dev":
+            print("🌱 Ambiente DEV: Verificando dados de teste...")
+            seed_initial_data()
         else:
-            print("⚠️  Tipo de banco não reconhecido. Views/Triggers não criados.")
-        print()
-    except Exception as e:
-        print(f"❌ Erro ao criar Views/Triggers: {e}\n")
-    finally:
-        db.close()
+            print("⚠️  Ambiente PROD: Dados de teste NÃO serão criados.")
+            print("💡 Acesse a API com: admin@repcom.com / admin123")
 
-    # 3. CRIAR SUPER ADMIN (SEMPRE)
-    create_super_admin()
-    print()
+        print(f"{'=' * 70}")
+        print(f"✅ INICIALIZAÇÃO CONCLUÍDA")
+        print(f"{'=' * 70}\n")
 
-    # 4. POPULAR DADOS DE TESTE (APENAS EM DEV)
-    if ambiente == "dev":
-        print("🌱 Ambiente DEV: Populando dados de teste...")
-        seed_initial_data()
-        print()
-    else:
-        print("⚠️  Ambiente PROD: Dados de teste NÃO serão criados.")
-        print("💡 Acesse a API com: admin@repcom.com / admin123")
-        print()
-
-    print(f"{'=' * 70}")
-    print(f"✅ INICIALIZAÇÃO CONCLUÍDA COM SUCESSO")
-    print(f"{'=' * 70}\n")
+        _initialized = True
 
 
 # --- EXECUTAR INICIALIZAÇÃO ---

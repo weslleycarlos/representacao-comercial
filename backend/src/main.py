@@ -508,11 +508,21 @@ def create_postgresql_views(db: Session):
 
     for view_name, view_sql in views:
         try:
-            # SEMPRE DROPAR ANTES
-            db.execute(text(f'DROP VIEW IF EXISTS "{view_name}" CASCADE'))
-            db.commit()
+            # PRIMEIRO: Tentar dropar como TABELA (caso tenha sido criada como tabela)
+            try:
+                db.execute(text(f'DROP TABLE IF EXISTS "{view_name}" CASCADE'))
+                db.commit()
+            except:
+                pass
 
-            # CRIAR A VIEW
+            # SEGUNDO: Tentar dropar como VIEW
+            try:
+                db.execute(text(f'DROP VIEW IF EXISTS "{view_name}" CASCADE'))
+                db.commit()
+            except:
+                pass
+
+            # TERCEIRO: Criar a VIEW
             db.execute(text(f'CREATE VIEW "{view_name}" AS {view_sql}'))
             db.commit()
             print(f"  ✓ View {view_name} criada")

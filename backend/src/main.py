@@ -156,18 +156,22 @@ def view_exists(db: Session, view_name: str, is_postgres: bool = False) -> bool:
                     SELECT EXISTS (
                         SELECT 1 
                         FROM information_schema.views 
-                        WHERE table_name = :view_name
+                        WHERE table_schema = 'public' 
+                        AND table_name = :view_name
                     )
                 """),
-                {"view_name": view_name.lower()},
+                {
+                    "view_name": view_name.upper()
+                },  # PostgreSQL usa uppercase internamente
             )
+            return result.scalar()
         else:
             result = db.execute(
                 text(
                     f"SELECT name FROM sqlite_master WHERE type='view' AND name='{view_name}'"
                 )
             )
-        return bool(result.scalar())
+            return bool(result.scalar())
     except:
         return False
 
@@ -504,12 +508,14 @@ def create_postgresql_views(db: Session):
 
     for view_name, view_sql in views:
         try:
-            if not view_exists(db, view_name, is_postgres=True):
-                db.execute(text(f'CREATE VIEW "{view_name}" AS {view_sql}'))
-                db.commit()
-                print(f"  ✓ View {view_name} criada")
-            else:
-                print(f"  ℹ️ View {view_name} já existe")
+            # SEMPRE DROPAR ANTES
+            db.execute(text(f'DROP VIEW IF EXISTS "{view_name}" CASCADE'))
+            db.commit()
+
+            # CRIAR A VIEW
+            db.execute(text(f'CREATE VIEW "{view_name}" AS {view_sql}'))
+            db.commit()
+            print(f"  ✓ View {view_name} criada")
         except Exception as e:
             print(f"  ⚠️ Erro ao criar view {view_name}: {e}")
             db.rollback()

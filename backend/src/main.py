@@ -842,8 +842,26 @@ def initialize_database():
             create_sqlite_triggers(db)
         elif is_postgresql():
             print("🐘 Banco PostgreSQL detectado: Criando Views e Triggers...")
-            create_postgresql_views(db)
-            create_postgresql_triggers(db)
+            # Utiliza Advisory Lock para garantir que apenas um worker execute a inicialização por vez
+            print("🔒 Adquirindo Lock de inicialização (PostgreSQL)...")
+            try:
+                # ID arbitrário para o lock (deve ser único para essa finalidade no banco)
+                LOCK_ID = 8675309
+                db.execute(text(f"SELECT pg_advisory_lock({LOCK_ID})"))
+
+                create_postgresql_views(db)
+                create_postgresql_triggers(db)
+
+                print("🔓 Liberando Lock de inicialização...")
+                db.execute(text(f"SELECT pg_advisory_unlock({LOCK_ID})"))
+            except Exception as e:
+                print(f"⚠️ Erro durante inicialização com Lock: {e}")
+                # Tenta liberar o lock em caso de erro, por segurança
+                try:
+                    db.execute(text(f"SELECT pg_advisory_unlock({LOCK_ID})"))
+                except:
+                    pass
+                raise e
         else:
             print("⚠️  Tipo de banco não reconhecido. Views/Triggers não criados.")
         print()

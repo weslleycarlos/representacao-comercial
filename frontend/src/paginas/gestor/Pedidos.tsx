@@ -17,7 +17,7 @@ import {
   Edit as EditIcon,
   FilterList as FilterIcon,
 } from '@mui/icons-material';
-import { useGetPedidosGestor } from '../../api/servicos/gestorPedidoService';
+import { useGetPedidosGestor, useResendEmailGestor } from '../../api/servicos/gestorPedidoService';
 import { useGetVendedores } from '../../api/servicos/vendedorService';
 import type { IPedidoCompleto } from '../../tipos/schemas';
 import { formatCurrency } from '../../utils/format';
@@ -58,6 +58,9 @@ export const PaginaGestorPedidos: React.FC = () => {
   const [modalDetalheOpen, setModalDetalheOpen] = useState(false);
   const [modalStatusOpen, setModalStatusOpen] = useState(false);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<IPedidoCompleto | undefined>();
+
+  // Hook de reenvio de email (Gestor)
+  const { mutate: resendEmailGestor, isPending: isResendingGestor } = useResendEmailGestor();
 
   // Buscar dados
   const { data: pedidos, isLoading, isError, error } = useGetPedidosGestor({
@@ -269,6 +272,11 @@ export const PaginaGestorPedidos: React.FC = () => {
           open={modalDetalheOpen}
           onClose={() => setModalDetalheOpen(false)}
           pedido={pedidoSelecionado}
+          onResendEmail={(id) => resendEmailGestor(id, {
+            onSuccess: () => alert("Email reenviado com sucesso!"),
+            onError: () => alert("Erro ao reenviar email.")
+          })}
+          isResending={isResendingGestor}
         />
       )}
 

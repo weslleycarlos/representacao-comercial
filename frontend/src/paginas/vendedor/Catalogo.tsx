@@ -34,6 +34,19 @@ import type { IItemCatalogoVenda, IProdutoSimples } from '../../tipos/schemas';
 // --- Componente Card do Produto ---
 const CardProdutoCatalogo: React.FC<{ item: IItemCatalogoVenda }> = ({ item }) => {
   const produto = item.produto as IProdutoSimples;
+  const temVariacoes = produto.variacoes && produto.variacoes.length > 0;
+
+  // Calcula range de preços se houver variações
+  const precoDisplay = useMemo(() => {
+    if (!temVariacoes) return formatCurrency(item.vl_preco_catalogo);
+
+    const precos = produto.variacoes.map(v => Number(item.vl_preco_catalogo) + Number(v.vl_ajuste_preco));
+    const min = Math.min(...precos);
+    const max = Math.max(...precos);
+
+    if (min === max) return formatCurrency(min);
+    return `De ${formatCurrency(min)} a ${formatCurrency(max)}`;
+  }, [item.vl_preco_catalogo, produto.variacoes, temVariacoes]);
 
   return (
     <Paper
@@ -105,22 +118,32 @@ const CardProdutoCatalogo: React.FC<{ item: IItemCatalogoVenda }> = ({ item }) =
             WebkitLineClamp: 2,
             lineHeight: 1.4,
             minHeight: '2.8em',
-            mb: 0.5,
+            mb: 1,
             wordBreak: 'break-word',
           }}
         >
           {produto.ds_produto}
         </Typography>
 
-        {produto.variacoes && produto.variacoes.length > 0 && (
-          <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5 }}>
-            {produto.variacoes.length} {produto.variacoes.length === 1 ? 'variação' : 'variações'}
+        {/* Chips de Variação */}
+        {temVariacoes ? (
+          <Box sx={{ mb: 1, display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
+            {Array.from(new Set(produto.variacoes.map(v => v.ds_cor))).slice(0, 3).map(cor => (
+              <Chip key={cor} label={cor} size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 20 }} />
+            ))}
+            {produto.variacoes.length > 3 && (
+              <Chip label={`+${produto.variacoes.length - 3}`} size="small" variant="outlined" sx={{ fontSize: '0.65rem', height: 20 }} />
+            )}
+          </Box>
+        ) : (
+          <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>
+            Produto Simples
           </Typography>
         )}
 
         <Box sx={{ mt: 'auto', pt: 1 }}>
-          <Typography variant="h6" fontWeight={700} color="primary.main">
-            {formatCurrency(item.vl_preco_catalogo)}
+          <Typography variant="h6" fontWeight={700} color="primary.main" sx={{ fontSize: temVariacoes ? '1rem' : '1.25rem' }}>
+            {precoDisplay}
           </Typography>
           <Typography variant="caption" color="text.secondary">
             {produto.sg_unidade_medida || 'UN'}
@@ -141,7 +164,7 @@ const CardProdutoCatalogo: React.FC<{ item: IItemCatalogoVenda }> = ({ item }) =
             borderRadius: 2,
           }}
         >
-          Adicionar
+          {temVariacoes ? 'Selecionar Opções' : 'Adicionar'}
         </Button>
       </Box>
     </Paper>
@@ -353,17 +376,11 @@ export const PaginaVendedorCatalogo: React.FC = () => {
               onChange={handleViewChange}
               size="small"
               fullWidth
-              sx={{
-                '& .MuiToggleButton-root': {
-                  borderRadius: 2,
-                  py: 1,
-                },
-              }}
             >
-              <ToggleButton value="cards" aria-label="visualização em cards">
+              <ToggleButton value="cards">
                 <CardViewIcon />
               </ToggleButton>
-              <ToggleButton value="table" aria-label="visualização em tabela">
+              <ToggleButton value="table">
                 <TableViewIcon />
               </ToggleButton>
             </ToggleButtonGroup>
@@ -372,71 +389,38 @@ export const PaginaVendedorCatalogo: React.FC = () => {
       </Paper>
 
       {/* Conteúdo */}
-      {!idCatalogoSelecionado && !isLoading ? (
-        <Alert severity="warning" sx={{ borderRadius: 2 }}>
-          Nenhuma tabela de preços disponível. Contate seu gestor.
-        </Alert>
-      ) : isLoading ? (
-        <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
+      {isLoading ? (
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress />
         </Box>
       ) : isError ? (
-        <Alert severity="error" sx={{ borderRadius: 2 }}>
-          Erro ao carregar o catálogo: {(error as Error)?.message}
+        <Alert severity="error">
+          Erro ao carregar catálogo: {(error as any).message}
         </Alert>
       ) : itensFiltrados.length === 0 ? (
-        <Paper
-          elevation={0}
-          sx={{
-            p: 6,
-            textAlign: 'center',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 3,
-          }}
-        >
-          <SearchIcon sx={{ fontSize: 56, color: 'text.disabled', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary" gutterBottom>
-            Nenhum produto encontrado
-          </Typography>
-          <Typography variant="body2" color="text.secondary">
-            Tente ajustar os filtros ou buscar por outro termo.
-          </Typography>
-        </Paper>
-      ) : viewMode === 'table' ? (
-        <Paper
-          elevation={0}
-          sx={{
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 3,
-            height: 'calc(100vh - 320px)',
-            minHeight: 400,
-          }}
-        >
-          <DataGrid
-            rows={dadosTabela}
-            columns={colunas}
-            pageSizeOptions={[10, 25, 50]}
-            initialState={{
-              pagination: { paginationModel: { pageSize: 10 } },
-            }}
-            sx={{
-              border: 0,
-              '& .MuiDataGrid-columnHeaders': {
-                bgcolor: 'background.default',
-              },
-            }}
-          />
-        </Paper>
-      ) : (
+        <Alert severity="info">Nenhum produto encontrado.</Alert>
+      ) : viewMode === 'cards' ? (
         <Grid container spacing={2}>
           {itensFiltrados.map((item) => (
-            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={item.id_item_catalogo}>
+            <Grid key={item.id_item_catalogo} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <CardProdutoCatalogo item={item} />
             </Grid>
           ))}
         </Grid>
+      ) : (
+        <Paper elevation={0} sx={{ height: 600, width: '100%' }}>
+          <DataGrid
+            rows={dadosTabela}
+            columns={colunas}
+            disableRowSelectionOnClick
+            initialState={{
+              pagination: {
+                paginationModel: { pageSize: 25 },
+              },
+            }}
+            pageSizeOptions={[10, 25, 50, 100]}
+          />
+        </Paper>
       )}
     </Box>
   );

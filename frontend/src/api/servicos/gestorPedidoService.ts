@@ -10,7 +10,7 @@ const GESTOR_PEDIDOS_KEY = (filters?: any) => ['pedidosGestor', filters];
 /**
  * Hook (useQuery) para listar TODOS os pedidos da organização (com filtros)
  */
-export const useGetPedidosGestor = (filters?: { 
+export const useGetPedidosGestor = (filters?: {
   id_vendedor?: number;
   id_cliente?: number;
   st_pedido?: string;
@@ -21,7 +21,7 @@ export const useGetPedidosGestor = (filters?: {
     const params = Object.fromEntries(
       Object.entries(filters || {}).filter(([_, v]) => v != null && v !== '')
     );
-    
+
     const { data } = await apiClient.get('/gestor/pedidos/', { params });
     return data;
   };
@@ -45,7 +45,7 @@ export const useUpdateStatusPedido = () => {
 
   const updateStatus = async (payload: StatusPayload): Promise<IPedidoCompleto> => {
     const { data } = await apiClient.put(
-      `/gestor/pedidos/${payload.idPedido}/status`, 
+      `/gestor/pedidos/${payload.idPedido}/status`,
       payload.data
     );
     return data;
@@ -57,5 +57,19 @@ export const useUpdateStatusPedido = () => {
       // Invalida a lista geral de pedidos do gestor
       queryClient.invalidateQueries({ queryKey: ['pedidosGestor'] });
     },
+  });
+};
+
+/**
+ * Hook (useMutation) para REENVIAR EMAIL do pedido (Gestor)
+ */
+export const useResendEmailGestor = () => {
+  const resendEmail = async (idPedido: number): Promise<any> => {
+    const { data } = await apiClient.post(`/gestor/pedidos/${idPedido}/reenviar-email`);
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: resendEmail,
   });
 };

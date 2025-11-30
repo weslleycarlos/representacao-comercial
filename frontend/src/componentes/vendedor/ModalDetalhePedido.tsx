@@ -6,18 +6,21 @@ import {
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
   Box, Stack, IconButton, Skeleton
 } from '@mui/material';
-import { Close as CloseIcon, Print as PrintIcon } from '@mui/icons-material';
+import { Close as CloseIcon, Print as PrintIcon, Email as EmailIcon } from '@mui/icons-material';
 
 import type { IPedidoCompleto } from '../../tipos/schemas';
 import { formatCurrency } from '../../utils/format';
+import { useResendEmail } from '../../api/servicos/vendedorService';
 
 interface ModalDetalhePedidoProps {
   open: boolean;
   onClose: () => void;
   pedido?: IPedidoCompleto;
+  onResendEmail?: (id: number) => void;
+  isResending?: boolean;
 }
 
-// Helper para cor do status (já corrigido por você)
+// Helper para cor do status
 const getStatusColor = (status: string) => {
   const safeStatus = (status || '').toLowerCase();
   switch (safeStatus) {
@@ -29,37 +32,56 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, onClose, pedido }) => {
-  
-  // Loading state (bem implementado)
+export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({
+  open,
+  onClose,
+  pedido,
+  onResendEmail,
+  isResending: externalIsResending
+}) => {
+  const { mutate: internalResendEmail, isPending: internalIsResending } = useResendEmail();
+
+  const handleResendEmail = (id: number) => {
+    if (onResendEmail) {
+      onResendEmail(id);
+    } else {
+      internalResendEmail(id, {
+        onSuccess: () => alert("Email reenviado com sucesso!"),
+        onError: () => alert("Erro ao reenviar email.")
+      });
+    }
+  };
+
+  const isResending = externalIsResending !== undefined ? externalIsResending : internalIsResending;
+
+  // Loading state
   if (!pedido) {
     return (
-       <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-         <DialogContent>
-           <Stack spacing={2}>
-             <Skeleton variant="text" height={40} width="40%" />
-             <Skeleton variant="rectangular" height={200} />
-           </Stack>
-         </DialogContent>
-       </Dialog>
+      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+        <DialogContent>
+          <Stack spacing={2}>
+            <Skeleton variant="text" height={40} width="40%" />
+            <Skeleton variant="rectangular" height={200} />
+          </Stack>
+        </DialogContent>
+      </Dialog>
     );
   }
 
-  // Correção do crash (ótima solução)
   const statusLabel = (pedido.st_pedido || 'desconhecido').replace(/_/g, " ").toUpperCase();
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
       fullWidth
-      PaperProps={{ 
-        sx: { 
+      PaperProps={{
+        sx: {
           borderRadius: 2,
-          maxHeight: { xs: '90vh', md: 'auto' }, // Melhor para mobile
-          margin: { xs: 1, md: 2 } // Espaçamento responsivo
-        } 
+          maxHeight: { xs: '90vh', md: 'auto' },
+          margin: { xs: 1, md: 2 }
+        }
       }}
     >
       {/* --- HEADER --- */}
@@ -70,20 +92,20 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
               Pedido #{pedido.nr_pedido || pedido.id_pedido}
             </Typography>
             <Typography variant="caption" color="text.secondary">
-              Realizado em: {pedido.dt_pedido ? new Date(pedido.dt_pedido).toLocaleDateString('pt-BR', { 
-                day: '2-digit', 
-                month: 'long', 
-                year: 'numeric', 
-                hour: '2-digit', 
-                minute: '2-digit' 
+              Realizado em: {pedido.dt_pedido ? new Date(pedido.dt_pedido).toLocaleDateString('pt-BR', {
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
               }) : '-'}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
-            <Chip 
-              label={statusLabel} 
-              color={getStatusColor(pedido.st_pedido)} 
-              size="small" 
+            <Chip
+              label={statusLabel}
+              color={getStatusColor(pedido.st_pedido)}
+              size="small"
               sx={{ fontWeight: 'bold' }}
             />
             <IconButton onClick={onClose} size="small">
@@ -92,12 +114,12 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
           </Stack>
         </Stack>
       </DialogTitle>
-      
+
       <Divider />
 
       <DialogContent sx={{ pt: 3 }}>
-        <Grid container spacing={2}> {/* Reduzido spacing para mobile */}
-          
+        <Grid container spacing={2}>
+
           {/* --- 1. DADOS DO CLIENTE --- */}
           <Grid size={{ xs: 12 }}>
             <Paper variant="outlined" sx={{ p: 2, bgcolor: 'background.default' }}>
@@ -180,11 +202,11 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
             <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
               🛒 ITENS DO PEDIDO
             </Typography>
-            <TableContainer 
-              component={Paper} 
+            <TableContainer
+              component={Paper}
               variant="outlined"
-              sx={{ 
-                maxHeight: { xs: 300, md: 400 }, // Scroll em mobile
+              sx={{
+                maxHeight: { xs: 300, md: 400 },
                 overflow: 'auto'
               }}
             >
@@ -211,18 +233,18 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
                       </TableCell>
                       <TableCell align="center">{item.qt_quantidade}</TableCell>
                       <TableCell align="right">{formatCurrency(item.vl_unitario)}</TableCell>
-                      <TableCell align="center"> {/* Mudado para center */}
+                      <TableCell align="center">
                         {item.pc_desconto_item > 0 ? (
-                          <Chip 
-                            label={`-${item.pc_desconto_item}%`} 
-                            size="small" 
-                            color="error" 
-                            variant="outlined" 
-                            sx={{ 
-                              height: 20, 
+                          <Chip
+                            label={`-${item.pc_desconto_item}%`}
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                            sx={{
+                              height: 20,
                               fontSize: '0.65rem',
-                              minWidth: 50 // Melhor to target
-                            }} 
+                              minWidth: 50
+                            }}
                           />
                         ) : '-'}
                       </TableCell>
@@ -239,11 +261,11 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
           {/* --- 4. OBSERVAÇÕES E TOTAIS --- */}
           <Grid size={{ xs: 12, md: 7 }}>
             {pedido.ds_observacoes && (
-              <Box sx={{ 
-                p: 2, 
-                bgcolor: 'warning.50', // Corrigido bgcolorOpacity
-                borderRadius: 1, 
-                border: '1px dashed', 
+              <Box sx={{
+                p: 2,
+                bgcolor: 'warning.50',
+                borderRadius: 1,
+                border: '1px dashed',
                 borderColor: 'warning.main',
                 height: '100%'
               }}>
@@ -256,36 +278,36 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
               </Box>
             )}
           </Grid>
-          
+
           <Grid size={{ xs: 12, md: 5 }}>
-            <Paper 
-              elevation={0} 
-              sx={{ 
-                p: 2, 
-                bgcolor: 'background.default', 
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: 'background.default',
                 borderRadius: 2,
-                border: '1px solid', // Adicionada borda sutil
+                border: '1px solid',
                 borderColor: 'divider'
               }}
             >
               <Stack spacing={1.5}>
-                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="body2" color="text.secondary">
-                      Forma de Pagamento:
-                    </Typography>
-                    <Typography variant="body2" fontWeight="medium">
-                      {pedido.forma_pagamento?.no_forma_pagamento || 'N/A'}
-                    </Typography>
-                 </Stack>
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="body2" color="text.secondary">
+                    Forma de Pagamento:
+                  </Typography>
+                  <Typography variant="body2" fontWeight="medium">
+                    {pedido.forma_pagamento?.no_forma_pagamento || 'N/A'}
+                  </Typography>
+                </Stack>
 
-                 <Divider />
-                 
-                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                    <Typography variant="h6" fontWeight="bold">TOTAL:</Typography>
-                    <Typography variant="h5" fontWeight="bold" color="primary">
-                      {formatCurrency(pedido.vl_total)}
-                    </Typography>
-                 </Stack>
+                <Divider />
+
+                <Stack direction="row" justifyContent="space-between" alignItems="center">
+                  <Typography variant="h6" fontWeight="bold">TOTAL:</Typography>
+                  <Typography variant="h5" fontWeight="bold" color="primary">
+                    {formatCurrency(pedido.vl_total)}
+                  </Typography>
+                </Stack>
               </Stack>
             </Paper>
           </Grid>
@@ -293,17 +315,29 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({ open, on
         </Grid>
       </DialogContent>
 
-      <DialogActions sx={{ p: 2, gap: 1 }}> {/* Gap para melhor espaçamento */}
-        <Button 
-          startIcon={<PrintIcon />} 
+      <DialogActions sx={{ p: 2, gap: 1 }}>
+        <Button
+          startIcon={<PrintIcon />}
           color="inherit"
           variant="outlined"
-          size="large" // Melhor para tablet
+          size="large"
         >
           Imprimir
         </Button>
-        <Button 
-          onClick={onClose} 
+        <Button
+          startIcon={<EmailIcon />}
+          color="inherit"
+          disabled={isResending}
+          onClick={() => {
+            if (pedido) {
+              handleResendEmail(pedido.id_pedido);
+            }
+          }}
+        >
+          {isResending ? "Enviando..." : "Reenviar Email"}
+        </Button>
+        <Button
+          onClick={onClose}
           variant="contained"
           size="large"
           sx={{ minWidth: 100 }}

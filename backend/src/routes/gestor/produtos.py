@@ -169,11 +169,9 @@ def create_produto(
         db.commit()
         db.refresh(db_produto)
         
-        # --- CORREÇÃO AQUI ---
         # Re-busca o produto usando o helper, que já faz os joins/loads
         # necessários ('variacoes', 'categoria') para o response_model
         return get_produto_by_id(db, db_produto.id_produto, id_organizacao)
-        # --- FIM DA CORREÇÃO ---
 
     except IntegrityError as e: # Captura UK (Unique Constraint)
         db.rollback()
@@ -226,33 +224,19 @@ def get_produto(
         models.Empresa.id_organizacao == id_organizacao
     ).first()
 
-    if not db_produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado.")
-    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
+# CRUD de Variações (TB_VARIACOES_PRODUTOS)
+# ============================================
 
-
-@gestor_produtos_router.put("/produtos/{id_produto}", response_model=ProdutoCompletoSchema)
-def update_produto(
+@gestor_produtos_router.get("/produtos/{id_produto}/variacoes", response_model=List[VariacaoProdutoSchema])
+def get_variacoes_produto(
     id_produto: int,
-    produto_in: ProdutoUpdate,
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
 ):
-    """ Atualiza um PRODUTO (definição) """
+    """ Lista todas as variações de um produto """
     db_produto = get_produto_by_id(db, id_produto, id_organizacao)
-    update_data = produto_in.model_dump(exclude_unset=True)
+    return [VariacaoProdutoSchema.model_validate(v, from_attributes=True) for v in db_produto.variacoes]
 
-    for key, value in update_data.items():
-        setattr(db_produto, key, value)
-
-    db.commit()
-    db.refresh(db_produto)
-    return ProdutoCompletoSchema.model_validate(db_produto, from_attributes=True)
-
-
-# ============================================
-# CRUD de Variações (TB_VARIACOES_PRODUTOS)
-# ============================================
 
 @gestor_produtos_router.post("/produtos/{id_produto}/variacoes", response_model=VariacaoProdutoSchema, status_code=status.HTTP_201_CREATED)
 def create_variacao(
@@ -272,6 +256,8 @@ def create_variacao(
         ).first()
         if existing_sku:
             raise HTTPException(status_code=409, detail="Este SKU já está em uso.")
+    elif variacao_in.cd_sku == "":
+        variacao_in.cd_sku = None
 
     db_variacao = models.VariacaoProduto(
         **variacao_in.model_dump(),
@@ -302,12 +288,36 @@ def update_variacao(
 
     update_data = variacao_in.model_dump(exclude_unset=True)
 
+    # Converte string vazia para None no SKU
+    if 'cd_sku' in update_data and update_data['cd_sku'] == "":
+        update_data['cd_sku'] = None
+
     for key, value in update_data.items():
         setattr(db_variacao, key, value)
 
     db.commit()
     db.refresh(db_variacao)
     return VariacaoProdutoSchema.model_validate(db_variacao, from_attributes=True)
+
+
+@gestor_produtos_router.delete("/variacoes/{id_variacao}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_variacao(
+    id_variacao: int,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    """ Remove uma variação """
+    db_variacao = db.query(models.VariacaoProduto).join(models.Produto).join(models.Empresa).filter(
+        models.VariacaoProduto.id_variacao == id_variacao,
+        models.Empresa.id_organizacao == id_organizacao
+    ).first()
+
+    if not db_variacao:
+        raise HTTPException(status_code=404, detail="Variação não encontrada.")
+
+    db.delete(db_variacao)
+    db.commit()
+    return
 
 
 # ============================================

@@ -3,15 +3,16 @@
 
 import React, { useState } from 'react';
 import {
-  Box, Button, Typography, Paper, Alert, LinearProgress, Chip, Tooltip
+  Box, Button, Paper, Alert, LinearProgress, Chip, Tooltip
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
-import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Delete as DeleteIcon, ViewWeek as GradeIcon } from '@mui/icons-material';
 
 import { useGetProdutosPorEmpresa, useDeleteProduto, useGetCategorias } from '../../../api/servicos/gestorCatalogoService';
 import type { IProdutoCompleto } from '../../../tipos/schemas';
 import { ModalFormProduto } from '../../../componentes/gestor/ModalFormProduto';
 import { ModalConfirmarExclusao } from '../../../componentes/layout/ModalConfirmarExclusao';
+import { ModalGerenciarVariacoes } from '../../../componentes/gestor/ModalGerenciarVariacoes';
 
 interface AbaProdutosProps {
   idEmpresa: number;
@@ -22,52 +23,53 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
   const [prodSelecionado, setProdSelecionado] = useState<IProdutoCompleto | undefined>(undefined);
   const [modalExcluirAberto, setModalExcluirAberto] = useState(false);
   const [idParaExcluir, setIdParaExcluir] = useState<number | null>(null);
+  const [modalVariacoesAberto, setModalVariacoesAberto] = useState(false);
 
-  const { 
-    data: produtos, 
-    isLoading, 
-    isError, 
-    error 
+  const {
+    data: produtos,
+    isLoading,
+    isError,
+    error
   } = useGetProdutosPorEmpresa(idEmpresa);
 
-  const { 
-    data: categorias, 
-    isLoading: isLoadingCategorias 
+  const {
+    data: categorias,
+    isLoading: isLoadingCategorias
   } = useGetCategorias();
 
   const { mutate: deleteProduto, isPending: isDeleting } = useDeleteProduto();
 
   const colunas: GridColDef[] = [
-    { 
-      field: 'cd_produto', 
-      headerName: 'Código', 
+    {
+      field: 'cd_produto',
+      headerName: 'Código',
       width: 120,
       headerAlign: 'center',
       align: 'center'
     },
-    { 
-      field: 'ds_produto', 
-      headerName: 'Descrição', 
+    {
+      field: 'ds_produto',
+      headerName: 'Descrição',
       flex: 2,
       minWidth: 250
     },
-    { 
-      field: 'sg_unidade_medida', 
-      headerName: 'UN', 
+    {
+      field: 'sg_unidade_medida',
+      headerName: 'UN',
       width: 80,
       headerAlign: 'center',
       align: 'center'
     },
-    { 
-      field: 'fl_ativo', 
-      headerName: 'Status', 
+    {
+      field: 'fl_ativo',
+      headerName: 'Status',
       width: 100,
       headerAlign: 'center',
       align: 'center',
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? "Ativo" : "Inativo"} 
-          color={params.value ? "success" : "default"} 
+        <Chip
+          label={params.value ? "Ativo" : "Inativo"}
+          color={params.value ? "success" : "default"}
           size="small"
           sx={{ fontWeight: 500 }}
         />
@@ -77,7 +79,7 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      width: 100,
+      width: 140,
       getActions: (params) => [
         <GridActionsCellItem
           icon={
@@ -87,6 +89,16 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
           }
           label="Editar"
           onClick={() => handleOpenEdit(params.row as IProdutoCompleto)}
+          showInMenu={false}
+        />,
+        <GridActionsCellItem
+          icon={
+            <Tooltip title="Gerenciar Grade (Cores/Tamanhos)">
+              <GradeIcon />
+            </Tooltip>
+          }
+          label="Grade"
+          onClick={() => handleOpenVariacoes(params.row as IProdutoCompleto)}
           showInMenu={false}
         />,
         <GridActionsCellItem
@@ -140,14 +152,24 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
     setIdParaExcluir(null);
   };
 
+  const handleOpenVariacoes = (produto: IProdutoCompleto) => {
+    setProdSelecionado(produto);
+    setModalVariacoesAberto(true);
+  };
+
+  const handleCloseVariacoes = () => {
+    setModalVariacoesAberto(false);
+    setProdSelecionado(undefined);
+  };
+
   return (
     <Box>
       {/* Header da Aba */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: 'center', 
-        mb: 3 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 3
       }}>
         <Button
           variant="contained"
@@ -166,9 +188,9 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
       )}
 
       {/* Tabela */}
-      <Paper 
-        elevation={0} 
-        sx={{ 
+      <Paper
+        elevation={0}
+        sx={{
           height: 500,
           width: '100%',
           border: '1px solid',
@@ -184,8 +206,8 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
           slots={{ loadingOverlay: LinearProgress }}
           disableRowSelectionOnClick
           initialState={{
-            pagination: { 
-              paginationModel: { pageSize: 25 } 
+            pagination: {
+              paginationModel: { pageSize: 25 }
             },
           }}
           pageSizeOptions={[10, 25, 50, 100]}
@@ -201,7 +223,7 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
           }}
         />
       </Paper>
-      
+
       {/* Modal de Form */}
       <ModalFormProduto
         open={modalFormAberto}
@@ -211,7 +233,7 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
         categorias={categorias || []}
         isLoadingCategorias={isLoadingCategorias}
       />
-      
+
       {/* Modal de Exclusão */}
       <ModalConfirmarExclusao
         open={modalExcluirAberto}
@@ -220,6 +242,13 @@ export const AbaProdutos: React.FC<AbaProdutosProps> = ({ idEmpresa }) => {
         titulo="Desativar Produto"
         mensagem="Tem certeza que deseja desativar este produto? Ele será removido dos catálogos ativos, mas permanecerá no histórico de pedidos."
         isLoading={isDeleting}
+      />
+
+      {/* Modal de Variações (Grade) */}
+      <ModalGerenciarVariacoes
+        open={modalVariacoesAberto}
+        onClose={handleCloseVariacoes}
+        produto={prodSelecionado || null}
       />
     </Box>
   );

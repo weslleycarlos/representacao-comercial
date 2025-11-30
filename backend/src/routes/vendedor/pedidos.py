@@ -1,16 +1,14 @@
 # /backend/src/routes/vendedor/pedidos.py
-# (VERSÃO CORRIGIDA - 100% SÍNCRONA, SEM async/await)
-
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session, joinedload
 from typing import List
 from decimal import Decimal
-from datetime import datetime  # <-- Importação necessária para o PUT/cancelar
-
+from datetime import datetime
+from src.services.email import EmailService
 from src.database import get_db
 from src.models import models
 from src.schemas import (
-    PedidoCreate, PedidoCompletoSchema, FormaPagamentoSchema,
+    PedidoCreate, PedidoCompletoSchema,
     PedidoUpdate, PedidoCancelRequest
 )
 from src.core.security import get_current_vendedor_contexto
@@ -22,7 +20,7 @@ vendedor_pedidos_router = APIRouter(
     dependencies=[Depends(get_current_vendedor_contexto)]
 )
 
-# --- FUNÇÃO HELPER (Corrigida para 'def' síncrono) ---
+# --- FUNÇÃO HELPER ---
 def get_pedido_by_id_vendedor(
     db: Session,
     id_pedido: int,
@@ -52,15 +50,16 @@ def get_pedido_by_id_vendedor(
     return pedido
 
 
-# --- ROTA CREATE (Corrigida para chamar a função síncrona) ---
+# --- ROTA CREATE ---
 @vendedor_pedidos_router.post("/", response_model=PedidoCompletoSchema, status_code=status.HTTP_201_CREATED)
 def create_pedido(
     pedido_in: PedidoCreate,
+    background_tasks: BackgroundTasks,
     contexto: tuple = Depends(get_current_vendedor_contexto),
     db: Session = Depends(get_db)
 ):
     """
-    Cria um novo pedido (lógica de preço síncrona).
+    Cria um novo pedido.
     """
     id_usuario, id_organizacao, id_empresa_ativa = contexto
 
@@ -100,7 +99,6 @@ def create_pedido(
             
             # Regra: Se NÃO tem variação, id_variacao deve ser nulo (ou ignorado)
             if variacoes_produto == 0 and item_in.id_variacao:
-                 # Opcional: pode limpar ou dar erro. Vamos apenas ignorar ou logar.
                  item_in.id_variacao = None
             
             item_catalogo = db.query(models.ItemCatalogo).filter(
@@ -153,8 +151,15 @@ def create_pedido(
         db.commit()
         db.refresh(db_pedido)
 
-        # --- CORREÇÃO AQUI (Removido 'await') ---
         db_pedido_completo = get_pedido_by_id_vendedor(db, db_pedido.id_pedido, id_usuario)
+    
+        # --- ENVIO DE EMAIL ---
+        if db_pedido_completo.cliente.ds_email:
+            EmailService.send_order_confirmation(
+                background_tasks=background_tasks,
+                pedido=db_pedido_completo,
+                emails_to=[db_pedido_completo.cliente.ds_email]
+            )
         return PedidoCompletoSchema.model_validate(db_pedido_completo, from_attributes=True)
 
     except HTTPException as e:
@@ -168,7 +173,7 @@ def create_pedido(
         )
 
 
-# --- ROTA GET (Corrigida para 'def' síncrono) ---
+# --- ROTA GET LIST ---
 @vendedor_pedidos_router.get("/", response_model=List[PedidoCompletoSchema])
 def get_meus_pedidos(
     contexto: tuple = Depends(get_current_vendedor_contexto),
@@ -190,7 +195,7 @@ def get_meus_pedidos(
     return [PedidoCompletoSchema.model_validate(p, from_attributes=True) for p in pedidos]
 
 
-# --- ROTA GET ID (Corrigida para 'def' síncrono) ---
+# --- ROTA GET BY ID ---
 @vendedor_pedidos_router.get("/{id_pedido}", response_model=PedidoCompletoSchema)
 def get_meu_pedido_especifico(
     id_pedido: int,
@@ -198,12 +203,33 @@ def get_meu_pedido_especifico(
     db: Session = Depends(get_db)
 ):
     id_usuario, _, _ = contexto
-    # --- CORREÇÃO AQUI (Removido 'await') ---
     db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
     return PedidoCompletoSchema.model_validate(db_pedido, from_attributes=True)
 
 
-# --- ROTA PUT (Corrigida para 'def' síncrono) ---
+# --- ROTA REENVIAR EMAIL ---
+@vendedor_pedidos_router.post("/{id_pedido}/reenviar-email")
+def reenviar_email_pedido_vendedor(
+    id_pedido: int,
+    background_tasks: BackgroundTasks,
+    contexto: tuple = Depends(get_current_vendedor_contexto),
+    db: Session = Depends(get_db)
+):
+    id_usuario, _, _ = contexto
+    db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
+    
+    if not db_pedido.cliente.ds_email:
+        raise HTTPException(status_code=400, detail="Cliente não possui e-mail cadastrado.")
+        
+    EmailService.send_order_confirmation(
+        background_tasks=background_tasks,
+        pedido=db_pedido,
+        emails_to=[db_pedido.cliente.ds_email]
+    )
+    return {"message": "E-mail enviado para a fila de processamento."}
+
+
+# --- ROTA PUT ---
 @vendedor_pedidos_router.put("/{id_pedido}", response_model=PedidoCompletoSchema)
 def update_meu_pedido(
     id_pedido: int,
@@ -212,7 +238,6 @@ def update_meu_pedido(
     db: Session = Depends(get_db)
 ):
     id_usuario, _, _ = contexto
-    # --- CORREÇÃO AQUI (Removido 'await') ---
     db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
 
     if db_pedido.st_pedido != 'pendente':
@@ -225,7 +250,6 @@ def update_meu_pedido(
 
     if 'pc_desconto' in update_data:
         db_pedido.pc_desconto = update_data['pc_desconto']
-        # (Idealmente, o trigger no DB recalcula o vl_total aqui)
 
     if 'ds_observacoes' in update_data:
         db_pedido.ds_observacoes = update_data['ds_observacoes']
@@ -242,7 +266,7 @@ def update_meu_pedido(
         )
 
 
-# --- ROTA CANCELAR (Corrigida para 'def' síncrono) ---
+# --- ROTA CANCELAR ---
 @vendedor_pedidos_router.post("/{id_pedido}/cancelar", response_model=PedidoCompletoSchema)
 def cancelar_meu_pedido(
     id_pedido: int,
@@ -251,7 +275,6 @@ def cancelar_meu_pedido(
     db: Session = Depends(get_db)
 ):
     id_usuario, _, _ = contexto
-    # --- CORREÇÃO AQUI (Removido 'await') ---
     db_pedido = get_pedido_by_id_vendedor(db, id_pedido, id_usuario)
 
     if db_pedido.st_pedido in ('cancelado', 'entregue'):

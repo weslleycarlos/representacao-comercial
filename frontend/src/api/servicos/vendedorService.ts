@@ -187,9 +187,9 @@ export const useDesvincularEmpresa = () => {
 export const useGetCatalogoVenda = (idEmpresaAtiva?: number, idCatalogo?: number, idCategoria?: number) => {
   const fetchCatalogo = async (): Promise<IItemCatalogoVenda[]> => {
     const { data } = await apiClient.get('/vendedor/catalogo/', {
-      params: { 
+      params: {
         id_catalogo: idCatalogo, // <-- Agora envia o ID
-        id_categoria: idCategoria 
+        id_categoria: idCategoria
       }
     });
     return data;
@@ -197,7 +197,7 @@ export const useGetCatalogoVenda = (idEmpresaAtiva?: number, idCatalogo?: number
 
   return useQuery({
     // A chave depende do Catálogo selecionado
-    queryKey: [...VENDEDOR_CATALOGO_KEY(idEmpresaAtiva), { idCatalogo, idCategoria }], 
+    queryKey: [...VENDEDOR_CATALOGO_KEY(idEmpresaAtiva), { idCatalogo, idCategoria }],
     queryFn: fetchCatalogo,
     enabled: !!idEmpresaAtiva && !!idCatalogo, // Só busca se tiver catálogo selecionado
   });
@@ -232,7 +232,7 @@ export const useGetMeusPedidos = (idEmpresaAtiva?: number) => {
 
   return useQuery({
     // Usa a nova chave 'lista'
-    queryKey: VENDEDOR_PEDIDOS_KEY(idEmpresaAtiva), 
+    queryKey: VENDEDOR_PEDIDOS_KEY(idEmpresaAtiva),
     queryFn: fetchPedidos,
     enabled: !!idEmpresaAtiva,
   });
@@ -249,7 +249,7 @@ export const useGetMeuPedidoDetalhe = (idPedido: number) => {
 
   return useQuery({
     // Usa a nova chave 'detalhe'
-    queryKey: VENDEDOR_PEDIDO_DETALHE_KEY(idPedido), 
+    queryKey: VENDEDOR_PEDIDO_DETALHE_KEY(idPedido),
     queryFn: fetchPedido,
     enabled: !!idPedido,
   });
@@ -283,7 +283,7 @@ export const useCancelarPedido = () => {
 
   const cancelarPedido = async (payload: CancelPayload): Promise<IPedidoCompleto> => {
     const { data } = await apiClient.post(
-      `/vendedor/pedidos/${payload.idPedido}/cancelar`, 
+      `/vendedor/pedidos/${payload.idPedido}/cancelar`,
       payload.data
     );
     return data;
@@ -297,6 +297,19 @@ export const useCancelarPedido = () => {
       // Atualiza o cache específico do detalhe deste pedido
       queryClient.setQueryData(VENDEDOR_PEDIDO_DETALHE_KEY(data.id_pedido), data);
     },
+  });
+};
+
+/**
+ * Hook (useMutation) para REENVIAR EMAIL de confirmação
+ */
+export const useResendEmail = () => {
+  const resendEmail = async (idPedido: number): Promise<void> => {
+    await apiClient.post(`/vendedor/pedidos/${idPedido}/reenviar-email`);
+  };
+
+  return useMutation({
+    mutationFn: resendEmail,
   });
 };
 
@@ -360,7 +373,7 @@ export const useAddVendedorEndereco = () => {
 
   const addEndereco = async (payload: AddPayload): Promise<IEndereco> => {
     const { data } = await apiClient.post(
-      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
+      `/vendedor/clientes/${payload.idCliente}/enderecos`,
       payload.data
     );
     return data;
@@ -369,14 +382,14 @@ export const useAddVendedorEndereco = () => {
   return useMutation({
     mutationFn: addEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
 
       // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
       // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
-      queryClient.invalidateQueries({ 
-        queryKey: ['clientesVendedor'] 
+      queryClient.invalidateQueries({
+        queryKey: ['clientesVendedor']
       });
     },
   });
@@ -387,7 +400,7 @@ export const useUpdateVendedorEndereco = () => {
 
   const updateEndereco = async (payload: UpdateEnderecoPayload): Promise<IEndereco> => {
     const { data } = await apiClient.put(
-      `/vendedor/clientes/${payload.idCliente}/enderecos`, 
+      `/vendedor/clientes/${payload.idCliente}/enderecos`,
       payload.data
     );
     return data;
@@ -396,14 +409,14 @@ export const useUpdateVendedorEndereco = () => {
   return useMutation({
     mutationFn: updateEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
 
       // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
       // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
-      queryClient.invalidateQueries({ 
-        queryKey: ['clientesVendedor'] 
+      queryClient.invalidateQueries({
+        queryKey: ['clientesVendedor']
       });
     },
   });
@@ -419,14 +432,14 @@ export const useDeleteVendedorEndereco = () => {
   return useMutation({
     mutationFn: deleteEndereco,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente) 
+      queryClient.invalidateQueries({
+        queryKey: VENDEDOR_ENDERECO_CACHE_KEY(variables.idCliente)
       });
 
       // 2. ADICIONE ISSO: Invalida a lista de CLIENTES (para atualizar o ModalNovoPedido)
       // Isso força o useGetVendedorClientes a buscar os dados de novo, trazendo o novo endereço
-      queryClient.invalidateQueries({ 
-        queryKey: ['clientesVendedor'] 
+      queryClient.invalidateQueries({
+        queryKey: ['clientesVendedor']
       });
     },
   });

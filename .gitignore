@@ -31,6 +31,8 @@ __pycache__/
 *.pyo
 *.pyd
 .pytest_cache/
+coverage/
+htmlcov/
 
 # Banco de Dados Local
 *.db

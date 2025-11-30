@@ -3,7 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
 from typing import List, Optional
 from datetime import datetime
-
+from fastapi import BackgroundTasks
+from src.services.email import EmailService
 from src.database import get_db
 from src.models import models
 from src.schemas import PedidoCompletoSchema, PedidoStatusUpdate
@@ -12,12 +13,12 @@ from src.core.security import get_current_gestor_org_id, get_current_user
 # Cria o router
 gestor_pedidos_router = APIRouter(
     prefix="/api/gestor/pedidos",
-    tags=["8. Gestor - Pedidos"],  # Novo grupo no /docs
+    tags=["8. Gestor - Pedidos"],
     dependencies=[Depends(get_current_gestor_org_id)]
 )
 
 
-async def get_pedido_by_id_gestor(
+def get_pedido_by_id_gestor(
     db: Session,
     id_pedido: int,
     id_organizacao: int
@@ -50,7 +51,7 @@ async def get_pedido_by_id_gestor(
 
 
 @gestor_pedidos_router.get("/", response_model=List[PedidoCompletoSchema])
-async def get_pedidos_da_organizacao(
+def get_pedidos_da_organizacao(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db),
     skip: int = Query(0, ge=0),
@@ -90,7 +91,7 @@ async def get_pedidos_da_organizacao(
 
 
 @gestor_pedidos_router.get("/{id_pedido}", response_model=PedidoCompletoSchema)
-async def get_pedido_especifico_gestor(
+def get_pedido_especifico_gestor(
     id_pedido: int,
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db)
@@ -99,15 +100,35 @@ async def get_pedido_especifico_gestor(
     Busca os detalhes de um pedido específico da organização.
     """
     # A função helper já faz a busca, validação e eager loading
-    db_pedido = await get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
+    db_pedido = get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
 
     return PedidoCompletoSchema.model_validate(db_pedido, from_attributes=True)
 
+@gestor_pedidos_router.post("/{id_pedido}/reenviar-email")
+def reenviar_email_pedido(
+    id_pedido: int,
+    background_tasks: BackgroundTasks,
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db)
+):
+    db_pedido = get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
+    
+    if not db_pedido.cliente.ds_email:
+        raise HTTPException(status_code=400, detail="Cliente não possui e-mail cadastrado.")
+        
+    EmailService.send_order_confirmation(
+        background_tasks=background_tasks,
+        pedido=db_pedido,
+        emails_to=[db_pedido.cliente.ds_email]
+    )
+    return {"message": "E-mail enviado para a fila de processamento."}
+
 
 @gestor_pedidos_router.put("/{id_pedido}/status", response_model=PedidoCompletoSchema)
-async def update_status_pedido(
+def update_status_pedido(
     id_pedido: int,
     status_in: PedidoStatusUpdate,
+    background_tasks: BackgroundTasks,
     id_organizacao: int = Depends(get_current_gestor_org_id),
     current_user: models.Usuario = Depends(get_current_user),  # Pega o usuário (Gestor)
     db: Session = Depends(get_db)
@@ -116,7 +137,7 @@ async def update_status_pedido(
     Atualiza o status de um pedido (ex: pendente -> confirmado).
     (Esta é a principal rota de gerenciamento do gestor)
     """
-    db_pedido = await get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
+    db_pedido = get_pedido_by_id_gestor(db, id_pedido, id_organizacao)
 
     status_antigo = db_pedido.st_pedido
     novo_status = status_in.novo_status
@@ -140,6 +161,15 @@ async def update_status_pedido(
     try:
         db.commit()
         db.refresh(db_pedido)
+
+        # --- ENVIO DE EMAIL ---
+        if db_pedido.cliente.ds_email:
+            EmailService.send_order_confirmation(
+                background_tasks=background_tasks,
+                pedido=db_pedido,
+                emails_to=[db_pedido.cliente.ds_email] # Envia para o cliente
+                # Pode adicionar o email do vendedor na lista se quiser cópia
+            )
 
         # (Aqui dispararia a lógica de Notificações em tempo real - Fase 2)
 

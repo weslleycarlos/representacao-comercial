@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+</head>
+
+<body style="font-family: Arial, sans-serif; color: #333;">
+    <div style="max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 8px; overflow: hidden;">
+        <div style="background-color: #005A9C; color: white; padding: 20px; text-align: center;">
+            <h1>Pedido Recebido</h1>
+            <p>Número: <strong>{{ nr_pedido }}</strong></p>
+        </div>
+
+        <div style="padding: 20px;">
+            <p>Olá, <strong>{{ cliente_nome }}</strong>.</p>
+            <p>Seu pedido foi registrado com sucesso no dia {{ dt_pedido }}.</p>
+            <p>Status Atual: <span style="background-color: #eee; padding: 4px 8px; border-radius: 4px;">{{ status
+                    }}</span></p>
+
+            <h3>Itens do Pedido</h3>
+            <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                <tr style="background-color: #f8f9fa; text-align: left;">
+                    <th style="padding: 10px; border-bottom: 1px solid #ddd;">Produto</th>
+                    <th style="padding: 10px; border-bottom: 1px solid #ddd;">Qtd</th>
+                    <th style="padding: 10px; border-bottom: 1px solid #ddd;">Preço</th>
+                    <th style="padding: 10px; border-bottom: 1px solid #ddd;">Total</th>
+                </tr>
+                {% for item in itens %}
+                <tr>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{{ item.produto }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{{ item.qtd }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{{ item.preco }}</td>
+                    <td style="padding: 10px; border-bottom: 1px solid #eee;">{{ item.total }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+
+            <div style="text-align: right; margin-top: 20px;">
+                <h3>Total: {{ total_pedido }}</h3>
+            </div>
+
+            <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
+            <p><strong>Observações:</strong><br>{{ observacoes }}</p>
+            <p style="font-size: 12px; color: #777; margin-top: 30px;">
+                Atendido por: {{ vendedor_nome }}<br>
+                Este é um e-mail automático, não responda.
+            </p>
+        </div>
+    </div>
+</body>
+
+</html>

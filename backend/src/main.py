@@ -316,88 +316,6 @@ def create_postgresql_views(db: Session):
         "VW_VENDAS_POR_CIDADE"
     ]
     for view in views:
-        try: 
-            db.execute(text(f"DROP VIEW IF EXISTS {view} CASCADE"))
-        except: 
-            pass
-        
-    # 1. View: Vendas por Vendedor
-    db.execute(text("""
-    CREATE VIEW VW_VENDAS_VENDEDOR_MES AS
-    SELECT 
-        u.ID_USUARIO,
-        u.NO_COMPLETO AS NO_VENDEDOR,
-        u.ID_ORGANIZACAO,
-        DATE_TRUNC('month', p.DT_PEDIDO) AS DT_MES_REFERENCIA,
-        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
-        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS,
-        AVG(p.VL_TOTAL) AS VL_TICKET_MEDIO
-    FROM TB_USUARIOS u
-    INNER JOIN TB_PEDIDOS p ON u.ID_USUARIO = p.ID_USUARIO
-    WHERE u.TP_USUARIO = 'vendedor' AND p.ST_PEDIDO != 'cancelado'
-    GROUP BY u.ID_USUARIO, u.NO_COMPLETO, u.ID_ORGANIZACAO, DATE_TRUNC('month', p.DT_PEDIDO);
-    """))
-
-    # 2. View: Vendas por Empresa
-    db.execute(text("""
-    CREATE VIEW VW_VENDAS_EMPRESA_MES AS
-    SELECT 
-        e.ID_EMPRESA,
-        e.NO_EMPRESA,
-        e.ID_ORGANIZACAO,
-        DATE_TRUNC('month', p.DT_PEDIDO) AS DT_MES_REFERENCIA,
-        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
-        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS,
-        COUNT(DISTINCT p.ID_CLIENTE) AS QT_CLIENTES_ATENDIDOS
-    FROM TB_EMPRESAS e
-    INNER JOIN TB_PEDIDOS p ON e.ID_EMPRESA = p.ID_EMPRESA
-    WHERE p.ST_PEDIDO != 'cancelado'
-    GROUP BY e.ID_EMPRESA, e.NO_EMPRESA, e.ID_ORGANIZACAO, DATE_TRUNC('month', p.DT_PEDIDO);
-    """))
-    
-    # 3. View: Vendas por Cidade
-    db.execute(text("""
-    CREATE VIEW VW_VENDAS_POR_CIDADE AS
-    SELECT 
-        en.NO_CIDADE,
-        en.SG_ESTADO,
-        c.ID_ORGANIZACAO,
-        DATE_TRUNC('month', p.DT_PEDIDO) AS DT_MES_REFERENCIA,
-        COUNT(p.ID_PEDIDO) AS QT_PEDIDOS,
-        SUM(p.VL_TOTAL) AS VL_TOTAL_VENDAS
-    FROM TB_PEDIDOS p
-    INNER JOIN TB_CLIENTES c ON p.ID_CLIENTE = c.ID_CLIENTE
-    INNER JOIN TB_ENDERECOS en ON p.ID_ENDERECO_ENTREGA = en.ID_ENDERECO
-    WHERE p.ST_PEDIDO != 'cancelado'
-    GROUP BY en.NO_CIDADE, en.SG_ESTADO, c.ID_ORGANIZACAO, DATE_TRUNC('month', p.DT_PEDIDO);
-    """))
-
-    # 4. View: Comissões
-    db.execute(text("""
-    CREATE VIEW VW_COMISSOES_CALCULADAS AS
-    SELECT 
-        p.ID_PEDIDO,
-        p.NR_PEDIDO,
-        p.ID_USUARIO,
-        u.NO_COMPLETO AS NO_VENDEDOR,
-        p.ID_EMPRESA,
-        e.NO_EMPRESA,
-        p.VL_TOTAL,
-        COALESCE(e.PC_COMISSAO_PADRAO, 0) AS PC_COMISSAO_APLICADA,
-        (p.VL_TOTAL * COALESCE(e.PC_COMISSAO_PADRAO, 0) / 100) AS VL_COMISSAO_CALCULADA,
-        p.DT_PEDIDO
-    FROM TB_PEDIDOS p
-    INNER JOIN TB_USUARIOS u ON p.ID_USUARIO = u.ID_USUARIO
-    INNER JOIN TB_EMPRESAS e ON p.ID_EMPRESA = e.ID_EMPRESA
-    WHERE p.ST_PEDIDO != 'cancelado';
-    """))
-
-    db.commit()
-    print("✅ Views criadas (PostgreSQL).")
-
-
-# --- POPULAÇÃO DE DADOS INICIAIS (SEED COMPLETO) ---
-def seed_initial_data():
     """Popula dados de teste completos (apenas DEV)"""
     db: Session = SessionLocal()
     try:
@@ -663,24 +581,6 @@ def initialize_database():
     print(f"\n{'='*70}")
     print(f"🚀 INICIALIZANDO APLICAÇÃO")
     print(f"{'='*70}")
-    print(f"   Ambiente: {ambiente.upper()}")
-    print(f"   Banco de Dados: {db_type}")
-    print(f"   URL: {str(engine.url).split('@')[-1] if '@' in str(engine.url) else str(engine.url)}")
-    print(f"{'='*70}\n")
-
-    # 1. CRIAR TABELAS (SEMPRE)
-    print("📦 Criando tabelas no banco de dados...")
-    try:
-        Base.metadata.create_all(bind=engine)
-        print("✅ Tabelas criadas/verificadas com sucesso.\n")
-    except Exception as e:
-        print(f"❌ Erro ao criar tabelas: {e}\n")
-        raise
-
-    # 2. CRIAR VIEWS E TRIGGERS (SEMPRE, MAS ESPECÍFICO DO BANCO)
-    db = SessionLocal()
-    try:
-        if is_sqlite():
             print("🔧 Banco SQLite detectado: Criando Views e Triggers...")
             create_sqlite_views(db)
             create_sqlite_triggers(db)

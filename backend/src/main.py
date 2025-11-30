@@ -875,7 +875,18 @@ def initialize_database():
         print(f"🚀 INICIALIZANDO APLICAÇÃO - Ambiente: {ambiente.upper()}")
         print(f"{'=' * 70}")
 
-        # CRIAR VIEWS E TRIGGERS
+        # *** ADICIONE ESTA PARTE AQUI ***
+        # 1. CRIAR TABELAS PRIMEIRO
+        print("📦 Criando tabelas do banco de dados...")
+        try:
+            Base.metadata.create_all(bind=engine)
+            print("✅ Tabelas criadas/verificadas com sucesso!")
+        except Exception as e:
+            print(f"❌ Erro ao criar tabelas: {e}")
+            return  # Para aqui se não conseguir criar tabelas
+        # *** FIM DA ADIÇÃO ***
+
+        # 2. CRIAR VIEWS E TRIGGERS (agora as tabelas já existem)
         db: Session = SessionLocal()
         try:
             if is_sqlite():
@@ -893,10 +904,10 @@ def initialize_database():
         finally:
             db.close()
 
-        # CRIAR SUPER ADMIN
+        # 3. CRIAR SUPER ADMIN
         create_super_admin()
 
-        # POPULAR DADOS DE TESTE (APENAS DEV)
+        # 4. POPULAR DADOS DE TESTE (APENAS DEV)
         if ambiente == "dev":
             print("🌱 Ambiente DEV: Verificando dados de teste...")
             seed_initial_data()

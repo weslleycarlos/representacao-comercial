@@ -165,14 +165,14 @@ def create_postgresql_triggers(db: Session):
         CREATE OR REPLACE FUNCTION fn_log_pedido_ins()
         RETURNS TRIGGER AS $$
         BEGIN
-            INSERT INTO TB_LOGS_AUDITORIA (TP_ENTIDADE, ID_ENTIDADE, TP_ACAO, DT_ACAO, ID_USUARIO, ID_ORGANIZACAO)
+            INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO")
             VALUES (
                 'Pedido', 
-                NEW.ID_PEDIDO, 
+                NEW."ID_PEDIDO", 
                 'CREATE', 
                 NOW(), 
-                NEW.ID_USUARIO,
-                (SELECT ID_ORGANIZACAO FROM TB_EMPRESAS WHERE ID_EMPRESA = NEW.ID_EMPRESA)
+                NEW."ID_USUARIO",
+                (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA")
             );
             RETURN NEW;
         END;
@@ -182,14 +182,14 @@ def create_postgresql_triggers(db: Session):
 
         db.execute(
             text("""
-        DROP TRIGGER IF EXISTS tg_log_pedido_ins ON TB_PEDIDOS;
+        DROP TRIGGER IF EXISTS tg_log_pedido_ins ON "TB_PEDIDOS";
         """)
         )
 
         db.execute(
             text("""
         CREATE TRIGGER tg_log_pedido_ins
-        AFTER INSERT ON TB_PEDIDOS
+        AFTER INSERT ON "TB_PEDIDOS"
         FOR EACH ROW
         EXECUTE FUNCTION fn_log_pedido_ins();
         """)
@@ -206,17 +206,17 @@ def create_postgresql_triggers(db: Session):
         CREATE OR REPLACE FUNCTION fn_log_pedido_upd()
         RETURNS TRIGGER AS $$
         BEGIN
-            IF OLD.ST_PEDIDO <> NEW.ST_PEDIDO THEN
-                INSERT INTO TB_LOGS_AUDITORIA (TP_ENTIDADE, ID_ENTIDADE, TP_ACAO, DT_ACAO, ID_USUARIO, ID_ORGANIZACAO, DS_VALORES_ANTIGOS, DS_VALORES_NOVOS)
+            IF OLD."ST_PEDIDO" <> NEW."ST_PEDIDO" THEN
+                INSERT INTO "TB_LOGS_AUDITORIA" ("TP_ENTIDADE", "ID_ENTIDADE", "TP_ACAO", "DT_ACAO", "ID_USUARIO", "ID_ORGANIZACAO", "DS_VALORES_ANTIGOS", "DS_VALORES_NOVOS")
                 VALUES (
                     'Pedido', 
-                    NEW.ID_PEDIDO, 
+                    NEW."ID_PEDIDO", 
                     'UPDATE_STATUS', 
                     NOW(), 
-                    NEW.ID_USUARIO,
-                    (SELECT ID_ORGANIZACAO FROM TB_EMPRESAS WHERE ID_EMPRESA = NEW.ID_EMPRESA),
-                    json_build_object('status', OLD.ST_PEDIDO)::TEXT,
-                    json_build_object('status', NEW.ST_PEDIDO)::TEXT
+                    NEW."ID_USUARIO",
+                    (SELECT "ID_ORGANIZACAO" FROM "TB_EMPRESAS" WHERE "ID_EMPRESA" = NEW."ID_EMPRESA"),
+                    json_build_object('status', OLD."ST_PEDIDO")::TEXT,
+                    json_build_object('status', NEW."ST_PEDIDO")::TEXT
                 );
             END IF;
             RETURN NEW;
@@ -227,14 +227,14 @@ def create_postgresql_triggers(db: Session):
 
         db.execute(
             text("""
-        DROP TRIGGER IF EXISTS tg_log_pedido_upd ON TB_PEDIDOS;
+        DROP TRIGGER IF EXISTS tg_log_pedido_upd ON "TB_PEDIDOS";
         """)
         )
 
         db.execute(
             text("""
         CREATE TRIGGER tg_log_pedido_upd
-        AFTER UPDATE ON TB_PEDIDOS
+        AFTER UPDATE ON "TB_PEDIDOS"
         FOR EACH ROW
         EXECUTE FUNCTION fn_log_pedido_upd();
         """)

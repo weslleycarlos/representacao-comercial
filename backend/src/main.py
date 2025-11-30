@@ -1,4 +1,5 @@
 from dotenv import load_dotenv
+
 load_dotenv()
 import uvicorn
 import os
@@ -44,18 +45,33 @@ tags_metadata = [
     {"name": "2. Gestor - Empresas", "description": "Gerenciamento de empresas."},
     {"name": "3. Gestor - Vendedores", "description": "Gerenciamento de vendedores."},
     {"name": "4. Gestor - Clientes", "description": "Gerenciamento de clientes."},
-    {"name": "5. Gestor - Catálogo (Produtos e Preços)", "description": "Gerenciamento de produtos e catálogos."},
-    {"name": "6. Gestor - Configurações", "description": "Configurações gerais do gestor."},
+    {
+        "name": "5. Gestor - Catálogo (Produtos e Preços)",
+        "description": "Gerenciamento de produtos e catálogos.",
+    },
+    {
+        "name": "6. Gestor - Configurações",
+        "description": "Configurações gerais do gestor.",
+    },
     {"name": "7. Gestor - Relatórios", "description": "Relatórios e estatísticas."},
     {"name": "8. Gestor - Pedidos", "description": "Gerenciamento de pedidos."},
     {"name": "9. Gestor - Logs", "description": "Logs e auditoria de ações do gestor."},
     {"name": "10. Vendedor - Pedidos", "description": "Pedidos do vendedor."},
-    {"name": "11. Vendedor - Catálogo", "description": "Catálogo de produtos para vendedores."},
+    {
+        "name": "11. Vendedor - Catálogo",
+        "description": "Catálogo de produtos para vendedores.",
+    },
     {"name": "12. Vendedor - Clientes", "description": "Clientes do vendedor."},
     {"name": "13. Vendedor - Dashboard", "description": "Dashboard do vendedor."},
-    {"name": "14. Super Admin - Organizações", "description": "Gerenciamento de organizações."},
+    {
+        "name": "14. Super Admin - Organizações",
+        "description": "Gerenciamento de organizações.",
+    },
     {"name": "15. Super Admin - Logs", "description": "Logs de sistema."},
-    {"name": "16. Super Admin - Dashboard", "description": "Dashboard do administrador."},
+    {
+        "name": "16. Super Admin - Dashboard",
+        "description": "Dashboard do administrador.",
+    },
     {"name": "Utilitários", "description": "Utilitários e funções auxiliares."},
 ]
 
@@ -68,10 +84,7 @@ app = FastAPI(
 )
 
 # --- CONFIGURAÇÃO DO CORS ---
-origins = [
-    "http://localhost:5173",
-    "https://repcom-front-production.up.railway.app"
-]
+origins = ["http://localhost:5173", "https://repcom-front-production.up.railway.app"]
 
 app.add_middleware(
     CORSMiddleware,
@@ -85,21 +98,22 @@ app.add_middleware(
 # --- DETECÇÃO DO BANCO DE DADOS ---
 def is_sqlite() -> bool:
     """Verifica se o banco é SQLite"""
-    return 'sqlite' in str(engine.url).lower()
+    return "sqlite" in str(engine.url).lower()
 
 
 def is_postgresql() -> bool:
     """Verifica se o banco é PostgreSQL"""
-    return 'postgres' in str(engine.url).lower()
+    return "postgres" in str(engine.url).lower()
 
 
 # --- FUNÇÕES PARA CRIAR TRIGGERS (LOGS AUTOMÁTICOS) ---
 def create_sqlite_triggers(db: Session):
     """Cria triggers no SQLite para popular a TB_LOGS_AUDITORIA automaticamente."""
     print("📝 Criando Triggers de Auditoria (SQLite)...")
-    
+
     # Trigger: Insert Pedido
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE TRIGGER IF NOT EXISTS tg_log_pedido_ins AFTER INSERT ON TB_PEDIDOS
     BEGIN
         INSERT INTO TB_LOGS_AUDITORIA (TP_ENTIDADE, ID_ENTIDADE, TP_ACAO, DT_ACAO, ID_USUARIO, ID_ORGANIZACAO)
@@ -112,10 +126,12 @@ def create_sqlite_triggers(db: Session):
             (SELECT ID_ORGANIZACAO FROM TB_EMPRESAS WHERE ID_EMPRESA = NEW.ID_EMPRESA)
         );
     END;
-    """))
-    
+    """)
+    )
+
     # Trigger: Update Pedido (Mudança de Status)
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE TRIGGER IF NOT EXISTS tg_log_pedido_upd AFTER UPDATE ON TB_PEDIDOS
     WHEN OLD.ST_PEDIDO <> NEW.ST_PEDIDO
     BEGIN
@@ -131,8 +147,9 @@ def create_sqlite_triggers(db: Session):
             json_object('status', NEW.ST_PEDIDO)
         );
     END;
-    """))
-    
+    """)
+    )
+
     db.commit()
     print("✅ Triggers de auditoria criados (SQLite).")
 
@@ -140,9 +157,10 @@ def create_sqlite_triggers(db: Session):
 def create_postgresql_triggers(db: Session):
     """Cria triggers no PostgreSQL para popular a TB_LOGS_AUDITORIA automaticamente."""
     print("📝 Criando Triggers de Auditoria (PostgreSQL)...")
-    
+
     # Função para Insert Pedido
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE OR REPLACE FUNCTION fn_log_pedido_ins()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -158,21 +176,27 @@ def create_postgresql_triggers(db: Session):
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-    """))
-    
-    db.execute(text("""
+    """)
+    )
+
+    db.execute(
+        text("""
     DROP TRIGGER IF EXISTS tg_log_pedido_ins ON TB_PEDIDOS;
-    """))
-    
-    db.execute(text("""
+    """)
+    )
+
+    db.execute(
+        text("""
     CREATE TRIGGER tg_log_pedido_ins
     AFTER INSERT ON TB_PEDIDOS
     FOR EACH ROW
     EXECUTE FUNCTION fn_log_pedido_ins();
-    """))
-    
+    """)
+    )
+
     # Função para Update Pedido (Mudança de Status)
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE OR REPLACE FUNCTION fn_log_pedido_upd()
     RETURNS TRIGGER AS $$
     BEGIN
@@ -192,19 +216,24 @@ def create_postgresql_triggers(db: Session):
         RETURN NEW;
     END;
     $$ LANGUAGE plpgsql;
-    """))
-    
-    db.execute(text("""
+    """)
+    )
+
+    db.execute(
+        text("""
     DROP TRIGGER IF EXISTS tg_log_pedido_upd ON TB_PEDIDOS;
-    """))
-    
-    db.execute(text("""
+    """)
+    )
+
+    db.execute(
+        text("""
     CREATE TRIGGER tg_log_pedido_upd
     AFTER UPDATE ON TB_PEDIDOS
     FOR EACH ROW
     EXECUTE FUNCTION fn_log_pedido_upd();
-    """))
-    
+    """)
+    )
+
     db.commit()
     print("✅ Triggers de auditoria criados (PostgreSQL).")
 
@@ -213,25 +242,26 @@ def create_postgresql_triggers(db: Session):
 def create_sqlite_views(db: Session):
     """Cria Views para Dashboards no SQLite"""
     print("📊 Criando Views (SQLite)...")
-    
+
     views = [
-        "VW_VENDAS_VENDEDOR_MES", 
-        "VW_COMISSOES_CALCULADAS", 
-        "VW_VENDAS_EMPRESA_MES", 
-        "VW_VENDAS_POR_CIDADE"
+        "VW_VENDAS_VENDEDOR_MES",
+        "VW_COMISSOES_CALCULADAS",
+        "VW_VENDAS_EMPRESA_MES",
+        "VW_VENDAS_POR_CIDADE",
     ]
     for view in views:
-        try: 
+        try:
             db.execute(text(f"DROP VIEW IF EXISTS {view}"))
-        except: 
+        except:
             pass
-        try: 
+        try:
             db.execute(text(f"DROP TABLE IF EXISTS {view}"))
-        except: 
+        except:
             pass
-        
+
     # 1. View: Vendas por Vendedor
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE VIEW VW_VENDAS_VENDEDOR_MES AS
     SELECT 
         u.ID_USUARIO,
@@ -245,10 +275,12 @@ def create_sqlite_views(db: Session):
     INNER JOIN TB_PEDIDOS p ON u.ID_USUARIO = p.ID_USUARIO
     WHERE u.TP_USUARIO = 'vendedor' AND p.ST_PEDIDO != 'cancelado'
     GROUP BY u.ID_USUARIO, u.NO_COMPLETO, u.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
-    """))
+    """)
+    )
 
     # 2. View: Vendas por Empresa
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE VIEW VW_VENDAS_EMPRESA_MES AS
     SELECT 
         e.ID_EMPRESA,
@@ -262,10 +294,12 @@ def create_sqlite_views(db: Session):
     INNER JOIN TB_PEDIDOS p ON e.ID_EMPRESA = p.ID_EMPRESA
     WHERE p.ST_PEDIDO != 'cancelado'
     GROUP BY e.ID_EMPRESA, e.NO_EMPRESA, e.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
-    """))
-    
+    """)
+    )
+
     # 3. View: Vendas por Cidade
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE VIEW VW_VENDAS_POR_CIDADE AS
     SELECT 
         en.NO_CIDADE,
@@ -279,10 +313,12 @@ def create_sqlite_views(db: Session):
     INNER JOIN TB_ENDERECOS en ON p.ID_ENDERECO_ENTREGA = en.ID_ENDERECO
     WHERE p.ST_PEDIDO != 'cancelado'
     GROUP BY en.NO_CIDADE, en.SG_ESTADO, c.ID_ORGANIZACAO, datetime(p.DT_PEDIDO, 'start of month');
-    """))
+    """)
+    )
 
     # 4. View: Comissões
-    db.execute(text("""
+    db.execute(
+        text("""
     CREATE VIEW VW_COMISSOES_CALCULADAS AS
     SELECT 
         p.ID_PEDIDO,
@@ -299,7 +335,8 @@ def create_sqlite_views(db: Session):
     INNER JOIN TB_USUARIOS u ON p.ID_USUARIO = u.ID_USUARIO
     INNER JOIN TB_EMPRESAS e ON p.ID_EMPRESA = e.ID_EMPRESA
     WHERE p.ST_PEDIDO != 'cancelado';
-    """))
+    """)
+    )
 
     db.commit()
     print("✅ Views criadas (SQLite).")
@@ -308,14 +345,104 @@ def create_sqlite_views(db: Session):
 def create_postgresql_views(db: Session):
     """Cria Views para Dashboards no PostgreSQL"""
     print("📊 Criando Views (PostgreSQL)...")
-    
+
     views = [
-        "VW_VENDAS_VENDEDOR_MES", 
-        "VW_COMISSOES_CALCULADAS", 
-        "VW_VENDAS_EMPRESA_MES", 
-        "VW_VENDAS_POR_CIDADE"
+        "VW_VENDAS_VENDEDOR_MES",
+        "VW_COMISSOES_CALCULADAS",
+        "VW_VENDAS_EMPRESA_MES",
+        "VW_VENDAS_POR_CIDADE",
     ]
     for view in views:
+        try:
+            db.execute(text(f'DROP VIEW IF EXISTS "{view}" CASCADE'))
+        except:
+            pass
+
+    # 1. View: Vendas por Vendedor
+    db.execute(
+        text("""
+    CREATE VIEW "VW_VENDAS_VENDEDOR_MES" AS
+    SELECT 
+        u."ID_USUARIO",
+        u."NO_COMPLETO" AS "NO_VENDEDOR",
+        u."ID_ORGANIZACAO",
+        DATE_TRUNC('month', p."DT_PEDIDO") AS "DT_MES_REFERENCIA",
+        COUNT(p."ID_PEDIDO") AS "QT_PEDIDOS",
+        SUM(p."VL_TOTAL") AS "VL_TOTAL_VENDAS",
+        AVG(p."VL_TOTAL") AS "VL_TICKET_MEDIO"
+    FROM "TB_USUARIOS" u
+    INNER JOIN "TB_PEDIDOS" p ON u."ID_USUARIO" = p."ID_USUARIO"
+    WHERE u."TP_USUARIO" = 'vendedor' AND p."ST_PEDIDO" != 'cancelado'
+    GROUP BY u."ID_USUARIO", u."NO_COMPLETO", u."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
+    """)
+    )
+
+    # 2. View: Vendas por Empresa
+    db.execute(
+        text("""
+    CREATE VIEW "VW_VENDAS_EMPRESA_MES" AS
+    SELECT 
+        e."ID_EMPRESA",
+        e."NO_EMPRESA",
+        e."ID_ORGANIZACAO",
+        DATE_TRUNC('month', p."DT_PEDIDO") AS "DT_MES_REFERENCIA",
+        COUNT(p."ID_PEDIDO") AS "QT_PEDIDOS",
+        SUM(p."VL_TOTAL") AS "VL_TOTAL_VENDAS",
+        COUNT(DISTINCT p."ID_CLIENTE") AS "QT_CLIENTES_ATENDIDOS"
+    FROM "TB_EMPRESAS" e
+    INNER JOIN "TB_PEDIDOS" p ON e."ID_EMPRESA" = p."ID_EMPRESA"
+    WHERE p."ST_PEDIDO" != 'cancelado'
+    GROUP BY e."ID_EMPRESA", e."NO_EMPRESA", e."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
+    """)
+    )
+
+    # 3. View: Vendas por Cidade
+    db.execute(
+        text("""
+    CREATE VIEW "VW_VENDAS_POR_CIDADE" AS
+    SELECT 
+        en."NO_CIDADE",
+        en."SG_ESTADO",
+        c."ID_ORGANIZACAO",
+        DATE_TRUNC('month', p."DT_PEDIDO") AS "DT_MES_REFERENCIA",
+        COUNT(p."ID_PEDIDO") AS "QT_PEDIDOS",
+        SUM(p."VL_TOTAL") AS "VL_TOTAL_VENDAS"
+    FROM "TB_PEDIDOS" p
+    INNER JOIN "TB_CLIENTES" c ON p."ID_CLIENTE" = c."ID_CLIENTE"
+    INNER JOIN "TB_ENDERECOS" en ON p."ID_ENDERECO_ENTREGA" = en."ID_ENDERECO"
+    WHERE p."ST_PEDIDO" != 'cancelado'
+    GROUP BY en."NO_CIDADE", en."SG_ESTADO", c."ID_ORGANIZACAO", DATE_TRUNC('month', p."DT_PEDIDO");
+    """)
+    )
+
+    # 4. View: Comissões
+    db.execute(
+        text("""
+    CREATE VIEW "VW_COMISSOES_CALCULADAS" AS
+    SELECT 
+        p."ID_PEDIDO",
+        p."NR_PEDIDO",
+        p."ID_USUARIO",
+        u."NO_COMPLETO" AS "NO_VENDEDOR",
+        p."ID_EMPRESA",
+        e."NO_EMPRESA",
+        p."VL_TOTAL",
+        COALESCE(e."PC_COMISSAO_PADRAO", 0) AS "PC_COMISSAO_APLICADA",
+        (p."VL_TOTAL" * COALESCE(e."PC_COMISSAO_PADRAO", 0) / 100) AS "VL_COMISSAO_CALCULADA",
+        p."DT_PEDIDO"
+    FROM "TB_PEDIDOS" p
+    INNER JOIN "TB_USUARIOS" u ON p."ID_USUARIO" = u."ID_USUARIO"
+    INNER JOIN "TB_EMPRESAS" e ON p."ID_EMPRESA" = e."ID_EMPRESA"
+    WHERE p."ST_PEDIDO" != 'cancelado';
+    """)
+    )
+
+    db.commit()
+    print("✅ Views criadas (PostgreSQL).")
+
+
+# --- POPULAÇÃO DE DADOS INICIAIS (SEED COMPLETO) ---
+def seed_initial_data():
     """Popula dados de teste completos (apenas DEV)"""
     db: Session = SessionLocal()
     try:
@@ -330,9 +457,11 @@ def create_postgresql_views(db: Session):
         print("🏗️  Criando Organização e ecossistema completo...")
 
         # Busca o super admin para referenciar
-        super_admin = db.query(models.Usuario).filter(
-            models.Usuario.tp_usuario == 'super_admin'
-        ).first()
+        super_admin = (
+            db.query(models.Usuario)
+            .filter(models.Usuario.tp_usuario == "super_admin")
+            .first()
+        )
 
         org = models.Organizacao(
             no_organizacao="Organização Modelo (Demo)",
@@ -340,7 +469,7 @@ def create_postgresql_views(db: Session):
             st_assinatura="ativo",
             tp_plano="premium",
             qt_limite_usuarios=50,
-            qt_limite_empresas=20
+            qt_limite_empresas=20,
         )
         db.add(org)
         db.flush()
@@ -352,7 +481,7 @@ def create_postgresql_views(db: Session):
             tp_usuario="gestor",
             no_completo="Gestor da Silva",
             fl_ativo=True,
-            id_usuario_criador=super_admin.id_usuario if super_admin else None
+            id_usuario_criador=super_admin.id_usuario if super_admin else None,
         )
         gestor.set_password("123456")
         db.add(gestor)
@@ -363,7 +492,7 @@ def create_postgresql_views(db: Session):
             tp_usuario="vendedor",
             no_completo="Vendedor Campeão",
             fl_ativo=True,
-            id_usuario_criador=super_admin.id_usuario if super_admin else None
+            id_usuario_criador=super_admin.id_usuario if super_admin else None,
         )
         vendedor.set_password("123456")
         db.add(vendedor)
@@ -371,18 +500,36 @@ def create_postgresql_views(db: Session):
 
         # CONFIGURAÇÕES GERAIS
         cats = [
-            models.CategoriaProduto(no_categoria="Roupas Masculinas", id_organizacao=org.id_organizacao),
-            models.CategoriaProduto(no_categoria="Roupas Femininas", id_organizacao=org.id_organizacao),
-            models.CategoriaProduto(no_categoria="Calçados", id_organizacao=org.id_organizacao),
-            models.CategoriaProduto(no_categoria="Acessórios", id_organizacao=org.id_organizacao),
+            models.CategoriaProduto(
+                no_categoria="Roupas Masculinas", id_organizacao=org.id_organizacao
+            ),
+            models.CategoriaProduto(
+                no_categoria="Roupas Femininas", id_organizacao=org.id_organizacao
+            ),
+            models.CategoriaProduto(
+                no_categoria="Calçados", id_organizacao=org.id_organizacao
+            ),
+            models.CategoriaProduto(
+                no_categoria="Acessórios", id_organizacao=org.id_organizacao
+            ),
         ]
         db.bulk_save_objects(cats)
 
         pgtos = [
-            models.FormaPagamento(no_forma_pagamento='Dinheiro', fl_ativa=True, id_organizacao=None),
-            models.FormaPagamento(no_forma_pagamento='PIX', fl_ativa=True, id_organizacao=None),
-            models.FormaPagamento(no_forma_pagamento='Boleto 30 Dias', fl_ativa=True, id_organizacao=org.id_organizacao),
-            models.FormaPagamento(no_forma_pagamento='Cartão Crédito', fl_ativa=True, id_organizacao=None),
+            models.FormaPagamento(
+                no_forma_pagamento="Dinheiro", fl_ativa=True, id_organizacao=None
+            ),
+            models.FormaPagamento(
+                no_forma_pagamento="PIX", fl_ativa=True, id_organizacao=None
+            ),
+            models.FormaPagamento(
+                no_forma_pagamento="Boleto 30 Dias",
+                fl_ativa=True,
+                id_organizacao=org.id_organizacao,
+            ),
+            models.FormaPagamento(
+                no_forma_pagamento="Cartão Crédito", fl_ativa=True, id_organizacao=None
+            ),
         ]
         db.bulk_save_objects(pgtos)
         db.flush()
@@ -392,22 +539,45 @@ def create_postgresql_views(db: Session):
             id_organizacao=org.id_organizacao,
             no_empresa="Moda Fashion Ltda",
             nr_cnpj="12.345.678/0001-00",
-            pc_comissao_padrao=10.0
+            pc_comissao_padrao=10.0,
         )
         db.add(empresa)
         db.flush()
 
         vinculo = models.UsuarioEmpresa(
-            id_usuario=vendedor.id_usuario,
-            id_empresa=empresa.id_empresa
+            id_usuario=vendedor.id_usuario, id_empresa=empresa.id_empresa
         )
         db.add(vinculo)
 
         prods = [
-            models.Produto(id_empresa=empresa.id_empresa, cd_produto="CAM-001", ds_produto="Camiseta Básica Algodão", sg_unidade_medida="UN", id_categoria=1),
-            models.Produto(id_empresa=empresa.id_empresa, cd_produto="CAL-JEANS", ds_produto="Calça Jeans Slim", sg_unidade_medida="UN", id_categoria=1),
-            models.Produto(id_empresa=empresa.id_empresa, cd_produto="VEST-FLO", ds_produto="Vestido Floral Verão", sg_unidade_medida="UN", id_categoria=2),
-            models.Produto(id_empresa=empresa.id_empresa, cd_produto="TEN-RUN", ds_produto="Tênis Running Pro", sg_unidade_medida="PAR", id_categoria=3),
+            models.Produto(
+                id_empresa=empresa.id_empresa,
+                cd_produto="CAM-001",
+                ds_produto="Camiseta Básica Algodão",
+                sg_unidade_medida="UN",
+                id_categoria=1,
+            ),
+            models.Produto(
+                id_empresa=empresa.id_empresa,
+                cd_produto="CAL-JEANS",
+                ds_produto="Calça Jeans Slim",
+                sg_unidade_medida="UN",
+                id_categoria=1,
+            ),
+            models.Produto(
+                id_empresa=empresa.id_empresa,
+                cd_produto="VEST-FLO",
+                ds_produto="Vestido Floral Verão",
+                sg_unidade_medida="UN",
+                id_categoria=2,
+            ),
+            models.Produto(
+                id_empresa=empresa.id_empresa,
+                cd_produto="TEN-RUN",
+                ds_produto="Tênis Running Pro",
+                sg_unidade_medida="PAR",
+                id_categoria=3,
+            ),
         ]
         for p in prods:
             db.add(p)
@@ -420,16 +590,32 @@ def create_postgresql_views(db: Session):
             ds_descricao="Preços vigentes para a temporada",
             dt_inicio_vigencia=datetime.utcnow(),
             dt_fim_vigencia=datetime.utcnow() + timedelta(days=180),
-            fl_ativo=True
+            fl_ativo=True,
         )
         db.add(catalogo)
         db.flush()
 
         itens_catalogo = [
-            models.ItemCatalogo(id_catalogo=catalogo.id_catalogo, id_produto=prods[0].id_produto, vl_preco_catalogo=Decimal("49.90")),
-            models.ItemCatalogo(id_catalogo=catalogo.id_catalogo, id_produto=prods[1].id_produto, vl_preco_catalogo=Decimal("129.90")),
-            models.ItemCatalogo(id_catalogo=catalogo.id_catalogo, id_produto=prods[2].id_produto, vl_preco_catalogo=Decimal("199.00")),
-            models.ItemCatalogo(id_catalogo=catalogo.id_catalogo, id_produto=prods[3].id_produto, vl_preco_catalogo=Decimal("299.50")),
+            models.ItemCatalogo(
+                id_catalogo=catalogo.id_catalogo,
+                id_produto=prods[0].id_produto,
+                vl_preco_catalogo=Decimal("49.90"),
+            ),
+            models.ItemCatalogo(
+                id_catalogo=catalogo.id_catalogo,
+                id_produto=prods[1].id_produto,
+                vl_preco_catalogo=Decimal("129.90"),
+            ),
+            models.ItemCatalogo(
+                id_catalogo=catalogo.id_catalogo,
+                id_produto=prods[2].id_produto,
+                vl_preco_catalogo=Decimal("199.00"),
+            ),
+            models.ItemCatalogo(
+                id_catalogo=catalogo.id_catalogo,
+                id_produto=prods[3].id_produto,
+                vl_preco_catalogo=Decimal("299.50"),
+            ),
         ]
         for item in itens_catalogo:
             db.add(item)
@@ -441,7 +627,7 @@ def create_postgresql_views(db: Session):
             no_fantasia="Magazine Centro",
             nr_cnpj="99.888.777/0001-66",
             ds_email="compras@lojacentro.com.br",
-            nr_telefone="(11) 99999-8888"
+            nr_telefone="(11) 99999-8888",
         )
         db.add(cliente)
         db.flush()
@@ -455,7 +641,7 @@ def create_postgresql_views(db: Session):
             no_cidade="São Paulo",
             sg_estado="SP",
             nr_cep="01000-000",
-            fl_principal=True
+            fl_principal=True,
         )
         db.add(endereco)
         db.flush()
@@ -464,7 +650,7 @@ def create_postgresql_views(db: Session):
             id_cliente=cliente.id_cliente,
             no_contato="Sr. João",
             ds_cargo="Gerente",
-            fl_principal=True
+            fl_principal=True,
         )
         db.add(contato)
         db.flush()
@@ -479,7 +665,7 @@ def create_postgresql_views(db: Session):
             vl_total=Decimal("758.80"),
             st_pedido="pendente",
             ds_observacoes="Pedido de teste gerado automaticamente.",
-            dt_pedido=datetime.utcnow()
+            dt_pedido=datetime.utcnow(),
         )
         db.add(pedido)
         db.flush()
@@ -490,15 +676,15 @@ def create_postgresql_views(db: Session):
                 id_produto=prods[0].id_produto,
                 qt_quantidade=10,
                 vl_unitario=Decimal("49.90"),
-                vl_total_item=Decimal("499.00")
+                vl_total_item=Decimal("499.00"),
             ),
             models.ItemPedido(
                 id_pedido=pedido.id_pedido,
                 id_produto=prods[1].id_produto,
                 qt_quantidade=2,
                 vl_unitario=Decimal("129.90"),
-                vl_total_item=Decimal("259.80")
-            )
+                vl_total_item=Decimal("259.80"),
+            ),
         ]
         for ip in itens_pedido:
             db.add(ip)
@@ -508,21 +694,51 @@ def create_postgresql_views(db: Session):
             id_pedido=pedido.id_pedido,
             id_usuario=vendedor.id_usuario,
             pc_comissao=10.0,
-            vl_comissao=Decimal("75.88")
+            vl_comissao=Decimal("75.88"),
         )
         db.add(comissao)
 
-            # AGORA: Criar Variações para a Camiseta (ID 1)
-            # Vamos criar uma grade: Azul (P, M, G) e Branco (P, M, G)
+        # AGORA: Criar Variações para a Camiseta (ID 1)
+        # Vamos criar uma grade: Azul (P, M, G) e Branco (P, M, G)
         variacoes_camiseta = [
-                # Azul
-                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="P", qt_estoque=10, vl_ajuste_preco=0),
-                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="M", qt_estoque=15, vl_ajuste_preco=0),
-                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Azul", ds_tamanho="G", qt_estoque=5, vl_ajuste_preco=2.00), # G é mais caro?
-                # Branco
-                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Branco", ds_tamanho="P", qt_estoque=8, vl_ajuste_preco=0),
-                models.VariacaoProduto(id_produto=prods[0].id_produto, ds_cor="Branco", ds_tamanho="M", qt_estoque=20, vl_ajuste_preco=0),
-            ]
+            # Azul
+            models.VariacaoProduto(
+                id_produto=prods[0].id_produto,
+                ds_cor="Azul",
+                ds_tamanho="P",
+                qt_estoque=10,
+                vl_ajuste_preco=0,
+            ),
+            models.VariacaoProduto(
+                id_produto=prods[0].id_produto,
+                ds_cor="Azul",
+                ds_tamanho="M",
+                qt_estoque=15,
+                vl_ajuste_preco=0,
+            ),
+            models.VariacaoProduto(
+                id_produto=prods[0].id_produto,
+                ds_cor="Azul",
+                ds_tamanho="G",
+                qt_estoque=5,
+                vl_ajuste_preco=2.00,
+            ),  # G é mais caro?
+            # Branco
+            models.VariacaoProduto(
+                id_produto=prods[0].id_produto,
+                ds_cor="Branco",
+                ds_tamanho="P",
+                qt_estoque=8,
+                vl_ajuste_preco=0,
+            ),
+            models.VariacaoProduto(
+                id_produto=prods[0].id_produto,
+                ds_cor="Branco",
+                ds_tamanho="M",
+                qt_estoque=20,
+                vl_ajuste_preco=0,
+            ),
+        ]
         db.bulk_save_objects(variacoes_camiseta)
         db.commit()
         print("✅ Dados de teste completos criados com sucesso!")
@@ -538,10 +754,12 @@ def create_super_admin():
     """Cria o Super Admin se não existir (DEV e PROD)"""
     db: Session = SessionLocal()
     try:
-        super_admin = db.query(models.Usuario).filter(
-            models.Usuario.tp_usuario == 'super_admin'
-        ).first()
-        
+        super_admin = (
+            db.query(models.Usuario)
+            .filter(models.Usuario.tp_usuario == "super_admin")
+            .first()
+        )
+
         if not super_admin:
             print("🔐 Criando Super Admin...")
             super_admin = models.Usuario(
@@ -549,7 +767,7 @@ def create_super_admin():
                 ds_email="admin@repcom.com",
                 tp_usuario="super_admin",
                 no_completo="Super Administrador",
-                fl_ativo=True
+                fl_ativo=True,
             )
             super_admin.set_password("admin123")
             db.add(super_admin)
@@ -557,7 +775,7 @@ def create_super_admin():
             print("✅ Super Admin criado com sucesso!")
         else:
             print("ℹ️  Super Admin já existe.")
-    
+
     except Exception as e:
         print(f"❌ Erro ao criar Super Admin: {e}")
         db.rollback()
@@ -576,11 +794,15 @@ def initialize_database():
     - Popula dados de teste (APENAS DEV)
     """
     ambiente = os.getenv("AMBIENTE", "dev")
-    db_type = "SQLite" if is_sqlite() else "PostgreSQL" if is_postgresql() else "Desconhecido"
-    
-    print(f"\n{'='*70}")
+
+    print(f"\n{'=' * 70}")
     print(f"🚀 INICIALIZANDO APLICAÇÃO")
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
+
+    # 2. CRIAR VIEWS E TRIGGERS
+    db: Session = SessionLocal()
+    try:
+        if is_sqlite():
             print("🔧 Banco SQLite detectado: Criando Views e Triggers...")
             create_sqlite_views(db)
             create_sqlite_triggers(db)
@@ -610,9 +832,9 @@ def initialize_database():
         print("💡 Acesse a API com: admin@repcom.com / admin123")
         print()
 
-    print(f"{'='*70}")
+    print(f"{'=' * 70}")
     print(f"✅ INICIALIZAÇÃO CONCLUÍDA COM SUCESSO")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
 
 # --- EXECUTAR INICIALIZAÇÃO ---
@@ -650,14 +872,10 @@ app.include_router(vendedor_config_router)
 @app.get("/", include_in_schema=False)
 async def root_redirect():
     from fastapi.responses import RedirectResponse
+
     return RedirectResponse(url="/docs")
 
 
 # --- EXECUÇÃO ---
 if __name__ == "__main__":
-    uvicorn.run(
-        "src.main:app",
-        host="0.0.0.0",
-        port=5000,
-        reload=True
-    )
+    uvicorn.run("src.main:app", host="0.0.0.0", port=5000, reload=True)

@@ -16,8 +16,10 @@ import {
   Logout as LogoutIcon,
   ArticleOutlined as LogsIcon,
   Menu as MenuIcon, // <-- MUDANÇA (4): Importa MenuIcon
+  LockReset as LockResetIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contextos/AuthContext';
+import { ModalAlterarSenha } from '../comum/ModalAlterarSenha';
 
 const DRAWER_WIDTH = 260;
 const MINI_DRAWER_WIDTH = 80; // <-- MUDANÇA (5): Define largura mini
@@ -29,7 +31,8 @@ export const LayoutSuperAdmin: React.FC = () => {
 
   // --- MUDANÇA (6): Adiciona estado para o menu ---
   const [open, setOpen] = useState(true); // Começa aberto
-  
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+
   const handleDrawerToggle = () => {
     setOpen(!open); // Inverte o estado
   };
@@ -45,7 +48,7 @@ export const LayoutSuperAdmin: React.FC = () => {
     { text: 'Organizações', icon: <BusinessIcon />, path: '/admin/organizacoes' },
     { text: 'Logs do Sistema', icon: <LogsIcon />, path: '/admin/logs' },
   ];
-  
+
   // --- MUDANÇA (7): Calcula a largura atual ---
   const currentDrawerWidth = open ? DRAWER_WIDTH : MINI_DRAWER_WIDTH;
 
@@ -53,8 +56,8 @@ export const LayoutSuperAdmin: React.FC = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* Header com Logo/Título */}
       <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-        <Avatar 
-          sx={{ 
+        <Avatar
+          sx={{
             bgcolor: 'error.main', // Cor vermelha de Admin
             width: 40, height: 40,
             transition: 'all 0.2s',
@@ -62,11 +65,11 @@ export const LayoutSuperAdmin: React.FC = () => {
         >
           <AdminPanelIcon />
         </Avatar>
-        
+
         {/* --- MUDANÇA (8): Anima o texto do título --- */}
-        <Typography 
-          variant="h6" 
-          fontWeight={700} 
+        <Typography
+          variant="h6"
+          fontWeight={700}
           color="text.primary"
           sx={{
             opacity: open ? 1 : 0,
@@ -79,13 +82,13 @@ export const LayoutSuperAdmin: React.FC = () => {
           Super Admin
         </Typography>
       </Box>
-      
+
       <Divider />
 
       {/* Perfil do Admin (Opcional, pode ser combinado com o acima) */}
       <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Avatar 
-          sx={{ 
+        <Avatar
+          sx={{
             bgcolor: 'error.main',
             width: 44, height: 44,
             fontSize: '1.25rem', fontWeight: 600
@@ -94,8 +97,8 @@ export const LayoutSuperAdmin: React.FC = () => {
           {usuario?.no_completo ? usuario.no_completo[0].toUpperCase() : usuario?.ds_email[0].toUpperCase()}
         </Avatar>
         {/* --- MUDANÇA (9): Anima o texto do perfil --- */}
-        <Box sx={{ 
-          flex: 1, 
+        <Box sx={{
+          flex: 1,
           minWidth: 0,
           opacity: open ? 1 : 0,
           transition: (theme) => theme.transitions.create('opacity', {
@@ -110,20 +113,20 @@ export const LayoutSuperAdmin: React.FC = () => {
           </Typography>
         </Box>
       </Box>
-      
+
       <Divider />
 
       {/* --- MUDANÇA (10): Anima o Menu Principal --- */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', py: 1 }}>
         <List disablePadding>
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                             location.pathname.startsWith(item.path + '/');
-            
+            const isActive = location.pathname === item.path ||
+              location.pathname.startsWith(item.path + '/');
+
             return (
               <ListItem key={item.text} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
                 <Tooltip title={item.text} placement="right" disableHoverListener={open}>
-                  <ListItemButton 
+                  <ListItemButton
                     component={RouterLink}
                     to={item.path}
                     selected={isActive}
@@ -138,8 +141,8 @@ export const LayoutSuperAdmin: React.FC = () => {
                       },
                     }}
                   >
-                    <ListItemIcon 
-                      sx={{ 
+                    <ListItemIcon
+                      sx={{
                         color: isActive ? 'inherit' : 'text.secondary',
                         minWidth: 0,
                         mr: open ? 2 : 'auto', // Margem automática
@@ -148,7 +151,7 @@ export const LayoutSuperAdmin: React.FC = () => {
                     >
                       {item.icon}
                     </ListItemIcon>
-                    <ListItemText 
+                    <ListItemText
                       primary={item.text}
                       sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
                       primaryTypographyProps={{
@@ -164,16 +167,35 @@ export const LayoutSuperAdmin: React.FC = () => {
           })}
         </List>
       </Box>
-      
+
       <Divider />
-      
+
       {/* --- MUDANÇA (11): Anima o Menu Inferior --- */}
       <List disablePadding sx={{ py: 1 }}>
+        {/* (Alterar Senha) */}
+        <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+          <Tooltip title="Alterar Senha" placement="right" disableHoverListener={open}>
+            <ListItemButton
+              onClick={() => setModalSenhaAberto(true)}
+              sx={{ borderRadius: 1.5, justifyContent: 'center' }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+                <LockResetIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Alterar Senha"
+                sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
+              />
+            </ListItemButton>
+          </Tooltip>
+        </ListItem>
+
         <ListItem disablePadding sx={{ px: 1.5 }}>
           <Tooltip title="Sair" placement="right" disableHoverListener={open}>
-            <ListItemButton 
+            <ListItemButton
               onClick={handleLogout}
-              sx={{ 
+              sx={{
                 borderRadius: 1.5,
                 justifyContent: 'center',
                 '&:hover': {
@@ -186,7 +208,7 @@ export const LayoutSuperAdmin: React.FC = () => {
               <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
                 <LogoutIcon />
               </ListItemIcon>
-              <ListItemText 
+              <ListItemText
                 primary="Sair"
                 sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
                 primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
@@ -200,7 +222,7 @@ export const LayoutSuperAdmin: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      
+
       {/* --- MUDANÇA (12): AppBar Animada e Corrigida --- */}
       <AppBar
         position="fixed"
@@ -210,11 +232,11 @@ export const LayoutSuperAdmin: React.FC = () => {
           width: `calc(100% - ${currentDrawerWidth}px)`,
           ml: `${currentDrawerWidth}px`,
           backgroundColor: 'background.paper',
-          
+
           // Remove a borda de baixo (Correção do "TOC")
           // borderBottom: '1px solid', (Removido)
           // borderColor: 'divider', (Removido)
-          
+
           // Animação
           transition: (theme) => theme.transitions.create(['width', 'margin'], {
             easing: theme.transitions.easing.sharp,
@@ -230,19 +252,19 @@ export const LayoutSuperAdmin: React.FC = () => {
               aria-label="toggle drawer"
               onClick={handleDrawerToggle}
               edge="start"
-              sx={{ 
-                mr: 2, 
+              sx={{
+                mr: 2,
                 color: 'text.primary',
               }}
             >
               <MenuIcon />
             </IconButton>
-            
+
             <Typography variant="h6" noWrap component="div" color="text.primary" fontWeight={600}>
               Painel de Controle
             </Typography>
           </Box>
-          
+
           <Box sx={{ display: 'flex', gap: 1 }}>
             {/* Espaço para ações */}
           </Box>
@@ -291,6 +313,12 @@ export const LayoutSuperAdmin: React.FC = () => {
         <Toolbar />
         <Outlet />
       </Box>
+
+      {/* Modal de Alterar Senha */}
+      <ModalAlterarSenha
+        open={modalSenhaAberto}
+        onClose={() => setModalSenhaAberto(false)}
+      />
     </Box>
   );
 };

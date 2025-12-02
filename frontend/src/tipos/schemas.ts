@@ -14,6 +14,10 @@ export interface IOrganizacao {
   tp_plano?: string;
 }
 
+export interface IOrganizacaoDetalhada extends IOrganizacao {
+  gestores: IUsuario[];
+}
+
 export interface IEmpresa {
   id_empresa: number;
   id_organizacao: number;
@@ -36,7 +40,7 @@ export interface IUsuario {
 
 export interface IVendedor extends IUsuario {
   // Um Vendedor é um IUsuario + suas empresas
-  empresas_vinculadas: IEmpresa[]; 
+  empresas_vinculadas: IEmpresa[];
 }
 
 // ============================================
@@ -53,10 +57,6 @@ export interface IEmpresaCompleta extends IEmpresa {
   ds_site?: string;
   dt_criacao: string;
   dt_atualizacao: string;
-}
-
-export interface IVendedor extends IUsuario {
-  empresas_vinculadas: IEmpresa[]; 
 }
 
 // --- Clientes ---
@@ -184,9 +184,9 @@ export interface IItemCatalogoVenda {
   id_catalogo: number;
   vl_preco_catalogo: number;
   fl_ativo_no_catalogo: boolean;
-  
+
   // O produto aninhado (com suas variações)
-  produto: IProdutoCompleto; 
+  produto: IProdutoCompleto;
 }
 
 export interface IFormaPagamento {
@@ -206,7 +206,7 @@ export interface IRegraComissao {
   fl_ativa: boolean;
   dt_inicio_vigencia?: string;
   dt_fim_vigencia?: string;
-  
+
   // Relacionamentos (opcionais, dependendo da query)
   id_empresa?: number;
   id_usuario?: number;
@@ -222,7 +222,7 @@ export interface IItemPedido {
   vl_unitario: number;
   pc_desconto_item: number;
   vl_total_item: number;
-  produto?: IProduto; 
+  produto?: IProduto;
 }
 
 export interface IPedidoCompleto {
@@ -235,7 +235,7 @@ export interface IPedidoCompleto {
   vl_total: number;
   dt_pedido: string;
   ds_observacoes?: string;
-  
+
   // Relacionamentos Aninhados
   cliente: ICliente;
   vendedor: IUsuario;
@@ -264,7 +264,7 @@ export interface ILogAuditoria {
   ds_valores_novos?: JsonValue; // JSON
   ds_endereco_ip?: string;
   dt_acao: string;
-  
+
   usuario?: IUsuario; // (Schema simplificado)
 }
 // /frontend/src/tipos/schemas.ts

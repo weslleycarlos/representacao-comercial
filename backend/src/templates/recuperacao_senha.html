@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #1976d2; color: white; padding: 10px; text-align: center; }
+        .content { padding: 20px; background-color: #f9f9f9; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #1976d2; color: white; text-decoration: none; border-radius: 5px; margin-top: 20px; }
+        .footer { text-align: center; margin-top: 20px; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Recuperação de Senha</h2>
+        </div>
+        <div class="content">
+            <p>Olá,</p>
+            <p>Recebemos uma solicitação para redefinir sua senha no sistema RepCom.</p>
+            <p>Se você não fez essa solicitação, ignore este email.</p>
+            <p>Para redefinir sua senha, clique no botão abaixo:</p>
+            <p style="text-align: center;">
+                <a href="{{ reset_link }}" class="button">Redefinir Senha</a>
+            </p>
+            <p>Este link é válido por 1 hora.</p>
+        </div>
+        <div class="footer">
+            <p>&copy; 2025 RepCom. Todos os direitos reservados.</p>
+        </div>
+    </div>
+</body>
+</html>

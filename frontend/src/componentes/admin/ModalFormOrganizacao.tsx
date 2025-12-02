@@ -6,7 +6,8 @@ import {
   Dialog, DialogTitle, DialogContent, DialogActions,
   Button, TextField, Grid, CircularProgress, Alert,
   MenuItem, Typography, Divider, Box, IconButton,
-  InputAdornment, Chip, Paper, Stack
+  InputAdornment, Chip, Paper, List, ListItem, ListItemAvatar,
+  Avatar, ListItemText
 } from '@mui/material';
 import {
   Close as CloseIcon,
@@ -16,12 +17,13 @@ import {
   Phone as PhoneIcon,
   Lock as LockIcon,
   Description as DescriptionIcon,
-  Info as InfoIcon
+  Info as InfoIcon,
+  SupervisorAccount as SupervisorIcon
 } from '@mui/icons-material';
 
 import { type AdminOrganizacaoFormData, adminOrganizacaoSchema } from '../../tipos/validacao';
 import type { IOrganizacao } from '../../tipos/schemas';
-import { useCreateOrganizacao, useUpdateOrganizacao } from '../../api/servicos/adminService';
+import { useCreateOrganizacao, useUpdateOrganizacao, useGetOrganizacaoById } from '../../api/servicos/adminService';
 import { MaskedInput } from '../utils/MaskedInput';
 
 interface Props {
@@ -58,13 +60,18 @@ const PLANOS_CONFIG = {
 export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizacao }) => {
   const isEditMode = !!organizacao;
 
-  const { 
-    register, 
-    handleSubmit, 
-    reset, 
-    formState: { errors }, 
-    setValue, 
-    watch 
+  // Busca detalhes se estiver editando
+  const { data: orgDetalhada, isLoading: isLoadingDetails } = useGetOrganizacaoById(
+    isEditMode && open ? organizacao.id_organizacao : undefined
+  );
+
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+    setValue,
+    watch
   } = useForm<AdminOrganizacaoFormData>({
     resolver: zodResolver(adminOrganizacaoSchema),
     defaultValues: {
@@ -86,8 +93,14 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
 
   useEffect(() => {
     if (open) {
-      if (isEditMode && organizacao) {
-        reset(organizacao);
+      if (isEditMode) {
+        // Se já carregou os detalhes, usa eles (mais completos)
+        // Se não, usa o básico passado por prop enquanto carrega
+        if (orgDetalhada) {
+          reset(orgDetalhada);
+        } else if (organizacao) {
+          reset(organizacao);
+        }
       } else {
         reset({
           tp_plano: 'basico',
@@ -97,7 +110,7 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
         });
       }
     }
-  }, [open, organizacao, isEditMode, reset]);
+  }, [open, organizacao, orgDetalhada, isEditMode, reset]);
 
   // Atualiza limites ao mudar plano (apenas na criação)
   useEffect(() => {
@@ -124,10 +137,10 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={handleClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      maxWidth="md"
       fullWidth
       PaperProps={{
         elevation: 0,
@@ -135,9 +148,9 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
       }}
     >
       {/* Header */}
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <DialogTitle sx={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         pb: 2,
         borderBottom: '1px solid',
@@ -149,8 +162,8 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
             {isEditMode ? 'Editar Organização' : 'Nova Organização'}
           </Typography>
         </Box>
-        <IconButton 
-          onClick={handleClose} 
+        <IconButton
+          onClick={handleClose}
           size="small"
           disabled={isSaving}
           sx={{ color: 'text.secondary' }}
@@ -167,14 +180,21 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
               {(mutationError as any)?.message || 'Erro ao processar solicitação'}
             </Alert>
           )}
-          
+
+          {/* Loading dos Detalhes */}
+          {isEditMode && isLoadingDetails && (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+              <CircularProgress size={24} />
+            </Box>
+          )}
+
           <Grid container spacing={3}>
             {/* ========== DADOS DA ORGANIZAÇÃO ========== */}
             <Grid item xs={12}>
-              <Paper 
-                elevation={0} 
-                sx={{ 
-                  p: 2, 
+              <Paper
+                elevation={0}
+                sx={{
+                  p: 2,
                   bgcolor: 'primary.50',
                   border: '1px solid',
                   borderColor: 'primary.200'
@@ -188,14 +208,14 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 </Box>
               </Paper>
             </Grid>
-            
+
             <Grid item xs={12} sm={8}>
-              <TextField 
-                {...register('no_organizacao')} 
-                label="Nome da Organização" 
-                fullWidth 
-                required 
-                error={!!errors.no_organizacao} 
+              <TextField
+                {...register('no_organizacao')}
+                label="Nome da Organização"
+                fullWidth
+                required
+                error={!!errors.no_organizacao}
                 helperText={errors.no_organizacao?.message}
                 placeholder="Ex: Minha Empresa Ltda"
                 InputProps={{
@@ -207,14 +227,14 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 }}
               />
             </Grid>
-            
+
             <Grid item xs={12} sm={4}>
-              <MaskedInput 
-                mask="cnpj" 
-                label="CNPJ" 
-                fullWidth 
+              <MaskedInput
+                mask="cnpj"
+                label="CNPJ"
+                fullWidth
                 required
-                value={watch('nr_cnpj') || ''} 
+                value={watch('nr_cnpj') || ''}
                 onChange={(v) => setValue('nr_cnpj', v)}
                 error={!!errors.nr_cnpj}
                 helperText={errors.nr_cnpj?.message}
@@ -223,11 +243,11 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
 
             {/* Plano e Limites */}
             <Grid item xs={12} sm={4}>
-              <TextField 
-                select 
-                label="Plano" 
-                {...register('tp_plano')} 
-                fullWidth 
+              <TextField
+                select
+                label="Plano"
+                {...register('tp_plano')}
+                fullWidth
                 defaultValue="basico"
                 error={!!errors.tp_plano}
                 helperText={selectedPlano ? PLANOS_CONFIG[selectedPlano as keyof typeof PLANOS_CONFIG]?.descricao : ''}
@@ -235,10 +255,10 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 {Object.entries(PLANOS_CONFIG).map(([key, config]) => (
                   <MenuItem key={key} value={key}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Chip 
-                        label={config.label} 
-                        color={config.color} 
-                        size="small" 
+                      <Chip
+                        label={config.label}
+                        color={config.color}
+                        size="small"
                         sx={{ fontWeight: 600 }}
                       />
                     </Box>
@@ -248,10 +268,10 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
             </Grid>
 
             <Grid item xs={6} sm={4}>
-              <TextField 
-                type="number" 
-                label="Limite de Usuários" 
-                {...register('qt_limite_usuarios', { valueAsNumber: true })} 
+              <TextField
+                type="number"
+                label="Limite de Usuários"
+                {...register('qt_limite_usuarios', { valueAsNumber: true })}
                 fullWidth
                 error={!!errors.qt_limite_usuarios}
                 helperText={errors.qt_limite_usuarios?.message}
@@ -262,10 +282,10 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
             </Grid>
 
             <Grid item xs={6} sm={4}>
-              <TextField 
-                type="number" 
-                label="Limite de Empresas" 
-                {...register('qt_limite_empresas', { valueAsNumber: true })} 
+              <TextField
+                type="number"
+                label="Limite de Empresas"
+                {...register('qt_limite_empresas', { valueAsNumber: true })}
                 fullWidth
                 error={!!errors.qt_limite_empresas}
                 helperText={errors.qt_limite_empresas?.message}
@@ -278,10 +298,10 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
             {/* Status (apenas na edição) */}
             {isEditMode && (
               <Grid item xs={12}>
-                <TextField 
-                  select 
-                  label="Status da Assinatura" 
-                  {...register('st_assinatura')} 
+                <TextField
+                  select
+                  label="Status da Assinatura"
+                  {...register('st_assinatura')}
                   fullWidth
                   error={!!errors.st_assinatura}
                   helperText={errors.st_assinatura?.message}
@@ -299,14 +319,72 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
               </Grid>
             )}
 
+            {/* ========== LISTA DE GESTORES (APENAS NA EDIÇÃO) ========== */}
+            {isEditMode && orgDetalhada?.gestores && (
+              <Grid item xs={12}>
+                <Paper
+                  elevation={0}
+                  sx={{
+                    p: 2,
+                    bgcolor: 'info.50',
+                    border: '1px solid',
+                    borderColor: 'info.200',
+                    mb: 2
+                  }}
+                >
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <SupervisorIcon fontSize="small" color="info" />
+                    <Typography variant="subtitle2" fontWeight={600} color="info.main">
+                      GESTORES VINCULADOS
+                    </Typography>
+                  </Box>
+                </Paper>
+
+                <Paper variant="outlined">
+                  <List disablePadding>
+                    {orgDetalhada.gestores.map((gestor, index) => (
+                      <React.Fragment key={gestor.id_usuario}>
+                        {index > 0 && <Divider />}
+                        <ListItem>
+                          <ListItemAvatar>
+                            <Avatar sx={{ bgcolor: 'info.main' }}>
+                              {gestor.no_completo?.[0] || gestor.ds_email[0]}
+                            </Avatar>
+                          </ListItemAvatar>
+                          <ListItemText
+                            primary={gestor.no_completo || 'Sem nome'}
+                            secondary={
+                              <React.Fragment>
+                                <Typography variant="caption" display="block">
+                                  {gestor.ds_email}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  {gestor.nr_telefone || 'Sem telefone'} • {gestor.fl_ativo ? 'Ativo' : 'Inativo'}
+                                </Typography>
+                              </React.Fragment>
+                            }
+                          />
+                        </ListItem>
+                      </React.Fragment>
+                    ))}
+                    {orgDetalhada.gestores.length === 0 && (
+                      <ListItem>
+                        <ListItemText primary="Nenhum gestor encontrado." sx={{ textAlign: 'center', color: 'text.secondary' }} />
+                      </ListItem>
+                    )}
+                  </List>
+                </Paper>
+              </Grid>
+            )}
+
             {/* ========== DADOS DO GESTOR (APENAS NA CRIAÇÃO) ========== */}
             {!isEditMode && (
               <>
                 <Grid item xs={12} sx={{ mt: 2 }}>
-                  <Paper 
-                    elevation={0} 
-                    sx={{ 
-                      p: 2, 
+                  <Paper
+                    elevation={0}
+                    sx={{
+                      p: 2,
                       bgcolor: 'info.50',
                       border: '1px solid',
                       borderColor: 'info.200'
@@ -325,12 +403,12 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField 
-                    {...register('gestor.no_completo')} 
-                    label="Nome Completo do Gestor" 
-                    fullWidth 
-                    required 
-                    error={!!errors.gestor?.no_completo} 
+                  <TextField
+                    {...register('gestor.no_completo')}
+                    label="Nome Completo do Gestor"
+                    fullWidth
+                    required
+                    error={!!errors.gestor?.no_completo}
                     helperText={errors.gestor?.no_completo?.message}
                     placeholder="Ex: João da Silva"
                     InputProps={{
@@ -344,11 +422,11 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <MaskedInput 
-                    mask="telefone" 
-                    label="Telefone" 
-                    fullWidth 
-                    value={watch('gestor.nr_telefone') || ''} 
+                  <MaskedInput
+                    mask="telefone"
+                    label="Telefone"
+                    fullWidth
+                    value={watch('gestor.nr_telefone') || ''}
                     onChange={(v) => setValue('gestor.nr_telefone', v)}
                     error={!!errors.gestor?.nr_telefone}
                     helperText={errors.gestor?.nr_telefone?.message}
@@ -357,13 +435,13 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField 
-                    type="email" 
-                    {...register('gestor.ds_email')} 
-                    label="E-mail (Login)" 
-                    fullWidth 
-                    required 
-                    error={!!errors.gestor?.ds_email} 
+                  <TextField
+                    type="email"
+                    {...register('gestor.ds_email')}
+                    label="E-mail (Login)"
+                    fullWidth
+                    required
+                    error={!!errors.gestor?.ds_email}
                     helperText={errors.gestor?.ds_email?.message}
                     placeholder="gestor@empresa.com.br"
                     InputProps={{
@@ -377,13 +455,13 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
                 </Grid>
 
                 <Grid item xs={12} sm={6}>
-                  <TextField 
-                    type="password" 
-                    {...register('gestor.password')} 
-                    label="Senha Inicial" 
-                    fullWidth 
-                    required 
-                    error={!!errors.gestor?.password} 
+                  <TextField
+                    type="password"
+                    {...register('gestor.password')}
+                    label="Senha Inicial"
+                    fullWidth
+                    required
+                    error={!!errors.gestor?.password}
                     helperText={errors.gestor?.password?.message || 'Mínimo 6 caracteres'}
                     placeholder="••••••"
                     InputProps={{
@@ -401,26 +479,26 @@ export const ModalFormOrganizacao: React.FC<Props> = ({ open, onClose, organizac
         </DialogContent>
 
         {/* Footer */}
-        <DialogActions sx={{ 
-          p: 3, 
+        <DialogActions sx={{
+          p: 3,
           borderTop: '1px solid',
           borderColor: 'divider',
           gap: 1
         }}>
-          <Button 
-            onClick={handleClose} 
+          <Button
+            onClick={handleClose}
             disabled={isSaving}
             variant="outlined"
             sx={{ textTransform: 'none' }}
           >
             Cancelar
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             disabled={isSaving}
             startIcon={isSaving ? <CircularProgress size={20} /> : null}
-            sx={{ 
+            sx={{
               textTransform: 'none',
               fontWeight: 600,
               minWidth: 120

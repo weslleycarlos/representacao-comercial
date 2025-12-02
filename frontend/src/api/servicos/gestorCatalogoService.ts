@@ -1,16 +1,16 @@
 // /frontend/src/api/servicos/gestorCatalogoService.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../axios';
-import type { 
-  ICategoriaProduto, 
-  IProdutoCompleto, 
-  ICatalogo, 
-  IItemCatalogo 
+import type {
+  ICategoriaProduto,
+  IProdutoCompleto,
+  ICatalogo,
+  IItemCatalogo
 } from '../../tipos/schemas';
-import type { 
-  ProdutoFormData, 
-  CatalogoFormData, 
-  ItemCatalogoFormData 
+import type {
+  ProdutoFormData,
+  CatalogoFormData,
+  ItemCatalogoFormData
 } from '../../tipos/validacao';
 
 // --- Chaves de Cache ---
@@ -73,8 +73,8 @@ export const useCreateProduto = () => {
     mutationFn: createProduto,
     onSuccess: (data) => {
       // Invalida a query de produtos desta empresa
-      queryClient.invalidateQueries({ 
-        queryKey: [PRODUTO_CACHE_KEY, data.id_empresa] 
+      queryClient.invalidateQueries({
+        queryKey: [PRODUTO_CACHE_KEY, data.id_empresa]
       });
     },
   });
@@ -103,8 +103,8 @@ export const useUpdateProduto = () => {
     mutationFn: updateProduto,
     onSuccess: (data) => {
       // Invalida a query de produtos desta empresa
-      queryClient.invalidateQueries({ 
-        queryKey: [PRODUTO_CACHE_KEY, data.id_empresa] 
+      queryClient.invalidateQueries({
+        queryKey: [PRODUTO_CACHE_KEY, data.id_empresa]
       });
       // (Opcional) Atualiza o cache individual do produto
       queryClient.setQueryData([PRODUTO_CACHE_KEY, 'detalhe', data.id_produto], data);
@@ -122,7 +122,7 @@ export const useDeleteProduto = () => {
     // (A API para DELETE de produto não foi criada no backend.
     // Vamos assumir que a rota PUT /produtos/{id} com fl_ativo=false é usada
     // ou que precisamos adicionar a rota DELETE)
-    
+
     // Por enquanto, vamos usar a rota PUT para DESATIVAR
     const { data } = await apiClient.put(
       `/gestor/catalogo/produtos/${idProduto}`,
@@ -177,8 +177,8 @@ export const useCreateCatalogo = () => {
     mutationFn: createCatalogo,
     onSuccess: (data) => {
       // Invalida a query de catálogos desta empresa
-      queryClient.invalidateQueries({ 
-        queryKey: CATALOGO_CACHE_KEY(data.id_empresa) 
+      queryClient.invalidateQueries({
+        queryKey: CATALOGO_CACHE_KEY(data.id_empresa)
       });
     },
   });
@@ -190,12 +190,12 @@ export const useUpdateCatalogo = () => {
   interface UpdatePayload {
     idCatalogo: number;
     // (Usamos Partial<> pois os campos são opcionais)
-    data: Partial<CatalogoFormData>; 
+    data: Partial<CatalogoFormData>;
   }
 
   const updateCatalogo = async (payload: UpdatePayload): Promise<ICatalogo> => {
     const { data } = await apiClient.put(
-      `/gestor/catalogo/catalogos/${payload.idCatalogo}`, 
+      `/gestor/catalogo/catalogos/${payload.idCatalogo}`,
       payload.data
     );
     return data;
@@ -205,8 +205,8 @@ export const useUpdateCatalogo = () => {
     mutationFn: updateCatalogo,
     onSuccess: (data) => {
       // Invalida a query de catálogos desta empresa
-      queryClient.invalidateQueries({ 
-        queryKey: CATALOGO_CACHE_KEY(data.id_empresa) 
+      queryClient.invalidateQueries({
+        queryKey: CATALOGO_CACHE_KEY(data.id_empresa)
       });
     },
   });
@@ -226,7 +226,7 @@ export const useDeleteCatalogo = () => {
   const deleteCatalogo = async (payload: DeletePayload): Promise<ICatalogo> => {
     // Soft delete é um PUT/UPDATE
     const { data } = await apiClient.put(
-      `/gestor/catalogo/catalogos/${payload.idCatalogo}`, 
+      `/gestor/catalogo/catalogos/${payload.idCatalogo}`,
       { fl_ativo: false } // O payload da desativação
     );
     return data;
@@ -272,7 +272,7 @@ export const useAddItemCatalogo = () => {
 
   const addItem = async (payload: AddPayload): Promise<IItemCatalogo> => {
     const { data } = await apiClient.post(
-      `/gestor/catalogo/catalogos/${payload.idCatalogo}/itens`, 
+      `/gestor/catalogo/catalogos/${payload.idCatalogo}/itens`,
       payload.data
     );
     return data;
@@ -282,8 +282,8 @@ export const useAddItemCatalogo = () => {
     mutationFn: addItem,
     onSuccess: (data) => {
       // Invalida os itens deste catálogo
-      queryClient.invalidateQueries({ 
-        queryKey: ITEM_CATALOGO_CACHE_KEY(data.id_catalogo) 
+      queryClient.invalidateQueries({
+        queryKey: ITEM_CATALOGO_CACHE_KEY(data.id_catalogo)
       });
     },
   });
@@ -303,7 +303,7 @@ export const useUpdateItemCatalogo = () => {
 
   const updateItem = async (payload: UpdatePayload): Promise<IItemCatalogo> => {
     const { data } = await apiClient.put(
-      `/gestor/catalogo/itens/${payload.idItemCatalogo}`, 
+      `/gestor/catalogo/itens/${payload.idItemCatalogo}`,
       payload.data
     );
     return data;
@@ -312,8 +312,8 @@ export const useUpdateItemCatalogo = () => {
   return useMutation({
     mutationFn: updateItem,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ITEM_CATALOGO_CACHE_KEY(variables.idCatalogo) 
+      queryClient.invalidateQueries({
+        queryKey: ITEM_CATALOGO_CACHE_KEY(variables.idCatalogo)
       });
     },
   });
@@ -337,11 +337,67 @@ export const useDeleteItemCatalogo = () => {
   return useMutation({
     mutationFn: deleteItem,
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ITEM_CATALOGO_CACHE_KEY(variables.idCatalogo) 
+      queryClient.invalidateQueries({
+        queryKey: ITEM_CATALOGO_CACHE_KEY(variables.idCatalogo)
       });
     },
   });
 };
 
-// (Rotas de Categoria, Variação, Updates e Deletes seguem o mesmo padrão)
+// ============================================
+// IMPORTAÇÃO
+// ============================================
+
+export const previewImportacao = async (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const { data } = await apiClient.post('/gestor/importacao/preview', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  });
+  return data; // { rows: [...] }
+};
+
+export const useImportarCatalogo = () => {
+  const queryClient = useQueryClient();
+
+  interface ImportPayload {
+    idCatalogo: number;
+    mapping: string;
+    file: File;
+  }
+
+  const importar = async (payload: ImportPayload) => {
+    const formData = new FormData();
+    formData.append('id_catalogo', String(payload.idCatalogo));
+    formData.append('mapping', payload.mapping);
+    formData.append('file', payload.file);
+
+    const { data } = await apiClient.post('/gestor/importacao/catalogo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return data;
+  };
+
+  return useMutation({
+    mutationFn: importar,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ITEM_CATALOGO_CACHE_KEY(variables.idCatalogo) });
+      queryClient.invalidateQueries({ queryKey: [PRODUTO_CACHE_KEY] });
+    }
+  });
+};
+
+export const downloadModeloImportacao = async () => {
+  const response = await apiClient.get('/gestor/importacao/modelo', {
+    responseType: 'blob'
+  });
+
+  const url = window.URL.createObjectURL(new Blob([response.data]));
+  const link = document.createElement('a');
+  link.href = url;
+  link.setAttribute('download', 'modelo_importacao_produtos.xlsx');
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+};

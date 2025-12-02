@@ -7,26 +7,28 @@ import {
   useMediaQuery
 } from '@mui/material';
 import { DataGrid, type GridColDef, GridActionsCellItem } from '@mui/x-data-grid';
-import { Add as AddIcon, Edit as EditIcon, Link as LinkIcon } from '@mui/icons-material';
+import { Add as AddIcon, Edit as EditIcon, Link as LinkIcon, LockReset as LockResetIcon } from '@mui/icons-material';
 
 import { useGetVendedores } from '../../api/servicos/vendedorService';
 import type { IVendedor } from '../../tipos/schemas';
 import { ModalFormVendedor } from '../../componentes/gestor/ModalFormVendedor';
 import { ModalVincularEmpresa } from '../../componentes/gestor/ModalVincularEmpresa';
+import { ModalResetSenha } from '../../componentes/gestor/ModalResetSenha';
 
 export const PaginaVendedores: React.FC = () => {
   const [modalFormAberto, setModalFormAberto] = useState(false);
   const [vendedorSelecionado, setVendedorSelecionado] = useState<IVendedor | undefined>(undefined);
   const [modalVincularAberto, setModalVincularAberto] = useState(false);
+  const [modalResetAberto, setModalResetAberto] = useState(false);
 
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
-  const { 
-    data: vendedores, 
-    isLoading: isLoadingVendedores, 
-    isError, 
-    error 
+  const {
+    data: vendedores,
+    isLoading: isLoadingVendedores,
+    isError,
+    error
   } = useGetVendedores();
 
   // Sincroniza vendedor selecionado com cache atualizado
@@ -40,39 +42,39 @@ export const PaginaVendedores: React.FC = () => {
       }
     }
   }, [vendedores, vendedorSelecionado]);
-  
+
   // Definição das Colunas
   const colunas: GridColDef[] = [
-    { 
-      field: 'no_completo', 
-      headerName: 'Nome', 
+    {
+      field: 'no_completo',
+      headerName: 'Nome',
       flex: 2,
       minWidth: 180,
     },
-    { 
-      field: 'ds_email', 
-      headerName: 'E-mail', 
+    {
+      field: 'ds_email',
+      headerName: 'E-mail',
       flex: 2,
       minWidth: 200,
     },
-    { 
-      field: 'nr_telefone', 
-      headerName: 'Telefone', 
+    {
+      field: 'nr_telefone',
+      headerName: 'Telefone',
       flex: 1,
       minWidth: 130,
       // SEM formatação - valor já vem formatado do banco
     },
-    { 
-      field: 'empresas_vinculadas', 
-      headerName: 'Empresas', 
+    {
+      field: 'empresas_vinculadas',
+      headerName: 'Empresas',
       width: 110,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => {
         const count = params.row.empresas_vinculadas?.length || 0;
         return (
-          <Badge 
-            badgeContent={count} 
+          <Badge
+            badgeContent={count}
             color={count > 0 ? "primary" : "default"}
             max={99}
             sx={{
@@ -83,12 +85,12 @@ export const PaginaVendedores: React.FC = () => {
               }
             }}
           >
-            <Chip 
+            <Chip
               label={count === 0 ? "Nenhuma" : `${count}`}
               size="small"
               color={count > 0 ? "primary" : "default"}
               variant={count > 0 ? "filled" : "outlined"}
-              sx={{ 
+              sx={{
                 fontWeight: 600,
                 minWidth: 60
               }}
@@ -97,18 +99,18 @@ export const PaginaVendedores: React.FC = () => {
         );
       }
     },
-    { 
-      field: 'fl_ativo', 
-      headerName: 'Status', 
+    {
+      field: 'fl_ativo',
+      headerName: 'Status',
       width: 100,
       align: 'center',
       headerAlign: 'center',
       renderCell: (params) => (
-        <Chip 
-          label={params.value ? "Ativo" : "Inativo"} 
-          color={params.value ? "success" : "default"} 
+        <Chip
+          label={params.value ? "Ativo" : "Inativo"}
+          color={params.value ? "success" : "default"}
           size="small"
-          sx={{ 
+          sx={{
             fontWeight: 600,
             minWidth: 70
           }}
@@ -119,7 +121,7 @@ export const PaginaVendedores: React.FC = () => {
       field: 'actions',
       type: 'actions',
       headerName: 'Ações',
-      width: 120,
+      width: 160,
       align: 'center',
       headerAlign: 'center',
       getActions: (params) => [
@@ -151,6 +153,20 @@ export const PaginaVendedores: React.FC = () => {
             '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
           }}
         />,
+        <GridActionsCellItem
+          key="reset"
+          icon={
+            <Tooltip title="Resetar Senha">
+              <LockResetIcon color="warning" />
+            </Tooltip>
+          }
+          label="Resetar Senha"
+          onClick={() => handleOpenReset(params.row as IVendedor)}
+          showInMenu={false}
+          sx={{
+            '& .MuiSvgIcon-root': { fontSize: '1.2rem' }
+          }}
+        />,
       ],
     },
   ];
@@ -165,12 +181,17 @@ export const PaginaVendedores: React.FC = () => {
     setVendedorSelecionado(vendedor);
     setModalFormAberto(true);
   };
-  
+
   const handleOpenVincular = (vendedor: IVendedor) => {
     setVendedorSelecionado(vendedor);
     setModalVincularAberto(true);
   };
-  
+
+  const handleOpenReset = (vendedor: IVendedor) => {
+    setVendedorSelecionado(vendedor);
+    setModalResetAberto(true);
+  };
+
   const handleCloseVincularModal = () => {
     setModalVincularAberto(false);
     setVendedorSelecionado(undefined);
@@ -181,13 +202,18 @@ export const PaginaVendedores: React.FC = () => {
     setVendedorSelecionado(undefined);
   };
 
+  const handleCloseResetModal = () => {
+    setModalResetAberto(false);
+    setVendedorSelecionado(undefined);
+  };
+
   return (
     <Box sx={{ p: { xs: 1, sm: 2 } }}>
       {/* Header Responsivo */}
-      <Box sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
-        alignItems: { xs: 'flex-start', sm: 'center' }, 
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: { xs: 'flex-start', sm: 'center' },
         mb: 3,
         flexDirection: { xs: 'column', sm: 'row' },
         gap: 2
@@ -206,7 +232,7 @@ export const PaginaVendedores: React.FC = () => {
           onClick={handleOpenCreate}
           size="large"
           fullWidth={isMobile}
-          sx={{ 
+          sx={{
             minWidth: { xs: '100%', sm: 'auto' },
             whiteSpace: 'nowrap'
           }}
@@ -223,9 +249,9 @@ export const PaginaVendedores: React.FC = () => {
       )}
 
       {/* Tabela de Dados */}
-      <Paper 
-        elevation={0} 
-        sx={{ 
+      <Paper
+        elevation={0}
+        sx={{
           height: { xs: '60vh', md: 'calc(100vh - 240px)' },
           minHeight: 400,
           width: '100%',
@@ -257,8 +283,8 @@ export const PaginaVendedores: React.FC = () => {
             ),
           }}
           initialState={{
-            pagination: { 
-              paginationModel: { pageSize: 25 } 
+            pagination: {
+              paginationModel: { pageSize: 25 }
             },
             sorting: {
               sortModel: [{ field: 'no_completo', sort: 'asc' }]
@@ -286,19 +312,28 @@ export const PaginaVendedores: React.FC = () => {
           }}
         />
       </Paper>
-      
+
       {/* Modal de Adicionar/Editar */}
       <ModalFormVendedor
         open={modalFormAberto}
         onClose={handleCloseModal}
         vendedor={vendedorSelecionado}
       />
-      
+
       {/* Modal de Vincular Empresas */}
       {vendedorSelecionado && (
         <ModalVincularEmpresa
           open={modalVincularAberto}
           onClose={handleCloseVincularModal}
+          vendedor={vendedorSelecionado}
+        />
+      )}
+
+      {/* Modal de Reset de Senha */}
+      {vendedorSelecionado && (
+        <ModalResetSenha
+          open={modalResetAberto}
+          onClose={handleCloseResetModal}
           vendedor={vendedorSelecionado}
         />
       )}

@@ -133,7 +133,13 @@ export const PaginaLogin: React.FC = () => {
 
               <Grid container sx={{ mt: 1, mb: 1 }}>
                 <Grid size="grow">
-                  <Link href="#" variant="body2" color="primary">
+                  <Link
+                    component="button"
+                    type="button"
+                    variant="body2"
+                    color="primary"
+                    onClick={() => navigate('/esqueceu-senha')}
+                  >
                     Esqueceu sua senha?
                   </Link>
                 </Grid>

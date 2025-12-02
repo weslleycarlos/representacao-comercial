@@ -7,7 +7,9 @@ from pydantic import EmailStr
 from starlette.background import BackgroundTasks
 
 from src.models import models
-from src.core.config import settings # Ou use os.getenv direto se não tiver settings centralizado
+from src.core.config import (
+    settings,
+)  # Ou use os.getenv direto se não tiver settings centralizado
 
 # Configuração
 conf = ConnectionConfig(
@@ -20,11 +22,11 @@ conf = ConnectionConfig(
     MAIL_SSL_TLS=False,
     USE_CREDENTIALS=True,
     VALIDATE_CERTS=True,
-    TEMPLATE_FOLDER=Path(__file__).parent.parent / 'templates', # Pasta /src/templates
+    TEMPLATE_FOLDER=Path(__file__).parent.parent / "templates",  # Pasta /src/templates
 )
 
+
 class EmailService:
-    
     @staticmethod
     def formatar_moeda(valor):
         return f"R$ {valor:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
@@ -33,12 +35,12 @@ class EmailService:
     def send_order_confirmation(
         background_tasks: BackgroundTasks,
         pedido: models.Pedido,
-        emails_to: List[EmailStr]
+        emails_to: List[EmailStr],
     ):
         """
         Prepara os dados e coloca o envio na fila de background tasks.
         """
-        
+
         # Prepara os dados para o Template HTML
         body_data = {
             "nr_pedido": pedido.nr_pedido or f"#{pedido.id_pedido}",
@@ -50,23 +52,46 @@ class EmailService:
                     "produto": item.produto.ds_produto,
                     "qtd": item.qt_quantidade,
                     "preco": EmailService.formatar_moeda(item.vl_unitario),
-                    "total": EmailService.formatar_moeda(item.vl_total_item)
+                    "total": EmailService.formatar_moeda(item.vl_total_item),
                 }
                 for item in pedido.itens
             ],
             "total_pedido": EmailService.formatar_moeda(pedido.vl_total),
             "observacoes": pedido.ds_observacoes or "Sem observações.",
-            "status": pedido.st_pedido.upper().replace("_", " ")
+            "status": pedido.st_pedido.upper().replace("_", " "),
         }
 
         message = MessageSchema(
             subject=f"Pedido {body_data['nr_pedido']} - Confirmação",
             recipients=emails_to,
             template_body=body_data,
-            subtype=MessageType.html
+            subtype=MessageType.html,
         )
 
         fm = FastMail(conf)
-        
+
         # Envia em background para não travar a API
-        background_tasks.add_task(fm.send_message, message, template_name="pedido_confirmacao.html")
+        background_tasks.add_task(
+            fm.send_message, message, template_name="pedido_confirmacao.html"
+        )
+
+    @staticmethod
+    def send_password_reset_email(
+        background_tasks: BackgroundTasks, email_to: EmailStr, reset_link: str
+    ):
+        """
+        Envia email com link de recuperação de senha.
+        """
+        body_data = {"reset_link": reset_link}
+
+        message = MessageSchema(
+            subject="Recuperação de Senha - RepCom",
+            recipients=[email_to],
+            template_body=body_data,
+            subtype=MessageType.html,
+        )
+
+        fm = FastMail(conf)
+        background_tasks.add_task(
+            fm.send_message, message, template_name="recuperacao_senha.html"
+        )

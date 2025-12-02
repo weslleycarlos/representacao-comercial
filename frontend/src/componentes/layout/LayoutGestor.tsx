@@ -32,8 +32,10 @@ import {
   History as HistoryIcon,
   Menu as MenuIcon, // 2. Importa o ícone de Menu
   ChevronLeft as ChevronLeftIcon, // (Opcional) Ícone para fechar
+  LockReset as LockResetIcon,
 } from '@mui/icons-material';
 import { useAuth } from '../../contextos/AuthContext';
+import { ModalAlterarSenha } from '../comum/ModalAlterarSenha';
 
 // Define as larguras do menu
 const DRAWER_WIDTH = 260; // Largura total (como você definiu)
@@ -46,7 +48,8 @@ export const LayoutGestor: React.FC = () => {
 
   // 3. Adiciona o estado para controlar o menu
   const [open, setOpen] = useState(true); // Começa aberto
-  
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+
   const handleDrawerToggle = () => {
     setOpen(!open); // Inverte o estado
   };
@@ -74,8 +77,8 @@ export const LayoutGestor: React.FC = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       {/* --- Perfil (adaptado para colapsar) --- */}
       <Box sx={{ p: 2.5, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Avatar 
-          sx={{ 
+        <Avatar
+          sx={{
             bgcolor: 'primary.main',
             width: 44,
             height: 44,
@@ -86,10 +89,10 @@ export const LayoutGestor: React.FC = () => {
         >
           {usuario?.no_completo ? usuario.no_completo[0].toUpperCase() : usuario?.ds_email[0].toUpperCase()}
         </Avatar>
-        
+
         {/* Oculta o texto quando o menu estiver fechado (open=false) */}
-        <Box sx={{ 
-          flex: 1, 
+        <Box sx={{
+          flex: 1,
           minWidth: 0,
           opacity: open ? 1 : 0, // Animação de fade
           transition: (theme) => theme.transitions.create('opacity', {
@@ -104,21 +107,21 @@ export const LayoutGestor: React.FC = () => {
           </Typography>
         </Box>
       </Box>
-      
+
       <Divider />
 
       {/* --- Menu Principal --- */}
       <Box sx={{ flexGrow: 1, overflowY: 'auto', py: 1 }}>
         <List disablePadding>
           {menuItems.map((item) => {
-            const isActive = location.pathname === item.path || 
-                             location.pathname.startsWith(item.path + '/');
-            
+            const isActive = location.pathname === item.path ||
+              location.pathname.startsWith(item.path + '/');
+
             return (
               <ListItem key={item.text} disablePadding sx={{ px: 1.5, mb: 0.5 }}>
                 {/* O Tooltip só aparece quando o menu está fechado */}
                 <Tooltip title={item.text} placement="right" disableHoverListener={open}>
-                  <ListItemButton 
+                  <ListItemButton
                     component={RouterLink}
                     to={item.path}
                     selected={isActive}
@@ -133,8 +136,8 @@ export const LayoutGestor: React.FC = () => {
                       },
                     }}
                   >
-                    <ListItemIcon 
-                      sx={{ 
+                    <ListItemIcon
+                      sx={{
                         color: isActive ? 'inherit' : 'text.secondary',
                         minWidth: 0, // Permite o ícone centralizar
                         mr: open ? 2 : 'auto', // Margem automática quando fechado
@@ -144,9 +147,9 @@ export const LayoutGestor: React.FC = () => {
                       {item.icon}
                     </ListItemIcon>
                     {/* Oculta o texto quando 'open=false' */}
-                    <ListItemText 
+                    <ListItemText
                       primary={item.text}
-                      sx={{ 
+                      sx={{
                         opacity: open ? 1 : 0, // Animação de fade
                         transition: 'opacity 0.2s',
                       }}
@@ -163,16 +166,16 @@ export const LayoutGestor: React.FC = () => {
           })}
         </List>
       </Box>
-      
+
       <Divider />
-      
+
       {/* --- Menu Inferior --- */}
       <List disablePadding sx={{ py: 1 }}>
         {/* (Configurações) */}
         <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
           <Tooltip title="Configurações" placement="right" disableHoverListener={open}>
-            <ListItemButton 
-              component={RouterLink} 
+            <ListItemButton
+              component={RouterLink}
               to="/gestor/configuracoes"
               selected={location.pathname === '/gestor/configuracoes'}
               sx={{ borderRadius: 1.5, justifyContent: 'center' }}
@@ -180,7 +183,7 @@ export const LayoutGestor: React.FC = () => {
               <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
                 <SettingsIcon />
               </ListItemIcon>
-              <ListItemText 
+              <ListItemText
                 primary="Configurações"
                 sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
                 primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
@@ -188,13 +191,32 @@ export const LayoutGestor: React.FC = () => {
             </ListItemButton>
           </Tooltip>
         </ListItem>
-        
+
+        {/* (Alterar Senha) */}
+        <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+          <Tooltip title="Alterar Senha" placement="right" disableHoverListener={open}>
+            <ListItemButton
+              onClick={() => setModalSenhaAberto(true)}
+              sx={{ borderRadius: 1.5, justifyContent: 'center' }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+                <LockResetIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Alterar Senha"
+                sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
+              />
+            </ListItemButton>
+          </Tooltip>
+        </ListItem>
+
         {/* (Sair) */}
         <ListItem disablePadding sx={{ px: 1.5 }}>
           <Tooltip title="Sair" placement="right" disableHoverListener={open}>
-            <ListItemButton 
+            <ListItemButton
               onClick={handleLogout}
-              sx={{ 
+              sx={{
                 borderRadius: 1.5,
                 justifyContent: 'center',
                 '&:hover': {
@@ -207,7 +229,7 @@ export const LayoutGestor: React.FC = () => {
               <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
                 <LogoutIcon />
               </ListItemIcon>
-              <ListItemText 
+              <ListItemText
                 primary="Sair"
                 sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
                 primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
@@ -221,7 +243,7 @@ export const LayoutGestor: React.FC = () => {
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
-      
+
       {/* --- AppBar (Corrigida) --- */}
       <AppBar
         position="fixed"
@@ -231,7 +253,7 @@ export const LayoutGestor: React.FC = () => {
           width: `calc(100% - ${currentDrawerWidth}px)`,
           ml: `${currentDrawerWidth}px`,
           backgroundColor: 'background.paper',
-          
+
           // 6. CORREÇÃO DO "TOC": Remove a borda de baixo
           // borderBottom: '1px solid', (Removido)
           // borderColor: 'divider', (Removido)
@@ -251,8 +273,8 @@ export const LayoutGestor: React.FC = () => {
               aria-label="toggle drawer"
               onClick={handleDrawerToggle}
               edge="start"
-              sx={{ 
-                mr: 2, 
+              sx={{
+                mr: 2,
                 color: 'text.primary',
                 // (Opcional) Gira o ícone quando o menu está fechado
                 // transform: open ? 'rotate(0deg)' : 'rotate(180deg)',
@@ -266,7 +288,7 @@ export const LayoutGestor: React.FC = () => {
               {/* Título (você pode querer um título dinâmico aqui) */}
             </Typography>
           </Box>
-          
+
           <Box sx={{ display: 'flex', gap: 1 }}>
             {/* (Espaço para Notificações, etc.) */}
           </Box>
@@ -317,6 +339,12 @@ export const LayoutGestor: React.FC = () => {
         <Toolbar /> {/* Espaçador (correto) */}
         <Outlet />
       </Box>
+
+      {/* Modal de Alterar Senha */}
+      <ModalAlterarSenha
+        open={modalSenhaAberto}
+        onClose={() => setModalSenhaAberto(false)}
+      />
     </Box>
   );
 };

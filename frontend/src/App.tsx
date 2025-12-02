@@ -3,6 +3,8 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Páginas
 import { PaginaLogin } from './paginas/Login';
+import EsqueceuSenha from './paginas/auth/EsqueceuSenha';
+import RedefinirSenha from './paginas/auth/RedefinirSenha';
 import { PaginaAdminDashboard } from './paginas/admin/DashboardAdmin';
 import { PaginaAdminOrganizacoes } from './paginas/admin/Organizacoes';
 import { PaginaAdminLogs } from './paginas/admin/Logs';
@@ -38,7 +40,7 @@ function App() {
     if (!estaLogado || !usuario) {
       return <Navigate to="/login" replace />;
     }
-    
+
     // Roteamento baseado no Papel (Role)
     switch (usuario.tp_usuario) {
       case 'super_admin':
@@ -56,9 +58,11 @@ function App() {
     <Routes>
       {/* Rota Raiz (/) */}
       <Route path="/" element={getPaginaInicial()} />
-      
+
       {/* Rota de Login */}
       <Route path="/login" element={<PaginaLogin />} />
+      <Route path="/esqueceu-senha" element={<EsqueceuSenha />} />
+      <Route path="/redefinir-senha" element={<RedefinirSenha />} />
 
       {/* --- Rotas do GESTOR --- */}
       <Route element={<RotaProtegida permissoes={['gestor']} />}>
@@ -74,7 +78,7 @@ function App() {
           <Route path="/gestor/logs" element={<PaginaLogs />} />
         </Route>
       </Route>
-      
+
       {/* --- Rotas do SUPER ADMIN --- */}
       <Route element={<RotaProtegida permissoes={['super_admin']} />}>
         <Route element={<LayoutSuperAdmin />}>

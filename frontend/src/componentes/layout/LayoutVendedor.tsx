@@ -27,11 +27,13 @@ import {
   Logout as LogoutIcon,
   SwapHoriz as TrocarEmpresaIcon,
   Menu as MenuIcon, // <-- MUDANÇA (4): Importa MenuIcon
+  LockReset as LockResetIcon,
 } from '@mui/icons-material';
 
 import { useAuth } from '../../contextos/AuthContext';
 import { PaginaSelecionarEmpresa } from '../../paginas/vendedor/PaginaSelecionarEmpresa';
 import { ModalSelecionarEmpresa } from '../auth/ModalSelecionarEmpresa';
+import { ModalAlterarSenha } from '../comum/ModalAlterarSenha';
 
 const DRAWER_WIDTH = 260;
 const MINI_DRAWER_WIDTH = 80; // <-- MUDANÇA (5): Define largura mini
@@ -39,13 +41,14 @@ const MINI_DRAWER_WIDTH = 80; // <-- MUDANÇA (5): Define largura mini
 export const LayoutVendedor: React.FC = () => {
   const { usuario, logout, empresaAtiva } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation(); 
+  const location = useLocation();
 
   const [modalTrocarEmpresaAberto, setModalTrocarEmpresaAberto] = useState(false);
-  
+
   // --- MUDANÇA (6): Adiciona estado para o menu ---
   const [open, setOpen] = useState(true); // Começa aberto
-  
+  const [modalSenhaAberto, setModalSenhaAberto] = useState(false);
+
   const handleDrawerToggle = () => {
     setOpen(!open); // Inverte o estado
   };
@@ -88,10 +91,10 @@ export const LayoutVendedor: React.FC = () => {
         >
           {usuario?.no_completo ? usuario.no_completo[0].toUpperCase() : usuario?.ds_email[0].toUpperCase()}
         </Avatar>
-        
+
         {/* --- MUDANÇA (8): Anima o texto do perfil --- */}
-        <Box sx={{ 
-          flex: 1, 
+        <Box sx={{
+          flex: 1,
           minWidth: 0,
           opacity: open ? 1 : 0, // Fade out
           transition: (theme) => theme.transitions.create('opacity', {
@@ -182,6 +185,25 @@ export const LayoutVendedor: React.FC = () => {
           </Tooltip>
         </ListItem>
 
+        {/* (Alterar Senha) */}
+        <ListItem disablePadding sx={{ px: 1.5, mb: 0.5 }}>
+          <Tooltip title="Alterar Senha" placement="right" disableHoverListener={open}>
+            <ListItemButton
+              onClick={() => setModalSenhaAberto(true)}
+              sx={{ borderRadius: 1.5, justifyContent: 'center' }}
+            >
+              <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
+                <LockResetIcon />
+              </ListItemIcon>
+              <ListItemText
+                primary="Alterar Senha"
+                sx={{ opacity: open ? 1 : 0, transition: 'opacity 0.2s' }}
+                primaryTypographyProps={{ fontSize: '0.9375rem', noWrap: true }}
+              />
+            </ListItemButton>
+          </Tooltip>
+        </ListItem>
+
         <ListItem disablePadding sx={{ px: 1.5 }}>
           <Tooltip title="Sair" placement="right" disableHoverListener={open}>
             <ListItemButton
@@ -189,7 +211,11 @@ export const LayoutVendedor: React.FC = () => {
               sx={{
                 borderRadius: 1.5,
                 justifyContent: 'center',
-                '&:hover': { /* ... (estilos de hover) ... */ },
+                '&:hover': {
+                  bgcolor: 'error.dark',
+                  color: 'error.contrastText',
+                  '& .MuiListItemIcon-root': { color: 'error.contrastText' },
+                }
               }}
             >
               <ListItemIcon sx={{ color: 'text.secondary', minWidth: 0, mr: open ? 2 : 'auto', justifyContent: 'center' }}>
@@ -218,7 +244,7 @@ export const LayoutVendedor: React.FC = () => {
           width: `calc(100% - ${currentDrawerWidth}px)`,
           ml: `${currentDrawerWidth}px`,
           backgroundColor: 'background.paper',
-          
+
           // Remove a borda de baixo (Correção do "TOC")
           // borderBottom: '1px solid', (Removido)
           // borderColor: 'divider', (Removido)
@@ -238,8 +264,8 @@ export const LayoutVendedor: React.FC = () => {
               aria-label="toggle drawer"
               onClick={handleDrawerToggle}
               edge="start"
-              sx={{ 
-                mr: 2, 
+              sx={{
+                mr: 2,
                 color: 'text.primary',
               }}
             >
@@ -303,6 +329,12 @@ export const LayoutVendedor: React.FC = () => {
       <ModalSelecionarEmpresa
         open={modalTrocarEmpresaAberto}
         onClose={() => setModalTrocarEmpresaAberto(false)}
+      />
+
+      {/* Modal de Alterar Senha */}
+      <ModalAlterarSenha
+        open={modalSenhaAberto}
+        onClose={() => setModalSenhaAberto(false)}
       />
     </Box>
   );

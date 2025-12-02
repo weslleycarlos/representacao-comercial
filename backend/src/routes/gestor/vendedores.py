@@ -1,5 +1,5 @@
 # /src/routes/gestor/vendedores.py
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
 from typing import List
@@ -7,8 +7,13 @@ from typing import List
 from src.database import get_db
 from src.models.models import Usuario, Empresa, UsuarioEmpresa
 from src.schemas import (
-    VendedorCreate, VendedorUpdate, VendedorSchema,
-    VincularEmpresaRequest, UsuarioEmpresaSchema, EmpresaSchema, UsuarioSchema
+    VendedorCreate,
+    VendedorUpdate,
+    VendedorSchema,
+    VincularEmpresaRequest,
+    UsuarioEmpresaSchema,
+    EmpresaSchema,
+    UsuarioSchema,
 )
 from src.core.security import get_current_gestor_org_id
 
@@ -16,7 +21,7 @@ from src.core.security import get_current_gestor_org_id
 gestor_vendedores_router = APIRouter(
     prefix="/api/gestor/vendedores",
     tags=["3. Gestor - Vendedores"],
-    dependencies=[Depends(get_current_gestor_org_id)]  # Protege todas as rotas
+    dependencies=[Depends(get_current_gestor_org_id)],  # Protege todas as rotas
 )
 
 
@@ -25,35 +30,44 @@ def get_vendedor_by_id(db: Session, id_vendedor: int, id_organizacao: int) -> Us
     Função helper para buscar um vendedor, garantindo que ele pertença
     à organização do gestor e que seja do tipo 'vendedor'.
     """
-    user = db.query(Usuario).filter(
-        Usuario.id_usuario == id_vendedor,
-        Usuario.id_organizacao == id_organizacao,
-        Usuario.tp_usuario == 'vendedor'  # Garante que só podemos gerenciar vendedores
-    ).first()
+    user = (
+        db.query(Usuario)
+        .filter(
+            Usuario.id_usuario == id_vendedor,
+            Usuario.id_organizacao == id_organizacao,
+            Usuario.tp_usuario
+            == "vendedor",  # Garante que só podemos gerenciar vendedores
+        )
+        .first()
+    )
 
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vendedor não encontrado ou não pertence a esta organização."
+            detail="Vendedor não encontrado ou não pertence a esta organização.",
         )
     return user
 
 
-@gestor_vendedores_router.post("/", response_model=VendedorSchema, status_code=status.HTTP_201_CREATED)
+@gestor_vendedores_router.post(
+    "/", response_model=VendedorSchema, status_code=status.HTTP_201_CREATED
+)
 def create_vendedor(
     vendedor_in: VendedorCreate,
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Cria um novo usuário do tipo 'vendedor' para a organização do gestor.
     """
     # Verifica se o email já existe
-    existing_user = db.query(Usuario).filter(Usuario.ds_email == vendedor_in.ds_email).first()
+    existing_user = (
+        db.query(Usuario).filter(Usuario.ds_email == vendedor_in.ds_email).first()
+    )
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"O email {vendedor_in.ds_email} já está em uso."
+            detail=f"O email {vendedor_in.ds_email} já está em uso.",
         )
 
     # Cria o novo objeto Usuário
@@ -62,8 +76,8 @@ def create_vendedor(
         no_completo=vendedor_in.no_completo,
         nr_telefone=vendedor_in.nr_telefone,
         fl_ativo=vendedor_in.fl_ativo,
-        tp_usuario='vendedor',  # Define o tipo
-        id_organizacao=id_organizacao  # Associa à organização do gestor
+        tp_usuario="vendedor",  # Define o tipo
+        id_organizacao=id_organizacao,  # Associa à organização do gestor
     )
     db_vendedor.set_password(vendedor_in.password)  # Criptografa a senha
 
@@ -77,7 +91,7 @@ def create_vendedor(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao criar vendedor: {str(e)}"
+            detail=f"Erro ao criar vendedor: {str(e)}",
         )
 
 
@@ -86,15 +100,21 @@ def get_vendedores_da_organizacao(
     id_organizacao: int = Depends(get_current_gestor_org_id),
     db: Session = Depends(get_db),
     skip: int = 0,
-    limit: int = 100
+    limit: int = 100,
 ):
     """
     Lista todos os usuários do tipo 'vendedor' da organização do gestor.
     """
-    vendedores = db.query(Usuario).filter(
-        Usuario.id_organizacao == id_organizacao,
-        Usuario.tp_usuario == 'vendedor'
-    ).order_by(Usuario.no_completo).offset(skip).limit(limit).all()
+    vendedores = (
+        db.query(Usuario)
+        .filter(
+            Usuario.id_organizacao == id_organizacao, Usuario.tp_usuario == "vendedor"
+        )
+        .order_by(Usuario.no_completo)
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
 
     response = []
     for user in vendedores:
@@ -111,7 +131,7 @@ def get_vendedores_da_organizacao(
         # 3. Constrói o schema final combinando os dados
         vendedor_schema_data = VendedorSchema(
             **user_data.model_dump(),  # Pega dados do UsuarioSchema
-            empresas_vinculadas=empresas_list  # Adiciona a lista correta
+            empresas_vinculadas=empresas_list,  # Adiciona a lista correta
         )
         response.append(vendedor_schema_data)
 
@@ -122,7 +142,7 @@ def get_vendedores_da_organizacao(
 def get_vendedor(
     id_vendedor: int,
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Busca detalhes de um vendedor específico, incluindo suas empresas vinculadas.
@@ -141,8 +161,7 @@ def get_vendedor(
 
     # 3. Constrói o schema final
     vendedor_schema_data = VendedorSchema(
-        **user_data.model_dump(),
-        empresas_vinculadas=empresas_list
+        **user_data.model_dump(), empresas_vinculadas=empresas_list
     )
 
     return vendedor_schema_data
@@ -153,7 +172,7 @@ def update_vendedor(
     id_vendedor: int,
     vendedor_in: VendedorUpdate,
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Atualiza os dados de um vendedor (nome, email, status, telefone).
@@ -163,15 +182,19 @@ def update_vendedor(
     update_data = vendedor_in.model_dump(exclude_unset=True)
 
     # Verifica se o email está sendo alterado e se já existe
-    if 'ds_email' in update_data and update_data['ds_email'] != db_vendedor.ds_email:
-        existing_user = db.query(Usuario).filter(
-            Usuario.ds_email == update_data['ds_email'],
-            Usuario.id_usuario != id_vendedor
-        ).first()
+    if "ds_email" in update_data and update_data["ds_email"] != db_vendedor.ds_email:
+        existing_user = (
+            db.query(Usuario)
+            .filter(
+                Usuario.ds_email == update_data["ds_email"],
+                Usuario.id_usuario != id_vendedor,
+            )
+            .first()
+        )
         if existing_user:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"O email {update_data['ds_email']} já está em uso."
+                detail=f"O email {update_data['ds_email']} já está em uso.",
             )
 
     # Aplica as atualizações
@@ -185,18 +208,22 @@ def update_vendedor(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
 # --- ROTAS DE VÍNCULO (TB_USUARIO_EMPRESAS) ---
 
-@gestor_vendedores_router.post("/vincular-empresa", response_model=UsuarioEmpresaSchema, status_code=status.HTTP_201_CREATED)
+
+@gestor_vendedores_router.post(
+    "/vincular-empresa",
+    response_model=UsuarioEmpresaSchema,
+    status_code=status.HTTP_201_CREATED,
+)
 def vincular_vendedor_empresa(
     vinculo_in: VincularEmpresaRequest,
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Vincula um Vendedor (id_usuario) a uma Empresa Representada (id_empresa).
@@ -206,34 +233,41 @@ def vincular_vendedor_empresa(
     db_vendedor = get_vendedor_by_id(db, vinculo_in.id_usuario, id_organizacao)
 
     # 2. Valida a Empresa
-    db_empresa = db.query(Empresa).filter(
-        Empresa.id_empresa == vinculo_in.id_empresa,
-        Empresa.id_organizacao == id_organizacao,
-        Empresa.fl_ativa == True
-    ).first()
+    db_empresa = (
+        db.query(Empresa)
+        .filter(
+            Empresa.id_empresa == vinculo_in.id_empresa,
+            Empresa.id_organizacao == id_organizacao,
+            Empresa.fl_ativa == True,
+        )
+        .first()
+    )
 
     if not db_empresa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Empresa não encontrada ou não pertence a esta organização."
+            detail="Empresa não encontrada ou não pertence a esta organização.",
         )
 
     # 3. Verifica se o vínculo já existe
-    existing_vinculo = db.query(UsuarioEmpresa).filter(
-        UsuarioEmpresa.id_usuario == vinculo_in.id_usuario,
-        UsuarioEmpresa.id_empresa == vinculo_in.id_empresa
-    ).first()
+    existing_vinculo = (
+        db.query(UsuarioEmpresa)
+        .filter(
+            UsuarioEmpresa.id_usuario == vinculo_in.id_usuario,
+            UsuarioEmpresa.id_empresa == vinculo_in.id_empresa,
+        )
+        .first()
+    )
 
     if existing_vinculo:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail="Este vendedor já está vinculado a esta empresa."
+            detail="Este vendedor já está vinculado a esta empresa.",
         )
 
     # 4. Cria o Vínculo
     db_vinculo = UsuarioEmpresa(
-        id_usuario=vinculo_in.id_usuario,
-        id_empresa=vinculo_in.id_empresa
+        id_usuario=vinculo_in.id_usuario, id_empresa=vinculo_in.id_empresa
     )
 
     try:
@@ -244,37 +278,40 @@ def vincular_vendedor_empresa(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )
 
 
-@gestor_vendedores_router.delete("/desvincular-empresa", status_code=status.HTTP_204_NO_CONTENT)
+@gestor_vendedores_router.delete(
+    "/desvincular-empresa", status_code=status.HTTP_204_NO_CONTENT
+)
 def desvincular_vendedor_empresa(
     vinculo_in: VincularEmpresaRequest,  # Reutiliza o schema de request
     id_organizacao: int = Depends(get_current_gestor_org_id),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Remove o vínculo entre um Vendedor e uma Empresa.
     """
     # Busca o vínculo
-    db_vinculo = db.query(UsuarioEmpresa).filter(
-        UsuarioEmpresa.id_usuario == vinculo_in.id_usuario,
-        UsuarioEmpresa.id_empresa == vinculo_in.id_empresa
-    ).first()
+    db_vinculo = (
+        db.query(UsuarioEmpresa)
+        .filter(
+            UsuarioEmpresa.id_usuario == vinculo_in.id_usuario,
+            UsuarioEmpresa.id_empresa == vinculo_in.id_empresa,
+        )
+        .first()
+    )
 
     if not db_vinculo:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Vínculo não encontrado."
+            status_code=status.HTTP_404_NOT_FOUND, detail="Vínculo não encontrado."
         )
 
     # Validação extra (opcional): garante que o gestor só desvincule da sua org
     if db_vinculo.usuario.id_organizacao != id_organizacao:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso negado."
+            status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado."
         )
 
     try:
@@ -284,6 +321,35 @@ def desvincular_vendedor_empresa(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e)
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
+        )
+
+
+@gestor_vendedores_router.put(
+    "/{id_vendedor}/reset-password", status_code=status.HTTP_200_OK
+)
+def reset_vendedor_password(
+    id_vendedor: int,
+    password_data: dict = Body(...),
+    id_organizacao: int = Depends(get_current_gestor_org_id),
+    db: Session = Depends(get_db),
+):
+    """
+    Reseta a senha de um vendedor manualmente pelo Gestor.
+    """
+    db_vendedor = get_vendedor_by_id(db, id_vendedor, id_organizacao)
+
+    new_password = password_data.get("password")
+    if not new_password:
+        raise HTTPException(status_code=400, detail="Senha não fornecida.")
+
+    db_vendedor.set_password(new_password)
+
+    try:
+        db.commit()
+        return {"message": "Senha alterada com sucesso."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e)
         )

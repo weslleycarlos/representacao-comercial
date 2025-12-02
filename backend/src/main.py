@@ -26,6 +26,7 @@ from src.routes.gestor.produtos import gestor_produtos_router as gestor_catalogo
 from src.routes.gestor.config import gestor_config_router
 from src.routes.gestor.relatorios import gestor_relatorios_router
 from src.routes.gestor.pedidos import gestor_pedidos_router
+from src.routes.gestor.importacao import importacao_router
 
 # Admin
 from src.routes.admin.organizacoes import admin_orgs_router
@@ -960,6 +961,7 @@ app.include_router(gestor_config_router)
 app.include_router(gestor_relatorios_router)
 app.include_router(gestor_pedidos_router)
 app.include_router(gestor_logs_router)
+app.include_router(importacao_router)
 
 # Vendedor
 app.include_router(vendedor_pedidos_router)

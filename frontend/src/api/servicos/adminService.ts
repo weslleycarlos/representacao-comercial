@@ -1,11 +1,12 @@
 // /frontend/src/api/servicos/adminService.ts
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import apiClient from '../axios';
-import type { IAdminDashboardKpiSchema, IOrganizacao, ILogAuditoria } from '../../tipos/schemas';
+import type { IAdminDashboardKpiSchema, IOrganizacao, IOrganizacaoDetalhada, ILogAuditoria } from '../../tipos/schemas';
 import type { AdminOrganizacaoFormData } from '../../tipos/validacao';
 
 const ADMIN_KPI_KEY = 'adminKpis';
 const ADMIN_ORGS_KEY = 'adminOrgs';
+const ADMIN_ORG_DETAIL_KEY = (id: number) => ['adminOrgDetail', id];
 const ADMIN_LOGS_KEY = (filters?: any) => ['adminLogs', filters];
 
 // --- DASHBOARD ---
@@ -34,6 +35,20 @@ export const useGetOrganizacoes = () => {
   return useQuery({ queryKey: [ADMIN_ORGS_KEY], queryFn: fetchOrgs });
 };
 
+export const useGetOrganizacaoById = (id?: number) => {
+  const fetchOrg = async (): Promise<IOrganizacaoDetalhada> => {
+    if (!id) throw new Error("ID is required");
+    const { data } = await apiClient.get(`/admin/organizacoes/${id}`);
+    return data;
+  };
+
+  return useQuery({
+    queryKey: ADMIN_ORG_DETAIL_KEY(id!),
+    queryFn: fetchOrg,
+    enabled: !!id
+  });
+};
+
 export const useCreateOrganizacao = () => {
   const queryClient = useQueryClient();
   const create = async (data: AdminOrganizacaoFormData): Promise<IOrganizacao> => {
@@ -49,7 +64,7 @@ export const useCreateOrganizacao = () => {
 export const useUpdateOrganizacao = () => {
   const queryClient = useQueryClient();
   interface UpdatePayload { id: number; data: Partial<AdminOrganizacaoFormData>; }
-  
+
   const update = async ({ id, data }: UpdatePayload): Promise<IOrganizacao> => {
     const { data: res } = await apiClient.put(`/admin/organizacoes/${id}`, data);
     return res;
@@ -70,9 +85,9 @@ export const useGetLogsAdmin = (filters?: { id_organizacao?: number; tp_entidade
     const { data } = await apiClient.get('/admin/logs/', { params });
     return data;
   };
-  
-  return useQuery({ 
-    queryKey: ADMIN_LOGS_KEY(filters), 
-    queryFn: fetchLogs 
+
+  return useQuery({
+    queryKey: ADMIN_LOGS_KEY(filters),
+    queryFn: fetchLogs
   });
 };

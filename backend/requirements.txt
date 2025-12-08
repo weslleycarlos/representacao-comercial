@@ -21,7 +21,7 @@ bcrypt                   # Para hash de senhas
 python-dotenv            # Para carregar o .env
 email-validator
 httpx
-fastapi-mail>=1.5.8
+fastapi-mail
 jinja2
 pandas
 openpyxl

@@ -5,17 +5,9 @@ import {
   Typography,
   Paper,
   Skeleton,
-  Avatar,
   LinearProgress,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
   Chip,
   Grid,
-  Tooltip,
 } from '@mui/material';
 import {
   TrendingUp as TrendingUpIcon,
@@ -25,22 +17,24 @@ import {
   People as PeopleIcon,
   AccountBalance as WalletIcon,
   EmojiEvents as TrophyIcon,
+  Info as InfoIcon,
 } from '@mui/icons-material';
 import { useGetGestorKpis, useGetRankingVendedores } from '../../api/servicos/dashboardService';
+import { useRelatorioVendasEmpresa, useEvolucaoVendasMensal } from '../../api/servicos/relatorioService';
 import { formatCurrency } from '../../utils/format';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip as RechartsTooltip, BarChart, Bar } from 'recharts';
 
 interface StatCardProps {
   title: string;
   value: string;
-  trend: number;
+  trend: number | null; // null significa "sem comparação (novo)"
   subtitle: string;
   icon: React.ReactElement;
   isLoading: boolean;
 }
 
 const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon, isLoading }) => {
-  const trendColor = trend >= 0 ? 'success' : 'error';
-  const TrendIcon = trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
+  const TrendIcon = trend == null ? InfoIcon : trend >= 0 ? TrendingUpIcon : TrendingDownIcon;
 
   return (
     <Paper
@@ -65,19 +59,19 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon
         <Typography variant="body2" color="text.secondary" fontWeight={500}>
           {title}
         </Typography>
-        <Box
-          sx={{
-            width: 48,
-            height: 48,
-            borderRadius: 2,
-            bgcolor: 'primary.50',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {React.cloneElement(icon, { color: 'primary' })}
-        </Box>
+          <Box
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: 2,
+              bgcolor: 'primary.50',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Box sx={{ color: 'primary.main', display: 'flex', alignItems: 'center' }}>{icon}</Box>
+          </Box>
       </Box>
 
       {isLoading ? (
@@ -88,13 +82,23 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon
             {value}
           </Typography>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Chip
-              icon={<TrendIcon style={{ fontSize: 16 }} />}
-              label={`${trend > 0 ? '+' : ''}${trend}%`}
-              color={trendColor}
-              size="small"
-              sx={{ fontWeight: 600, height: 24 }}
-            />
+            {trend == null ? (
+              <Chip
+                icon={<TrendIcon style={{ fontSize: 16 }} />}
+                label={`Novo`}
+                color="default"
+                size="small"
+                sx={{ fontWeight: 600, height: 24 }}
+              />
+            ) : (
+              <Chip
+                icon={<TrendIcon style={{ fontSize: 16 }} />}
+                label={`${trend > 0 ? '+' : ''}${trend.toFixed(0)}%`}
+                color={trend >= 0 ? 'success' : 'error'}
+                size="small"
+                sx={{ fontWeight: 600, height: 24 }}
+              />
+            )}
             <Typography variant="caption" color="text.secondary">
               {subtitle}
             </Typography>
@@ -108,29 +112,70 @@ const StatCard: React.FC<StatCardProps> = ({ title, value, subtitle, trend, icon
 export const PaginaDashboardGestor: React.FC = () => {
   const { data: kpis, isLoading: loadingKpis } = useGetGestorKpis();
   const { data: ranking, isLoading: loadingRanking } = useGetRankingVendedores();
+  const { data: evolucaoVendas } = useEvolucaoVendasMensal();
 
-  // Trends mockadas
-  const mockTrends = useMemo(
-    () => ({
-      faturamento: 12.5,
-      pedidos: 8.2,
-      ticket: -3.1,
-      comissoes: 15.3,
-    }),
-    []
-  );
+  // Trends: calcular comparando com mês anterior usando relatórios
+  const firstDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1);
+  const lastDayOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59);
 
-  // Evolução de vendas (mockado)
-  const evolucaoMock = useMemo(
-    () => [
-      { mes: 'Jan', valor: 180000 },
-      { mes: 'Fev', valor: 195000 },
-      { mes: 'Mar', valor: 210000 },
-      { mes: 'Abr', valor: 198000 },
-      { mes: 'Mai', valor: 230000 },
-      { mes: 'Jun', valor: Number(kpis?.vendas_mes_atual || 245000) },
+  const pad = (n: number) => String(n).padStart(2, '0');
+
+  const today = new Date();
+  // Format dates using local components (avoid toISOString timezone shifts)
+  const startCurrentDate = firstDayOfMonth(today);
+  const endCurrentDate = lastDayOfMonth(today);
+  const startCurrent = `${startCurrentDate.getFullYear()}-${pad(startCurrentDate.getMonth() + 1)}-${pad(startCurrentDate.getDate())}`;
+  const endCurrent = `${endCurrentDate.getFullYear()}-${pad(endCurrentDate.getMonth() + 1)}-${pad(endCurrentDate.getDate())}`;
+
+  const prevMonthDate = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const startPrevDate = firstDayOfMonth(prevMonthDate);
+  const endPrevDate = lastDayOfMonth(prevMonthDate);
+  const startPrev = `${startPrevDate.getFullYear()}-${pad(startPrevDate.getMonth() + 1)}-${pad(startPrevDate.getDate())}`;
+  const endPrev = `${endPrevDate.getFullYear()}-${pad(endPrevDate.getMonth() + 1)}-${pad(endPrevDate.getDate())}`;
+
+  // Busca vendas por empresa para o mês atual e mês anterior (somaremos para obter totals)
+  const { data: vendasEmpresaCurrent } = useRelatorioVendasEmpresa(startCurrent, endCurrent);
+  const { data: vendasEmpresaPrev } = useRelatorioVendasEmpresa(startPrev, endPrev);
+
+  type VRow = { vl_total_vendas?: number; qt_pedidos?: number };
+  const sumVendas = (rows?: VRow[]) => (rows || []).reduce((s, r) => s + Number(r?.vl_total_vendas || 0), 0);
+  const sumPedidos = (rows?: VRow[]) => (rows || []).reduce((s, r) => s + Number(r?.qt_pedidos || 0), 0);
+
+  const vendasCurrentTotal = sumVendas(vendasEmpresaCurrent);
+  const vendasPrevTotal = sumVendas(vendasEmpresaPrev);
+  const pedidosCurrentTotal = sumPedidos(vendasEmpresaCurrent);
+  const pedidosPrevTotal = sumPedidos(vendasEmpresaPrev);
+
+  const calcPercentChange = (current: number, previous: number): number | null => {
+    if (previous === 0) {
+      if (current === 0) return 0;
+      return null; // sem comparação válida (novo)
+    }
+    return ((current - previous) / Math.abs(previous)) * 100;
+  };
+
+  const mockTrends = useMemo(() => ({
+    faturamento: calcPercentChange(vendasCurrentTotal, vendasPrevTotal),
+    pedidos: calcPercentChange(pedidosCurrentTotal, pedidosPrevTotal),
+    ticket: (() => {
+      const ticketCurrent = pedidosCurrentTotal > 0 ? vendasCurrentTotal / pedidosCurrentTotal : 0;
+      const ticketPrev = pedidosPrevTotal > 0 ? vendasPrevTotal / pedidosPrevTotal : 0;
+      return calcPercentChange(ticketCurrent, ticketPrev);
+    })(),
+    comissoes: 0, // Se quiser comissões, precisamos somar a view de comissões por mês (poderia usar useRelatorioComissoes)
+  }), [vendasCurrentTotal, vendasPrevTotal, pedidosCurrentTotal, pedidosPrevTotal]);
+
+  // Evolução de vendas (real, últimos 12 meses)
+  const graficoData = useMemo(
+    () => evolucaoVendas || [
+      { mes: 'Jan', valor: 0 },
+      { mes: 'Fev', valor: 0 },
+      { mes: 'Mar', valor: 0 },
+      { mes: 'Abr', valor: 0 },
+      { mes: 'Mai', valor: 0 },
+      { mes: 'Jun', valor: 0 },
     ],
-    [kpis?.vendas_mes_atual]
+    [evolucaoVendas]
   );
 
   const metasMock = useMemo(
@@ -217,55 +262,18 @@ export const PaginaDashboardGestor: React.FC = () => {
               Evolução de Vendas
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Últimos 6 meses (Simulado)
+              Últimos 12 meses
             </Typography>
 
-            <Box
-              sx={{
-                display: 'flex',
-                alignItems: 'flex-end',
-                justifyContent: 'space-around',
-                height: 280,
-                gap: 1,
-              }}
-            >
-              {evolucaoMock.map((item, idx) => {
-                const maxValor = Math.max(...evolucaoMock.map((e) => e.valor));
-                const altura = (item.valor / maxValor) * 100;
-                const isCurrent = idx === evolucaoMock.length - 1;
-
-                return (
-                  <Box
-                    key={item.mes}
-                    sx={{
-                      flex: 1,
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: 1,
-                    }}
-                  >
-                    <Tooltip title={formatCurrency(item.valor)} arrow>
-                      <Box
-                        sx={{
-                          width: '100%',
-                          height: `${altura}%`,
-                          bgcolor: isCurrent ? 'primary.main' : 'primary.light',
-                          opacity: isCurrent ? 1 : 0.5,
-                          borderRadius: '6px 6px 0 0',
-                          transition: 'all 0.3s ease-in-out',
-                          cursor: 'pointer',
-                          '&:hover': { opacity: 1, transform: 'scaleY(1.02)' },
-                        }}
-                      />
-                    </Tooltip>
-                    <Typography variant="caption" color="text.secondary" fontWeight={500}>
-                      {item.mes}
-                    </Typography>
-                  </Box>
-                );
-              })}
-            </Box>
+            <ResponsiveContainer width="100%" height={280}>
+              <LineChart data={graficoData} margin={{ top: 20, right: 30, left: 60, bottom: 20 }}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="mes" />
+                <YAxis tickFormatter={(v) => formatCurrency(Number(v))} />
+                <RechartsTooltip formatter={(value: number) => formatCurrency(Number(value))} />
+                <Line type="monotone" dataKey="valor" stroke="#1976d2" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              </LineChart>
+            </ResponsiveContainer>
           </Paper>
         </Grid>
 
@@ -347,68 +355,31 @@ export const PaginaDashboardGestor: React.FC = () => {
         <Typography variant="h6" fontWeight={600} gutterBottom>
           Ranking de Vendedores
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
           Baseado nas vendas aprovadas deste mês
         </Typography>
 
         {loadingRanking ? (
           <LinearProgress sx={{ borderRadius: 1 }} />
+        ) : ranking && ranking.length > 0 ? (
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart data={ranking} margin={{ top: 20, right: 30, left: 80, bottom: 80 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="no_vendedor" 
+                angle={-45}
+                textAnchor="end"
+                height={100}
+              />
+              <YAxis tickFormatter={(v) => formatCurrency(Number(v))} />
+              <RechartsTooltip formatter={(value: number) => formatCurrency(Number(value))} />
+              <Bar dataKey="vl_total_vendas" fill="#1976d2" name="Vendas" />
+            </BarChart>
+          </ResponsiveContainer>
         ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell width={100}>Posição</TableCell>
-                  <TableCell>Vendedor</TableCell>
-                  <TableCell align="right">Vendas</TableCell>
-                  <TableCell align="right">Pedidos</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {ranking?.map((vendedor, index) => (
-                  <TableRow key={vendedor.id_usuario} hover>
-                    <TableCell>
-                      <Chip
-                        label={`#${index + 1}`}
-                        size="small"
-                        color={index === 0 ? 'primary' : 'default'}
-                        sx={{ fontWeight: 700, minWidth: 48 }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                        <Avatar sx={{ width: 36, height: 36, fontSize: '0.875rem', bgcolor: 'primary.light' }}>
-                          {vendedor.no_vendedor?.[0]?.toUpperCase() || '?'}
-                        </Avatar>
-                        <Typography variant="body2" fontWeight={600}>
-                          {vendedor.no_vendedor}
-                        </Typography>
-                      </Box>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" fontWeight={600} color="success.main">
-                        {formatCurrency(vendedor.vl_total_vendas)}
-                      </Typography>
-                    </TableCell>
-                    <TableCell align="right">
-                      <Typography variant="body2" color="text.secondary">
-                        {vendedor.qt_pedidos}
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!ranking?.length && (
-                  <TableRow>
-                    <TableCell colSpan={4} align="center" sx={{ py: 4 }}>
-                      <Typography variant="body2" color="text.secondary">
-                        Nenhuma venda registrada neste mês.
-                      </Typography>
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
+            Nenhuma venda registrada neste mês.
+          </Typography>
         )}
       </Paper>
     </Box>

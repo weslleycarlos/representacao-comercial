@@ -1,29 +1,38 @@
 # /backend/src/services/email.py
 import os
 from pathlib import Path
-from typing import List, Dict, Any
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+from typing import List, Dict, Any, Optional
+from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType, NameEmail
 from pydantic import EmailStr
 from starlette.background import BackgroundTasks
 
 from src.models import models
-from src.core.config import (
-    settings,
-)  # Ou use os.getenv direto se não tiver settings centralizado
+from src.core.config import settings
 
-# Configuração
-conf = ConnectionConfig(
-    MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
-    MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
-    MAIL_FROM=os.getenv("MAIL_FROM"),
-    MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
-    MAIL_SERVER=os.getenv("MAIL_SERVER"),
-    MAIL_STARTTLS=True,
-    MAIL_SSL_TLS=False,
-    USE_CREDENTIALS=True,
-    VALIDATE_CERTS=True,
-    TEMPLATE_FOLDER=Path(__file__).parent.parent / "templates",  # Pasta /src/templates
-)
+# Configuração lazy: criada apenas quando necessário
+_conf: Optional[ConnectionConfig] = None
+
+
+def get_email_config() -> ConnectionConfig:
+    """
+    Retorna a configuração de email, criando-a apenas na primeira chamada.
+    Isso garante que as variáveis de ambiente foram carregadas do .env antes.
+    """
+    global _conf
+    if _conf is None:
+        _conf = ConnectionConfig(
+            MAIL_USERNAME=os.getenv("MAIL_USERNAME"),
+            MAIL_PASSWORD=os.getenv("MAIL_PASSWORD"),
+            MAIL_FROM=os.getenv("MAIL_FROM"),
+            MAIL_PORT=int(os.getenv("MAIL_PORT", 587)),
+            MAIL_SERVER=os.getenv("MAIL_SERVER"),
+            MAIL_STARTTLS=True,
+            MAIL_SSL_TLS=False,
+            USE_CREDENTIALS=True,
+            VALIDATE_CERTS=True,
+            TEMPLATE_FOLDER=Path(__file__).parent.parent / "templates",
+        )
+    return _conf
 
 
 class EmailService:
@@ -68,7 +77,7 @@ class EmailService:
             subtype=MessageType.html,
         )
 
-        fm = FastMail(conf)
+        fm = FastMail(get_email_config())
 
         # Envia em background para não travar a API
         background_tasks.add_task(
@@ -91,7 +100,7 @@ class EmailService:
             subtype=MessageType.html,
         )
 
-        fm = FastMail(conf)
+        fm = FastMail(get_email_config())
         background_tasks.add_task(
             fm.send_message, message, template_name="recuperacao_senha.html"
         )

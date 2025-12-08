@@ -52,6 +52,204 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({
     }
   };
 
+  const handlePrint = () => {
+    if (!pedido) return;
+
+    // Cria uma janela oculta para impressão
+    const printWindow = window.open('', '', 'width=900,height=600');
+    if (!printWindow) {
+      alert('Não foi possível abrir a janela de impressão. Verifique se pop-ups estão bloqueados.');
+      return;
+    }
+
+    const itensHTML = pedido.itens?.map(item => `
+      <tr>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: left;">
+          <strong>${item.produto?.ds_produto || 'Produto Indisponível'}</strong><br>
+          Cód: ${item.produto?.cd_produto || '-'}
+        </td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.qt_quantidade}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: right;">${formatCurrency(item.vl_unitario)}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: center;">${item.pc_desconto_item > 0 ? `-${item.pc_desconto_item}%` : '-'}</td>
+        <td style="border: 1px solid #ddd; padding: 8px; text-align: right; font-weight: bold;">${formatCurrency(item.vl_total_item)}</td>
+      </tr>
+    `).join('') || '';
+
+    const dataFormatada = pedido.dt_pedido 
+      ? new Date(pedido.dt_pedido).toLocaleDateString('pt-BR', {
+          day: '2-digit',
+          month: 'long',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      : '-';
+
+    const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>Pedido #${pedido.nr_pedido || pedido.id_pedido}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: Arial, sans-serif; padding: 20px; background-color: white; }
+          .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+          .header h1 { font-size: 28px; margin-bottom: 5px; }
+          .header p { color: #666; font-size: 12px; }
+          
+          .status-badge {
+            display: inline-block;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-weight: bold;
+            font-size: 12px;
+            margin-top: 10px;
+          }
+          .status-success { background-color: #4caf50; color: white; }
+          .status-error { background-color: #f44336; color: white; }
+          .status-warning { background-color: #ff9800; color: white; }
+          .status-info { background-color: #2196f3; color: white; }
+          .status-default { background-color: #9e9e9e; color: white; }
+          
+          .section { margin-bottom: 25px; }
+          .section-title { font-size: 14px; font-weight: bold; background-color: #f5f5f5; padding: 10px; border-left: 4px solid #1976d2; margin-bottom: 10px; }
+          
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+          .grid-item { padding: 10px 0; }
+          .grid-item label { display: block; font-size: 12px; color: #666; margin-bottom: 2px; }
+          .grid-item span { display: block; font-size: 13px; font-weight: 500; }
+          
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background-color: #f5f5f5; border: 1px solid #ddd; padding: 10px; text-align: left; font-size: 12px; font-weight: bold; }
+          td { border: 1px solid #ddd; padding: 8px; font-size: 12px; }
+          
+          .totals { text-align: right; margin-top: 20px; padding-top: 20px; border-top: 2px solid #333; }
+          .total-row { display: flex; justify-content: flex-end; margin-bottom: 10px; gap: 40px; }
+          .total-label { font-weight: bold; min-width: 150px; }
+          .total-value { text-align: right; min-width: 120px; }
+          .grand-total { font-size: 18px; font-weight: bold; color: #1976d2; }
+          
+          .observations { background-color: #fff9e6; border-left: 4px solid #ff9800; padding: 10px; margin-top: 20px; font-size: 12px; }
+          .observations label { display: block; font-weight: bold; margin-bottom: 5px; }
+          
+          .footer { margin-top: 30px; border-top: 1px solid #ddd; padding-top: 20px; text-align: center; font-size: 11px; color: #999; }
+          
+          @media print {
+            body { padding: 0; }
+            .no-print { display: none; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h1>PEDIDO #${pedido.nr_pedido || pedido.id_pedido}</h1>
+          <p>Realizado em: ${dataFormatada}</p>
+          <span class="status-badge status-${pedido.st_pedido?.toLowerCase() || 'default'}">
+            ${(pedido.st_pedido || 'desconhecido').replace(/_/g, ' ').toUpperCase()}
+          </span>
+        </div>
+
+        <div class="section">
+          <div class="section-title">👤 DADOS DO CLIENTE</div>
+          <div class="grid-2">
+            <div class="grid-item">
+              <label>Razão Social</label>
+              <span>${pedido.cliente?.no_razao_social || '-'}</span>
+              <label style="margin-top: 8px;">Fantasia</label>
+              <span>${pedido.cliente?.no_fantasia || '-'}</span>
+              <label style="margin-top: 8px;">CNPJ</label>
+              <span>${pedido.cliente?.nr_cnpj || '-'}</span>
+            </div>
+            <div class="grid-item">
+              <label>Email</label>
+              <span>${pedido.cliente?.ds_email || '-'}</span>
+              <label style="margin-top: 8px;">Telefone</label>
+              <span>${pedido.cliente?.nr_telefone || '-'}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="grid-2">
+            <div>
+              <div class="section-title">📍 ENDEREÇO DE ENTREGA</div>
+              ${pedido.endereco_entrega ? `
+                <div class="grid-item">
+                  <span>${pedido.endereco_entrega.ds_logradouro}, ${pedido.endereco_entrega.nr_endereco}</span>
+                  <span>${pedido.endereco_entrega.no_bairro} - ${pedido.endereco_entrega.no_cidade}/${pedido.endereco_entrega.sg_estado}</span>
+                  <span>CEP: ${pedido.endereco_entrega.nr_cep}</span>
+                </div>
+              ` : '<span style="color: red;">Não informado</span>'}
+            </div>
+            <div>
+              <div class="section-title">📄 ENDEREÇO DE COBRANÇA</div>
+              ${pedido.endereco_cobranca ? `
+                <div class="grid-item">
+                  <span>${pedido.endereco_cobranca.ds_logradouro}, ${pedido.endereco_cobranca.nr_endereco}</span>
+                  <span>${pedido.endereco_cobranca.no_bairro} - ${pedido.endereco_cobranca.no_cidade}/${pedido.endereco_cobranca.sg_estado}</span>
+                  <span>CEP: ${pedido.endereco_cobranca.nr_cep}</span>
+                </div>
+              ` : '<span style="color: red;">Não informado</span>'}
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">🛒 ITENS DO PEDIDO</div>
+          <table>
+            <thead>
+              <tr>
+                <th>Produto</th>
+                <th style="width: 80px; text-align: center;">Qtd</th>
+                <th style="width: 100px; text-align: right;">Unitário</th>
+                <th style="width: 100px; text-align: center;">Desc. (%)</th>
+                <th style="width: 120px; text-align: right;">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itensHTML}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="section">
+          ${pedido.ds_observacoes ? `
+            <div class="observations">
+              <label>📝 OBSERVAÇÕES:</label>
+              <p>${pedido.ds_observacoes.replace(/\n/g, '<br>')}</p>
+            </div>
+          ` : ''}
+          
+          <div class="totals">
+            <div class="total-row">
+              <span class="total-label">Forma de Pagamento:</span>
+              <span class="total-value">${pedido.forma_pagamento?.no_forma_pagamento || 'N/A'}</span>
+            </div>
+            <div class="total-row" style="border-top: 1px solid #ddd; padding-top: 10px;">
+              <span class="total-label grand-total">TOTAL:</span>
+              <span class="total-value grand-total">${formatCurrency(pedido.vl_total)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">
+          <p>Documento gerado em: ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</p>
+        </div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+
+    // Aguarda o carregamento antes de chamar print
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
   const isResending = externalIsResending !== undefined ? externalIsResending : internalIsResending;
 
   // Loading state
@@ -321,6 +519,7 @@ export const ModalDetalhePedido: React.FC<ModalDetalhePedidoProps> = ({
           color="inherit"
           variant="outlined"
           size="large"
+          onClick={handlePrint}
         >
           Imprimir
         </Button>

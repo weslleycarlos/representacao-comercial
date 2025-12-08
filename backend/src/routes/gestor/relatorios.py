@@ -115,12 +115,32 @@ def get_relatorio_vendas_vendedor(
     end_date: Optional[date] = Query(None)
 ):
     """ Relatório de Vendas por Vendedor (filtrável por data) """
-    start, end = get_date_filters(start_date, end_date)
-
-    dados = db.query(models.VwVendasVendedorMes).filter(
-        models.VwVendasVendedorMes.id_organizacao == id_organizacao,
-        models.VwVendasVendedorMes.dt_mes_referencia.between(start, end)
-    ).order_by(models.VwVendasVendedorMes.vl_total_vendas.desc()).all()
+    # Se datas não fornecidas, retorna apenas o mês atual
+    if not start_date or not end_date:
+        hoje = datetime.utcnow()
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        dados = db.query(models.VwVendasVendedorMes).filter(
+            models.VwVendasVendedorMes.id_organizacao == id_organizacao,
+            extract('year', models.VwVendasVendedorMes.dt_mes_referencia) == ano_atual,
+            extract('month', models.VwVendasVendedorMes.dt_mes_referencia) == mes_atual
+        ).order_by(models.VwVendasVendedorMes.vl_total_vendas.desc()).all()
+    else:
+        # Converte date para strings YYYY-MM-DD para comparação com a view (que retorna strings)
+        start_str = start_date.isoformat()
+        end_str = end_date.isoformat()
+        
+        print(f"[DEBUG] Filtrando vendas-vendedor entre {start_str} e {end_str}, org_id={id_organizacao}")
+        
+        # Filtra por intervalo de datas personalizado
+        dados = db.query(models.VwVendasVendedorMes).filter(
+            models.VwVendasVendedorMes.id_organizacao == id_organizacao,
+            models.VwVendasVendedorMes.dt_mes_referencia >= start_str,
+            models.VwVendasVendedorMes.dt_mes_referencia <= end_str
+        ).order_by(models.VwVendasVendedorMes.vl_total_vendas.desc()).all()
+        
+        print(f"[DEBUG] Encontrados {len(dados)} registros")
 
     return [VendaVendedorMesSchema.model_validate(d, from_attributes=True) for d in dados]
 
@@ -133,12 +153,32 @@ def get_relatorio_vendas_empresa(
     end_date: Optional[date] = Query(None)
 ):
     """ Relatório de Vendas por Empresa Representada (filtrável por data) """
-    start, end = get_date_filters(start_date, end_date)
-
-    dados = db.query(models.VwVendasEmpresaMes).filter(
-        models.VwVendasEmpresaMes.id_organizacao == id_organizacao,
-        models.VwVendasEmpresaMes.dt_mes_referencia.between(start, end)
-    ).order_by(models.VwVendasEmpresaMes.vl_total_vendas.desc()).all()
+    # Se datas não fornecidas, retorna apenas o mês atual
+    if not start_date or not end_date:
+        hoje = datetime.utcnow()
+        mes_atual = hoje.month
+        ano_atual = hoje.year
+        
+        dados = db.query(models.VwVendasEmpresaMes).filter(
+            models.VwVendasEmpresaMes.id_organizacao == id_organizacao,
+            extract('year', models.VwVendasEmpresaMes.dt_mes_referencia) == ano_atual,
+            extract('month', models.VwVendasEmpresaMes.dt_mes_referencia) == mes_atual
+        ).order_by(models.VwVendasEmpresaMes.vl_total_vendas.desc()).all()
+    else:
+        # Converte date para strings YYYY-MM-DD para comparação com a view (que retorna strings)
+        start_str = start_date.isoformat()
+        end_str = end_date.isoformat()
+        
+        print(f"[DEBUG] Filtrando vendas entre {start_str} e {end_str}, org_id={id_organizacao}")
+        
+        # Filtra por intervalo de datas personalizado
+        dados = db.query(models.VwVendasEmpresaMes).filter(
+            models.VwVendasEmpresaMes.id_organizacao == id_organizacao,
+            models.VwVendasEmpresaMes.dt_mes_referencia >= start_str,
+            models.VwVendasEmpresaMes.dt_mes_referencia <= end_str
+        ).order_by(models.VwVendasEmpresaMes.vl_total_vendas.desc()).all()
+        
+        print(f"[DEBUG] Encontrados {len(dados)} registros")
 
     return [VendaEmpresaMesSchema.model_validate(d, from_attributes=True) for d in dados]
 

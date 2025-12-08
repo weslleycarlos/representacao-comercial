@@ -42,11 +42,23 @@ export const useGetVendedorKpis = () => {
 
 /**
  * Hook para buscar o Ranking de Vendas por Vendedor (para o Top Vendedores)
+ * Filtra por mês atual
  */
 export const useGetRankingVendedores = () => {
   const fetchRanking = async (): Promise<IVwVendasVendedor[]> => {
-    // Chama a rota de relatório que já criamos no backend
-    const { data } = await apiClient.get('/gestor/dashboard/relatorio/vendas-vendedor');
+    // Calcula o primeiro e último dia do mês atual
+    const hoje = new Date();
+    const primeiroDia = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+    const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0);
+
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const startDate = `${primeiroDia.getFullYear()}-${pad(primeiroDia.getMonth() + 1)}-${pad(primeiroDia.getDate())}`;
+    const endDate = `${ultimoDia.getFullYear()}-${pad(ultimoDia.getMonth() + 1)}-${pad(ultimoDia.getDate())}`;
+
+    // Chama a rota com datas do mês atual
+    const { data } = await apiClient.get('/gestor/dashboard/relatorio/vendas-vendedor', {
+      params: { start_date: startDate, end_date: endDate }
+    });
     return data;
   };
 
